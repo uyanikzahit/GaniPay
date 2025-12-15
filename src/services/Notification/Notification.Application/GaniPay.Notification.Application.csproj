@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Notification.Domain\GaniPay.Notification.Domain.csproj" />
+    <ProjectReference Include="..\..\..\building-blocks\GaniPay.SharedKernel\GaniPay.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\..\building-blocks\GaniPay.Common\GaniPay.Common.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,6 @@
+@GaniPay.Identity.API_HostAddress = http://localhost:5021
+
+GET {{GaniPay.Identity.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

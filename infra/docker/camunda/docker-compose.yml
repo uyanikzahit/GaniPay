@@ -1,0 +1,109 @@
+services:
+  # Camunda 8 - Orchestration (Zeebe + Operate + Tasklist) tek container
+  orchestration:
+    image: camunda/camunda:${CAMUNDA_VERSION}
+    ports:
+      - "26500:26500"   # Zeebe gRPC
+      - "9600:9600"     # Actuator
+      - "8081:8080"     # Operate + Tasklist (tek port)
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/9600'"]
+      interval: 5s
+      retries: 120
+      start_period: 80s
+      timeout: 3s
+    volumes:
+      - zeebe:/usr/local/zeebe/data
+    configs:
+      - source: orchestration-config
+        target: /usr/local/camunda/config/application.yaml
+    networks:
+      - ganipay-net
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  # Elasticsearch (Camunda secondary storage)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION}
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - cluster.routing.allocation.disk.threshold_enabled=false
+      - action.auto_create_index=true
+      # Windows/WSL2 ortamlarında stabilite için:
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=2s' | grep -Eq '\"status\":\"(yellow|green)\"'"]
+      interval: 5s
+      retries: 60
+      start_period: 40s
+      timeout: 3s
+    volumes:
+      - elastic:/usr/share/elasticsearch/data
+    networks:
+      - ganipay-net
+
+
+  # GaniPay DB (dev ortamı için tek Postgres)
+  postgres:
+    image: postgres:${POSTGRES_VERSION}
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=${GANIPAY_POSTGRES_USER}
+      - POSTGRES_PASSWORD=${GANIPAY_POSTGRES_PASSWORD}
+      - POSTGRES_DB=${GANIPAY_POSTGRES_DEFAULT_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - ganipay-net
+
+volumes:
+  zeebe:
+  elastic:
+  pgdata:
+
+networks:
+  ganipay-net:
+
+configs:
+  orchestration-config:
+    content: |
+      management.endpoints.configprops.show-values: always
+
+      camunda:
+        system:
+          cpu-thread-count: "3"
+          io-thread-count: "3"
+
+        security:
+          authentication:
+            method: "basic"
+            unprotectedApi: true
+          authorizations:
+            enabled: false
+
+          initialization:
+            users:
+              - username: "demo"
+                password: "demo"
+                name: "Demo User"
+                email: "demo@demo.com"
+            defaultRoles.admin.users:
+              - "demo"
+
+        database.index.numberOfReplicas: 0
+
+        data:
+          secondary-storage:
+            type: elasticsearch
+            elasticsearch:
+              url: "http://elasticsearch:9200"
