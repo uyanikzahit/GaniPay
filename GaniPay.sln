@@ -163,6 +163,15 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Workflow.PaymentProcessWork
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GaniPay.Workflow.PaymentProcessWorker", "src\workflow\Workflow.PaymentProcessWorker\GaniPay.Workflow.PaymentProcessWorker.csproj", "{C7410BDC-3E78-498F-AF87-4E21A26384F9}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Contracts", "Contracts", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+	ProjectSection(SolutionItems) = preProject
+		CreateCustomerRequest.cs = CreateCustomerRequest.cs
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Dtos", "Dtos", "{92CBDD83-7F04-47EA-93D6-24C55FFAEB05}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Enums", "Enums", "{EF6AF649-0F16-40AA-8962-EDA86977A8CB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -677,5 +686,11 @@ Global
 		{5581274B-02F6-C591-4A9B-D5600EAF20C0} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{E8687983-3E8E-864E-6D5A-7E52E5F6A8E1} = {5581274B-02F6-C591-4A9B-D5600EAF20C0}
 		{C7410BDC-3E78-498F-AF87-4E21A26384F9} = {E8687983-3E8E-864E-6D5A-7E52E5F6A8E1}
+		{02EA681E-C7D8-13C7-8484-4AC65E1B71E8} = {63C50384-33C9-88E5-5F6D-FFEDAB5EA349}
+		{92CBDD83-7F04-47EA-93D6-24C55FFAEB05} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+		{EF6AF649-0F16-40AA-8962-EDA86977A8CB} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {65C888F5-C115-40B8-91C0-BD5F26B2BEAF}
 	EndGlobalSection
 EndGlobal
