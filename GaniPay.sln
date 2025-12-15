@@ -166,9 +166,17 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Contracts", "Contracts", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 	ProjectSection(SolutionItems) = preProject
 		CreateCustomerRequest.cs = CreateCustomerRequest.cs
+		UpdateCustomerRequest.cs = UpdateCustomerRequest.cs
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Dtos", "Dtos", "{92CBDD83-7F04-47EA-93D6-24C55FFAEB05}"
+	ProjectSection(SolutionItems) = preProject
+		AddressDto.cs = AddressDto.cs
+		CustomerDto.cs = CustomerDto.cs
+		EmailDto.cs = EmailDto.cs
+		IndividualCustomerDto.cs = IndividualCustomerDto.cs
+		PhoneDto.cs = PhoneDto.cs
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Enums", "Enums", "{EF6AF649-0F16-40AA-8962-EDA86977A8CB}"
 EndProject
