@@ -16,7 +16,7 @@ public static class ServiceCollectionExtensions
         var cs = configuration.GetConnectionString("IdentityDb");
         if (string.IsNullOrWhiteSpace(cs))
             throw new InvalidOperationException("ConnectionStrings:IdentityDb tanýmlý deðil.");
-
+        
         services.AddDbContext<IdentityDbContext>(opt =>
         {
             opt.UseNpgsql(cs);
