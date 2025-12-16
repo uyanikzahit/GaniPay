@@ -1,10 +1,19 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\Identity.Application\GaniPay.Identity.Application.csproj" />
     <ProjectReference Include="..\Identity.Domain\GaniPay.Identity.Domain.csproj" />
     <ProjectReference Include="..\..\..\building-blocks\GaniPay.SharedKernel\GaniPay.SharedKernel.csproj" />
     <ProjectReference Include="..\..\..\building-blocks\GaniPay.Common\GaniPay.Common.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.0" />
   </ItemGroup>
 
   <PropertyGroup>

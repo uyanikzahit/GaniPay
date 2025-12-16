@@ -26,6 +26,15 @@ var customers = new Dictionary<Guid, CustomerDto>();
 // POST /api/v1/customers
 app.MapPost("/api/v1/customers", (CreateCustomerRequest req) =>
 {
+    // Register akýþýna uygun minimal zorunluluklar:
+    // - En az 1 telefon
+    // - En az 1 email
+    if (req.Phones is null || req.Phones.Count == 0)
+        return Results.BadRequest(new { message = "At least one phone is required." });
+
+    if (req.Emails is null || req.Emails.Count == 0)
+        return Results.BadRequest(new { message = "At least one email is required." });
+
     var now = DateTime.UtcNow;
     var id = Guid.NewGuid();
 

@@ -1,6 +1,3 @@
 ﻿namespace GaniPay.Identity.Infrastructure;
 
-public class Class1
-{
-
-}
+public sealed class InfrastructureMarker { }
