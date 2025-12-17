@@ -1,52 +1,55 @@
 ﻿using System.Security.Cryptography;
+using Microsoft.AspNetCore.Cryptography.KeyDerivation;
 
 namespace GaniPay.Identity.Application.Security;
 
 public sealed class PasswordHasher : IPasswordHasher
 {
-    // MVP için güvenli ve dependency'siz: PBKDF2
-    private const int SaltSize = 16;       // 128-bit
-    private const int KeySize = 32;        // 256-bit
+    private const string Algo = "PBKDF2-HMACSHA256";
     private const int Iterations = 100_000;
+    private const int SaltSize = 16;
+    private const int KeySize = 32;
 
-    public string Hash(string password)
+    public (string hash, string salt, string algo) Hash(string password)
     {
         if (string.IsNullOrWhiteSpace(password))
             throw new ArgumentException("Password is required.", nameof(password));
 
-        var salt = RandomNumberGenerator.GetBytes(SaltSize);
+        var saltBytes = RandomNumberGenerator.GetBytes(SaltSize);
 
-        var subkey = Rfc2898DeriveBytes.Pbkdf2(
-            password,
-            salt,
-            Iterations,
-            HashAlgorithmName.SHA256,
-            KeySize);
+        var key = KeyDerivation.Pbkdf2(
+            password: password,
+            salt: saltBytes,
+            prf: KeyDerivationPrf.HMACSHA256,
+            iterationCount: Iterations,
+            numBytesRequested: KeySize
+        );
 
-        // Format: PBKDF2$iter$saltB64$subkeyB64
-        return $"PBKDF2${Iterations}${Convert.ToBase64String(salt)}${Convert.ToBase64String(subkey)}";
+        return (Convert.ToBase64String(key), Convert.ToBase64String(saltBytes), Algo);
     }
 
-    public bool Verify(string password, string passwordHash)
+    public bool Verify(string password, string hash, string salt, string algo)
     {
-        if (string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(passwordHash))
-            return false;
+        if (algo != Algo) return false;
+        if (string.IsNullOrWhiteSpace(password)) return false;
+        if (string.IsNullOrWhiteSpace(hash)) return false;
+        if (string.IsNullOrWhiteSpace(salt)) return false;
 
-        var parts = passwordHash.Split('$');
-        if (parts.Length != 4) return false;
-        if (!string.Equals(parts[0], "PBKDF2", StringComparison.OrdinalIgnoreCase)) return false;
-        if (!int.TryParse(parts[1], out var iter)) return false;
+        var saltBytes = Convert.FromBase64String(salt);
 
-        var salt = Convert.FromBase64String(parts[2]);
-        var expected = Convert.FromBase64String(parts[3]);
+        var key = KeyDerivation.Pbkdf2(
+            password: password,
+            salt: saltBytes,
+            prf: KeyDerivationPrf.HMACSHA256,
+            iterationCount: Iterations,
+            numBytesRequested: KeySize
+        );
 
-        var actual = Rfc2898DeriveBytes.Pbkdf2(
-            password,
-            salt,
-            iter,
-            HashAlgorithmName.SHA256,
-            expected.Length);
+        var computed = Convert.ToBase64String(key);
 
-        return CryptographicOperations.FixedTimeEquals(actual, expected);
+        return CryptographicOperations.FixedTimeEquals(
+            Convert.FromBase64String(hash),
+            Convert.FromBase64String(computed)
+        );
     }
 }

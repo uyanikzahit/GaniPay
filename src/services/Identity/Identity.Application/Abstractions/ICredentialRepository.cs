@@ -1,12 +1,13 @@
 using GaniPay.Identity.Domain.Entities;
 
-namespace GaniPay.Identity.Infrastructure.Repositories.Abstractions;
+namespace GaniPay.Identity.Application.Abstractions;
 
 public interface ICredentialRepository
 {
+    Task<bool> ExistsByLoginAsync(string loginType, string loginValue, CancellationToken ct = default);
+    Task<Credential?> GetByLoginAsync(string loginType, string loginValue, CancellationToken ct = default);
     Task<Credential?> GetByIdAsync(Guid id, CancellationToken ct = default);
-    Task<Credential?> GetByPhoneAsync(string phone, CancellationToken ct = default);
+
     Task AddAsync(Credential entity, CancellationToken ct = default);
-    Task UpdateAsync(Credential entity, CancellationToken ct = default);
     Task SaveChangesAsync(CancellationToken ct = default);
 }

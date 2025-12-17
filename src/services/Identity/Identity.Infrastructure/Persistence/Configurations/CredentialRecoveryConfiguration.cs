@@ -1,4 +1,4 @@
-using GaniPay.Identity.Domain.Entities;
+﻿using GaniPay.Identity.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -6,27 +6,31 @@ namespace GaniPay.Identity.Infrastructure.Persistence.Configurations;
 
 public sealed class CredentialRecoveryConfiguration : IEntityTypeConfiguration<CredentialRecovery>
 {
-    public void Configure(EntityTypeBuilder<CredentialRecovery> b)
+    public void Configure(EntityTypeBuilder<CredentialRecovery> builder)
     {
-        b.ToTable("identity_credential_recovery");
+        builder.ToTable("identity_credential_recovery");
 
-        b.HasKey(x => x.Id);
-        b.Property(x => x.Id).ValueGeneratedNever();
+        builder.HasKey(x => x.Id);
 
-        b.Property(x => x.CredentialId).IsRequired();
-        b.Property(x => x.Channel).HasConversion<int>().IsRequired();
+        builder.Property(x => x.Id).HasColumnName("id");
+        builder.Property(x => x.CredentialId).HasColumnName("credential_id");
 
-        b.Property(x => x.TokenHash).HasMaxLength(512).IsRequired();
-        b.Property(x => x.ExpiresAt).IsRequired();
-        b.Property(x => x.UsedAt);
+        // ✅ DB'de channel varchar/text ise enum'u STRING olarak sakla/oku
+        builder.Property(x => x.Channel)
+            .HasColumnName("channel")
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .IsRequired();
 
-        b.Property(x => x.CreatedAt).IsRequired();
+        builder.Property(x => x.TokenHash)
+            .HasColumnName("token_hash")
+            .IsRequired();
 
-        b.HasIndex(x => x.CredentialId);
+        builder.Property(x => x.ExpiresAt).HasColumnName("expires_at");
+        builder.Property(x => x.UsedAt).HasColumnName("used_at");
+        builder.Property(x => x.CreatedAt).HasColumnName("created_at");
 
-        b.HasOne<Credential>()
-            .WithMany()
-            .HasForeignKey(x => x.CredentialId)
-            .OnDelete(DeleteBehavior.Cascade);
+        builder.HasIndex(x => x.TokenHash)
+            .HasDatabaseName("ix_identity_credential_recovery_token_hash");
     }
 }
