@@ -1,10 +1,8 @@
 using GaniPay.Customer.Application.Contracts.Enums;
 
-namespace GaniPay.Customer.Application.Contracts.Dtos;
+namespace GaniPay.Customer.Application.Contracts.Requests;
 
-public sealed record AddressDto(
-    Guid Id,
-    Guid CustomerId,
+public sealed record AddAddressRequest(
     AddressType AddressType,
     string City,
     string District,

@@ -1,7 +1,11 @@
-﻿namespace GaniPay.Customer.Application.Contracts.Dtos;
+using GaniPay.Customer.Application.Contracts.Enums;
 
-public sealed record class EmailDto
-{
-    public string Email { get; init; } = default!;
-    public int Type { get; init; }
-}
+namespace GaniPay.Customer.Application.Contracts.Dtos;
+
+public sealed record EmailDto(
+    Guid Id,
+    Guid CustomerId,
+    string EmailAddress,
+    EmailType Type,
+    bool IsVerified
+);

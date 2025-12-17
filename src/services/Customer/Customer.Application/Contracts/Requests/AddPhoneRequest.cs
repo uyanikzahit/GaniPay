@@ -1,10 +1,8 @@
 using GaniPay.Customer.Application.Contracts.Enums;
 
-namespace GaniPay.Customer.Application.Contracts.Dtos;
+namespace GaniPay.Customer.Application.Contracts.Requests;
 
-public sealed record PhoneDto(
-    Guid Id,
-    Guid CustomerId,
+public sealed record AddPhoneRequest(
     string CountryCode,
     string PhoneNumber,
     PhoneType Type

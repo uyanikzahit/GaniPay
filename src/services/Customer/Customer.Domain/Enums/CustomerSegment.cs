@@ -1,4 +1,4 @@
-namespace GaniPay.Customer.Application.Contracts.Enums;
+namespace GaniPay.Customer.Domain.Enums;
 
 public enum CustomerSegment
 {

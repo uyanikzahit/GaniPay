@@ -1,14 +1,22 @@
-using GaniPay.Customer.Application.Contracts;
-using GaniPay.Customer.Application.Contracts.Dtos;
-using GaniPay.Customer.Application.Contracts.Enums;
+using GaniPay.Customer.Application.Services;
+using Microsoft.Extensions.DependencyInjection;
+using GaniPay.Customer.Infrastructure.DependencyInjection;
+using GaniPay.Customer.Application.Contracts.Requests;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Infrastructure (DbContext + Repos)
+builder.Services.AddCustomerInfrastructure(builder.Configuration);
+
+// Application Service
+builder.Services.AddScoped<ICustomerService, CustomerService>();
+
 var app = builder.Build();
+
+app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "customer" }));
 
 if (app.Environment.IsDevelopment())
 {
@@ -16,82 +24,62 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Health
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
-   .WithTags("System");
-
-// In-memory demo store (MVP)
-var customers = new Dictionary<Guid, CustomerDto>();
-
-// POST /api/v1/customers
-app.MapPost("/api/v1/customers", (CreateCustomerRequest req) =>
+app.MapPost("/api/v1/customers/individual", async (
+    ICustomerService service,
+    CreateIndividualCustomerRequest request,
+    CancellationToken ct) =>
 {
-    // Register akýþýna uygun minimal zorunluluklar:
-    // - En az 1 telefon
-    // - En az 1 email
-    if (req.Phones is null || req.Phones.Count == 0)
-        return Results.BadRequest(new { message = "At least one phone is required." });
+    var result = await service.CreateIndividualAsync(request, ct);
+    return Results.Created($"/api/v1/customers/{result.Id}", result);
+});
 
-    if (req.Emails is null || req.Emails.Count == 0)
-        return Results.BadRequest(new { message = "At least one email is required." });
-
-    var now = DateTime.UtcNow;
-    var id = Guid.NewGuid();
-
-    var customerNumber = string.IsNullOrWhiteSpace(req.CustomerNumber)
-        ? $"CUST-{now:yyyyMMddHHmmss}-{Random.Shared.Next(1000, 9999)}"
-        : req.CustomerNumber;
-
-    var dto = new CustomerDto
-    {
-        Id = id,
-        CustomerNumber = customerNumber,
-        Type = req.Type,
-        Segment = req.Segment,
-        Status = CustomerStatus.Active,
-        OpenDate = req.OpenDate,
-        CloseDate = null,
-        CloseReason = null,
-        CreatedAt = now,
-        UpdatedAt = now,
-        Individual = req.Individual,
-        Addresses = req.Addresses ?? [],
-        Phones = req.Phones ?? [],
-        Emails = req.Emails ?? []
-    };
-
-    customers[id] = dto;
-    return Results.Created($"/api/v1/customers/{id}", dto);
-})
-.WithTags("Customer");
-
-// GET /api/v1/customers/{id}
-app.MapGet("/api/v1/customers/{id:guid}", (Guid id) =>
+app.MapGet("/api/v1/customers/{customerId:guid}", async (
+    ICustomerService service,
+    Guid customerId,
+    CancellationToken ct) =>
 {
-    return customers.TryGetValue(id, out var dto)
-        ? Results.Ok(dto)
-        : Results.NotFound(new { message = "Customer not found", id });
-})
-.WithTags("Customer");
+    var result = await service.GetByIdAsync(customerId, ct);
+    return result is null ? Results.NotFound() : Results.Ok(result);
+});
 
-// PATCH /api/v1/customers/{id}
-app.MapPatch("/api/v1/customers/{id:guid}", (Guid id, UpdateCustomerRequest req) =>
+app.MapPost("/api/v1/customers/{customerId:guid}/emails", async (
+    ICustomerService service,
+    Guid customerId,
+    AddEmailRequest request,
+    CancellationToken ct) =>
 {
-    if (!customers.TryGetValue(id, out var existing))
-        return Results.NotFound(new { message = "Customer not found", id });
+    await service.AddEmailAsync(customerId, request, ct);
+    return Results.NoContent();
+});
 
-    var updated = existing with
-    {
-        Segment = req.Segment ?? existing.Segment,
-        Status = req.Status ?? existing.Status,
-        CloseDate = req.CloseDate ?? existing.CloseDate,
-        CloseReason = req.CloseReason ?? existing.CloseReason,
-        UpdatedAt = DateTime.UtcNow
-    };
+app.MapPost("/api/v1/customers/{customerId:guid}/phones", async (
+    ICustomerService service,
+    Guid customerId,
+    AddPhoneRequest request,
+    CancellationToken ct) =>
+{
+    await service.AddPhoneAsync(customerId, request, ct);
+    return Results.NoContent();
+});
 
-    customers[id] = updated;
-    return Results.Ok(updated);
-})
-.WithTags("Customer");
+app.MapPost("/api/v1/customers/{customerId:guid}/addresses", async (
+    ICustomerService service,
+    Guid customerId,
+    AddAddressRequest request,
+    CancellationToken ct) =>
+{
+    await service.AddAddressAsync(customerId, request, ct);
+    return Results.NoContent();
+});
+
+app.MapPost("/api/v1/customers/{customerId:guid}/close", async (
+    ICustomerService service,
+    Guid customerId,
+    CloseCustomerRequest request,
+    CancellationToken ct) =>
+{
+    await service.CloseAsync(customerId, request, ct);
+    return Results.NoContent();
+});
 
 app.Run();
