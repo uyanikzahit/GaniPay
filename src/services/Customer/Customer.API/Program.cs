@@ -1,13 +1,19 @@
+using GaniPay.Customer.Application.Contracts.Requests;
 using GaniPay.Customer.Application.Services;
 using GaniPay.Customer.Infrastructure.DependencyInjection;
-using GaniPay.Customer.Application.Contracts.Requests;
 using Microsoft.Extensions.DependencyInjection;
+using System.Text.Json.Serialization;
 
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.ConfigureHttpJsonOptions(o =>
+{
+    o.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 
 // Infrastructure (DbContext + Repos)
 builder.Services.AddCustomerInfrastructure(builder.Configuration);
