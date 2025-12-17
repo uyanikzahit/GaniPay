@@ -1,7 +1,8 @@
 using GaniPay.Customer.Application.Services;
-using Microsoft.Extensions.DependencyInjection;
 using GaniPay.Customer.Infrastructure.DependencyInjection;
 using GaniPay.Customer.Application.Contracts.Requests;
+using Microsoft.Extensions.DependencyInjection;
+
 
 var builder = WebApplication.CreateBuilder(args);
 

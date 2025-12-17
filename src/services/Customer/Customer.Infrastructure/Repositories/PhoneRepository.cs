@@ -7,10 +7,19 @@ namespace GaniPay.Customer.Infrastructure.Repositories;
 public sealed class PhoneRepository : IPhoneRepository
 {
     private readonly CustomerDbContext _db;
-    public PhoneRepository(CustomerDbContext db) => _db = db;
 
-    public async Task AddAsync(Phone entity, CancellationToken ct) =>
+    public PhoneRepository(CustomerDbContext db)
+    {
+        _db = db;
+    }
+
+    public async Task AddAsync(Phone entity, CancellationToken ct)
+    {
         await _db.Phones.AddAsync(entity, ct);
+    }
 
-    public Task SaveChangesAsync(CancellationToken ct) => _db.SaveChangesAsync(ct);
+    public async Task SaveChangesAsync(CancellationToken ct)
+    {
+        await _db.SaveChangesAsync(ct);
+    }
 }

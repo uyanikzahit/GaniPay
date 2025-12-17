@@ -1,15 +1,14 @@
-using GaniPay.Customer.Domain.Entities;
+using CustomerEntity = GaniPay.Customer.Domain.Entities.Customer;
 
 namespace GaniPay.Customer.Application.Abstractions;
 
 public interface ICustomerRepository
 {
-    Task<Customer?> GetByIdAsync(Guid id, CancellationToken ct);
-    Task<Customer?> GetByCustomerNumberAsync(string customerNumber, CancellationToken ct);
+    Task<CustomerEntity?> GetByIdAsync(Guid id, CancellationToken ct);
+    Task<CustomerEntity?> GetByCustomerNumberAsync(string customerNumber, CancellationToken ct);
 
-    // Individual kayýt tekilliði için (TCKN gibi)
     Task<bool> ExistsByIdentityNumberAsync(string identityNumber, CancellationToken ct);
 
-    Task AddAsync(Customer customer, CancellationToken ct);
+    Task AddAsync(CustomerEntity customer, CancellationToken ct);
     Task SaveChangesAsync(CancellationToken ct);
 }

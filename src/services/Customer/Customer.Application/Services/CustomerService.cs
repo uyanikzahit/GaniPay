@@ -32,23 +32,24 @@ public sealed class CustomerService : ICustomerService
         if (string.IsNullOrWhiteSpace(request.IdentityNumber))
             throw new ArgumentException("IdentityNumber zorunludur.");
 
-        if (await _customers.ExistsByIdentityNumberAsync(request.IdentityNumber.Trim(), ct))
-            throw new InvalidOperationException("Bu identityNumber ile müþteri zaten mevcut.");
-
         if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName))
             throw new ArgumentException("Ad/Soyad zorunludur.");
 
+        var identity = request.IdentityNumber.Trim();
+        if (await _customers.ExistsByIdentityNumberAsync(identity, ct))
+            throw new InvalidOperationException("Bu identityNumber ile müþteri zaten mevcut.");
+
         var customerId = Guid.NewGuid();
-        var customerNumber = GenerateCustomerNumber();
 
         var customer = new Domain.Entities.Customer
         {
             Id = customerId,
-            CustomerNumber = customerNumber,
+            CustomerNumber = GenerateCustomerNumber(),
             Type = DomainEnums.CustomerType.Individual,
             Segment = MapSegment(request.Segment),
             Status = DomainEnums.CustomerStatus.Active,
             OpenDate = DateOnly.FromDateTime(DateTime.UtcNow),
+
             Individual = new CustomerIndividual
             {
                 Id = Guid.NewGuid(),
@@ -57,7 +58,7 @@ public sealed class CustomerService : ICustomerService
                 LastName = request.LastName.Trim(),
                 BirthDate = request.BirthDate,
                 Nationality = request.Nationality.Trim(),
-                IdentityNumber = request.IdentityNumber.Trim()
+                IdentityNumber = identity
             }
         };
 
@@ -75,7 +76,8 @@ public sealed class CustomerService : ICustomerService
 
     public async Task AddEmailAsync(Guid customerId, AddEmailRequest request, CancellationToken ct)
     {
-        _ = await _customers.GetByIdAsync(customerId, ct) ?? throw new KeyNotFoundException("Customer bulunamadý.");
+        _ = await _customers.GetByIdAsync(customerId, ct)
+            ?? throw new KeyNotFoundException("Customer bulunamadý.");
 
         if (string.IsNullOrWhiteSpace(request.EmailAddress) || !request.EmailAddress.Contains('@'))
             throw new ArgumentException("Email formatý geçersiz.");
@@ -95,7 +97,8 @@ public sealed class CustomerService : ICustomerService
 
     public async Task AddPhoneAsync(Guid customerId, AddPhoneRequest request, CancellationToken ct)
     {
-        _ = await _customers.GetByIdAsync(customerId, ct) ?? throw new KeyNotFoundException("Customer bulunamadý.");
+        _ = await _customers.GetByIdAsync(customerId, ct)
+            ?? throw new KeyNotFoundException("Customer bulunamadý.");
 
         if (string.IsNullOrWhiteSpace(request.CountryCode) || string.IsNullOrWhiteSpace(request.PhoneNumber))
             throw new ArgumentException("Telefon alanlarý zorunludur.");
@@ -115,10 +118,14 @@ public sealed class CustomerService : ICustomerService
 
     public async Task AddAddressAsync(Guid customerId, AddAddressRequest request, CancellationToken ct)
     {
-        _ = await _customers.GetByIdAsync(customerId, ct) ?? throw new KeyNotFoundException("Customer bulunamadý.");
+        _ = await _customers.GetByIdAsync(customerId, ct)
+            ?? throw new KeyNotFoundException("Customer bulunamadý.");
 
         if (string.IsNullOrWhiteSpace(request.City) || string.IsNullOrWhiteSpace(request.District))
             throw new ArgumentException("Þehir/Ýlçe zorunludur.");
+
+        if (string.IsNullOrWhiteSpace(request.AddressLine1))
+            throw new ArgumentException("AddressLine1 zorunludur.");
 
         var entity = new Address
         {
@@ -137,7 +144,8 @@ public sealed class CustomerService : ICustomerService
 
     public async Task CloseAsync(Guid customerId, CloseCustomerRequest request, CancellationToken ct)
     {
-        var customer = await _customers.GetByIdAsync(customerId, ct) ?? throw new KeyNotFoundException("Customer bulunamadý.");
+        var customer = await _customers.GetByIdAsync(customerId, ct)
+            ?? throw new KeyNotFoundException("Customer bulunamadý.");
 
         if (customer.Status == DomainEnums.CustomerStatus.Closed)
             return;
@@ -149,6 +157,9 @@ public sealed class CustomerService : ICustomerService
         await _customers.SaveChangesAsync(ct);
     }
 
+    // --------------------------
+    // DTO MAP
+    // --------------------------
     private static CustomerDto ToCustomerDto(Domain.Entities.Customer c)
         => new(
             c.Id,
@@ -164,6 +175,9 @@ public sealed class CustomerService : ICustomerService
     private static string GenerateCustomerNumber()
         => $"CUST-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}".Substring(0, 26);
 
+    // --------------------------
+    // ENUM MAP
+    // --------------------------
     private static DomainEnums.CustomerSegment MapSegment(ContractEnums.CustomerSegment segment)
         => segment switch
         {

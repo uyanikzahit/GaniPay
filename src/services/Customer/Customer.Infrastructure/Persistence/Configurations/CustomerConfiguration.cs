@@ -1,79 +1,83 @@
-using GaniPay.Customer.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace GaniPay.Customer.Infrastructure.Persistence.Configurations;
+using CustomerEntity = GaniPay.Customer.Domain.Entities.Customer;
 
-public sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
+namespace GaniPay.Customer.Infrasturcture.Persistence.Configurations;
+
+public sealed class CustomerConfiguration : IEntityTypeConfiguration<CustomerEntity>
 {
-    public void Configure(EntityTypeBuilder<Customer> b)
+    public void Configure(EntityTypeBuilder<CustomerEntity> builder)
     {
-        b.ToTable("customer");
-        b.HasKey(x => x.Id);
+        builder.ToTable("customer");
 
-        b.Property(x => x.CustomerNumber)
+        builder.HasKey(x => x.Id);
+
+        builder.Property(x => x.CustomerNumber)
             .HasColumnName("customer_number")
             .HasMaxLength(50)
             .IsRequired();
 
-        b.Property(x => x.Type)
+        builder.HasIndex(x => x.CustomerNumber)
+            .IsUnique();
+
+        builder.Property(x => x.Type)
             .HasColumnName("type")
             .HasConversion<string>()
-            .HasMaxLength(30)
+            .HasMaxLength(20)
             .IsRequired();
 
-        b.Property(x => x.Segment)
+        builder.Property(x => x.Segment)
             .HasColumnName("segment")
             .HasConversion<string>()
-            .HasMaxLength(30)
+            .HasMaxLength(20)
             .IsRequired();
 
-        b.Property(x => x.Status)
+        builder.Property(x => x.Status)
             .HasColumnName("status")
             .HasConversion<string>()
-            .HasMaxLength(30)
+            .HasMaxLength(20)
             .IsRequired();
 
-        b.Property(x => x.OpenDate)
+        builder.Property(x => x.OpenDate)
             .HasColumnName("open_date")
-            .HasConversion(
-                v => v.ToDateTime(TimeOnly.MinValue),
-                v => DateOnly.FromDateTime(v))
             .IsRequired();
 
-        b.Property(x => x.CloseDate)
-            .HasColumnName("close_date")
-            .HasConversion(
-                v => v.HasValue ? v.Value.ToDateTime(TimeOnly.MinValue) : (DateTime?)null,
-                v => v.HasValue ? DateOnly.FromDateTime(v.Value) : (DateOnly?)null);
+        builder.Property(x => x.CloseDate)
+            .HasColumnName("close_date");
 
-        b.Property(x => x.CloseReason)
+        builder.Property(x => x.CloseReason)
             .HasColumnName("close_reason")
             .HasMaxLength(255);
 
-        b.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
-        b.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
+        builder.Property(x => x.CreatedAt)
+            .HasColumnName("created_at")
+            .IsRequired();
 
-        b.HasIndex(x => x.CustomerNumber).IsUnique();
+        builder.Property(x => x.UpdatedAt)
+            .HasColumnName("updated_at")
+            .IsRequired();
 
-        b.HasOne(x => x.Individual)
-            .WithOne(i => i.Customer)
-            .HasForeignKey<CustomerIndividual>(i => i.CustomerId)
+        // 1-1: Customer -> CustomerIndividual
+        builder.HasOne(x => x.Individual)
+            .WithOne(x => x.Customer)
+            .HasForeignKey<GaniPay.Customer.Domain.Entities.CustomerIndividual>(x => x.CustomerId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        b.HasMany(x => x.Emails)
-            .WithOne(e => e.Customer)
-            .HasForeignKey(e => e.CustomerId)
+        // 1-N: Customer -> Emails/Phones/Addresses
+        builder.HasMany(x => x.Emails)
+            .WithOne(x => x.Customer)
+            .HasForeignKey(x => x.CustomerId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        b.HasMany(x => x.Phones)
-            .WithOne(p => p.Customer)
-            .HasForeignKey(p => p.CustomerId)
+        builder.HasMany(x => x.Phones)
+            .WithOne(x => x.Customer)
+            .HasForeignKey(x => x.CustomerId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        b.HasMany(x => x.Addresses)
-            .WithOne(a => a.Customer)
-            .HasForeignKey(a => a.CustomerId)
+        builder.HasMany(x => x.Addresses)
+            .WithOne(x => x.Customer)
+            .HasForeignKey(x => x.CustomerId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

@@ -9,10 +9,12 @@ namespace GaniPay.Customer.Infrastructure.DependencyInjection;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddCustomerInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddCustomerInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration)
     {
-        var cs = configuration.GetConnectionString("CustomerDb");
-        services.AddDbContext<CustomerDbContext>(opt => opt.UseNpgsql(cs));
+        services.AddDbContext<CustomerDbContext>(options =>
+            options.UseNpgsql(configuration.GetConnectionString("CustomerDb")));
 
         services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<IEmailRepository, EmailRepository>();
