@@ -1,4 +1,6 @@
-﻿namespace GaniPay.TransactionLimit.Application.Contracts.Requests;
+﻿using GaniPay.TransactionLimit.Application.Contracts.Enums;
+
+namespace GaniPay.TransactionLimit.Application.Contracts.Requests;
 
 public sealed record CreateCustomerLimitRequest(
     Guid CustomerId,
@@ -7,7 +9,8 @@ public sealed record CreateCustomerLimitRequest(
     short? Month,
     short? Day,
     decimal Value,
-    string? Currency,
-    string Source, // system/admin/migration (string)
-    string? Reason
+    string Currency,
+    LimitSource Source,
+    string? Reason,
+    string? UpdatedBy
 );

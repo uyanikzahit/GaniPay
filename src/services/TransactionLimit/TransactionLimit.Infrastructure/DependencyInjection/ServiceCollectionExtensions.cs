@@ -15,7 +15,7 @@ public static class ServiceCollectionExtensions
         IConfiguration configuration)
     {
         // Connection string key'i senin standardına göre ayarlayacağız (ör: ConnectionStrings:TransactionLimitDb)
-        var cs = configuration.GetConnectionString("CustomerDb");
+        var cs = configuration.GetConnectionString("TransactionLimitDb");
 
         services.AddDbContext<TransactionLimitDbContext>(opt =>
         {
@@ -30,4 +30,6 @@ public static class ServiceCollectionExtensions
         return services;
     }
 }
+
+
 
