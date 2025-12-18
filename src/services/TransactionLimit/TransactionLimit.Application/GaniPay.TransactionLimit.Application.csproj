@@ -1,9 +1,17 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\TransactionLimit.Domain\GaniPay.TransactionLimit.Domain.csproj" />
     <ProjectReference Include="..\..\..\building-blocks\GaniPay.SharedKernel\GaniPay.SharedKernel.csproj" />
     <ProjectReference Include="..\..\..\building-blocks\GaniPay.Common\GaniPay.Common.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Abstractions\" />
+    <Folder Include="Contracts\Dtos\" />
+    <Folder Include="Contracts\Enums\" />
+    <Folder Include="Contracts\Requests\" />
+    <Folder Include="Services\" />
   </ItemGroup>
 
   <PropertyGroup>
