@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <None Include="Entities\ExpenseDefinition.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\..\building-blocks\GaniPay.SharedKernel\GaniPay.SharedKernel.csproj" />
   </ItemGroup>
 

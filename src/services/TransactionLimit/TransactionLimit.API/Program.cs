@@ -31,9 +31,8 @@ app.MapGet("/health", () => Results.Ok(new { service = "transaction-limit", stat
 // ---- Limit Definitions ----
 app.MapGet("/api/transaction-limit/limit-definitions", async (ITransactionLimitService svc, CancellationToken ct) =>
 {
-    // Not: listeleme için henüz method eklemediysek şimdilik boş döndürmeyelim
-    // Bu endpointi bir sonraki adımda tamamlayacağız.
-    return Results.Ok(new { message = "TODO: list endpoint will be implemented next step" });
+    var result = await svc.GetLimitDefinitionsAsync(ct);
+    return Results.Ok(result);
 });
 
 app.MapPost("/api/transaction-limit/limit-definitions", async (CreateLimitDefinitionRequest req, ITransactionLimitService svc, CancellationToken ct) =>
@@ -49,13 +48,16 @@ app.MapGet("/api/transaction-limit/customers/{customerId:guid}/limits", async (G
     return Results.Ok(result);
 });
 
-app.MapPost("/api/transaction-limit/customers/{customerId:guid}/limits", async (Guid customerId, CreateCustomerLimitRequest req, ITransactionLimitService svc, CancellationToken ct) =>
+app.MapPost("/api/transaction-limit/customers/{customerId:guid}/limits",
+async (Guid customerId, CreateCustomerLimitRequest req, ITransactionLimitService svc, CancellationToken ct) =>
 {
     if (customerId != req.CustomerId)
         return Results.BadRequest(new { message = "customerId path/body mismatch" });
 
     var result = await svc.CreateCustomerLimitAsync(req, ct);
-    return Results.Created($"/api/transaction-limit/customers/{customerId:guid}/limits/{result.Id}", result);
+
+    // ✅ BURASI ÖNEMLİ: {customerId:guid} YOK!
+    return Results.Created($"/api/transaction-limit/customers/{customerId}/limits/{result.Id}", result);
 });
 
 // ---- Check ----

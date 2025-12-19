@@ -2,7 +2,7 @@
 
 public sealed record LimitCheckResultDto(
     bool Allowed,
-    string Reason,
-    decimal? Limit,
-    decimal Requested
+    string Message,
+    decimal RequestedValue,
+    decimal? LimitValue
 );

@@ -10,12 +10,11 @@ namespace GaniPay.TransactionLimit.Infrastructure.DependencyInjection;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddTransactionLimitInfrastructure(
-        this IServiceCollection services,
-        IConfiguration configuration)
+    public static IServiceCollection AddTransactionLimitInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        // Connection string key'i senin standardına göre ayarlayacağız (ör: ConnectionStrings:TransactionLimitDb)
         var cs = configuration.GetConnectionString("TransactionLimitDb");
+        if (string.IsNullOrWhiteSpace(cs))
+            throw new InvalidOperationException("ConnectionStrings:TransactionLimitDb not found.");
 
         services.AddDbContext<TransactionLimitDbContext>(opt =>
         {
@@ -30,6 +29,3 @@ public static class ServiceCollectionExtensions
         return services;
     }
 }
-
-
-
