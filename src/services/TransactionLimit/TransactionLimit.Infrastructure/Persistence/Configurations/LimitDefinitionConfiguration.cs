@@ -1,27 +1,48 @@
-﻿using GaniPay.TransactionLimit.Application.Abstractions;
-using GaniPay.TransactionLimit.Domain.Entities;
-using GaniPay.TransactionLimit.Infrastructure.Persistence;
+﻿using GaniPay.TransactionLimit.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace GaniPay.TransactionLimit.Infrastructure.Repositories;
+namespace GaniPay.TransactionLimit.Infrastructure.Persistence.Configurations;
 
-public sealed class LimitDefinitionRepository : ILimitDefinitionRepository
+public sealed class LimitDefinitionConfiguration : IEntityTypeConfiguration<LimitDefinition>
 {
-    private readonly TransactionLimitDbContext _db;
-    public LimitDefinitionRepository(TransactionLimitDbContext db) => _db = db;
-
-    public Task<LimitDefinition?> GetByIdAsync(Guid id, CancellationToken ct = default)
-        => _db.LimitDefinitions.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
-
-    public Task<LimitDefinition?> GetByCodeAsync(string code, CancellationToken ct = default)
-        => _db.LimitDefinitions.AsNoTracking().FirstOrDefaultAsync(x => x.Code == code, ct);
-
-    public async Task<IReadOnlyList<LimitDefinition>> GetAllAsync(CancellationToken ct = default)
-        => await _db.LimitDefinitions.AsNoTracking().OrderBy(x => x.Code).ToListAsync(ct);
-
-    public async Task AddAsync(LimitDefinition entity, CancellationToken ct = default)
+    public void Configure(EntityTypeBuilder<LimitDefinition> builder)
     {
-        _db.LimitDefinitions.Add(entity);
-        await _db.SaveChangesAsync(ct);
+        builder.ToTable("limit_definition");
+
+        builder.HasKey(x => x.Id);
+
+        builder.Property(x => x.Id)
+            .HasColumnName("Id");
+
+        builder.Property(x => x.Code)
+            .HasColumnName("Code")
+            .HasMaxLength(100)
+            .IsRequired();
+
+        builder.HasIndex(x => x.Code).IsUnique();
+
+        builder.Property(x => x.Name)
+            .HasColumnName("Name")
+            .HasMaxLength(200)
+            .IsRequired();
+
+        builder.Property(x => x.Description)
+            .HasColumnName("Description")
+            .HasMaxLength(500);
+
+        builder.Property(x => x.Period)
+            .HasColumnName("Period")
+            .HasConversion<string>()
+            .IsRequired();
+
+        builder.Property(x => x.MetricType)
+            .HasColumnName("MetricType")
+            .HasConversion<string>()
+            .IsRequired();
+
+        builder.Property(x => x.IsVisible)
+            .HasColumnName("IsVisible")
+            .IsRequired();
     }
 }

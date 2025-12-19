@@ -2,19 +2,16 @@ namespace GaniPay.Expense.Application.Contracts.Dtos;
 
 public sealed class ExpenseDto
 {
-    public Guid Id { get; init; }
-    public string Code { get; init; } = default!;
-    public string Name { get; init; } = default!;
-    public string? Description { get; init; }
+    public Guid Id { get; set; }
+    public string Code { get; set; } = default!;
+    public string Name { get; set; } = default!;
+    public string? Description { get; set; }
 
-    public decimal? MinAmount { get; init; }
-    public decimal? MaxAmount { get; init; }
-    public decimal? Percent { get; init; }
-    public decimal? FixedAmount { get; init; }
+    public decimal? MinAmount { get; set; }
+    public decimal? MaxAmount { get; set; }
+    public decimal? Percent { get; set; }
+    public decimal? FixedAmount { get; set; }
 
-    public string Currency { get; init; } = default!;
-    public bool IsVisible { get; init; }
-
-    public DateTime CreatedAt { get; init; }
-    public DateTime UpdatedAt { get; init; }
+    public string Currency { get; set; } = "TRY";
+    public bool IsVisible { get; set; }
 }

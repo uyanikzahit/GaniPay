@@ -9,7 +9,7 @@ public interface ITransactionLimitService
     Task<LimitDefinitionDto> CreateLimitDefinitionAsync(CreateLimitDefinitionRequest request, CancellationToken ct);
 
     Task<IReadOnlyList<CustomerLimitDto>> GetCustomerLimitsAsync(Guid customerId, CancellationToken ct);
-    Task<CustomerLimitDto> CreateCustomerLimitAsync(CreateCustomerLimitRequest request, CancellationToken ct);
+    Task<CustomerLimitDto> CreateCustomerLimitAsync(Guid customerId, CreateCustomerLimitRequest request, CancellationToken ct);
 
     Task<LimitCheckResultDto> CheckAsync(LimitCheckRequest request, CancellationToken ct);
 }

@@ -2,15 +2,15 @@ namespace GaniPay.Expense.Application.Requests;
 
 public sealed class CreateExpenseRequest
 {
-    public string Code { get; init; } = default!;
-    public string Name { get; init; } = default!;
-    public string? Description { get; init; }
+    public string Code { get; set; } = default!;
+    public string Name { get; set; } = default!;
+    public string? Description { get; set; }
 
-    public decimal? MinAmount { get; init; }
-    public decimal? MaxAmount { get; init; }
-    public decimal? Percent { get; init; }
-    public decimal? FixedAmount { get; init; }
+    public decimal? MinAmount { get; set; }
+    public decimal? MaxAmount { get; set; }
+    public decimal? Percent { get; set; }      // 0.02 gibi
+    public decimal? FixedAmount { get; set; }  // sabit masraf
 
-    public string Currency { get; init; } = "TRY";
-    public bool IsVisible { get; init; } = true;
+    public string Currency { get; set; } = "TRY";
+    public bool IsVisible { get; set; } = true;
 }

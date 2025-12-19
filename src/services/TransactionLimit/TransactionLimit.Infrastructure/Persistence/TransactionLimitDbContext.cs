@@ -5,7 +5,9 @@ namespace GaniPay.TransactionLimit.Infrastructure.Persistence;
 
 public sealed class TransactionLimitDbContext : DbContext
 {
-    public TransactionLimitDbContext(DbContextOptions<TransactionLimitDbContext> options) : base(options) { }
+    public TransactionLimitDbContext(DbContextOptions<TransactionLimitDbContext> options) : base(options)
+    {
+    }
 
     public DbSet<LimitDefinition> LimitDefinitions => Set<LimitDefinition>();
     public DbSet<CustomerLimit> CustomerLimits => Set<CustomerLimit>();

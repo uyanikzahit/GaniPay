@@ -1,7 +1,5 @@
 using GaniPay.Expense.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
-using System.Collections.Generic;
-using System.Reflection.Emit;
 
 namespace GaniPay.Expense.Infrastructure.Persistence;
 
@@ -15,5 +13,6 @@ public sealed class ExpenseDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ExpenseDbContext).Assembly);
+        base.OnModelCreating(modelBuilder);
     }
 }

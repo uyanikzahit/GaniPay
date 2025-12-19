@@ -1,8 +1,15 @@
 namespace GaniPay.Expense.Application.Requests;
 
-public sealed class CalculateExpenseRequest
+public sealed class CreateExpensePendingRequest
 {
-    public string Code { get; init; } = default!;
-    public decimal Amount { get; init; }
-    public string Currency { get; init; } = "TRY";
+    public Guid AccountingTxId { get; set; }
+
+    // Expense tanýmýný baðlamak için
+    public Guid ExpenseId { get; set; }
+
+    // Hesaplama için baz tutar (transfer/topup tutarý gibi)
+    public decimal BaseAmount { get; set; }
+
+    public string Currency { get; set; } = "TRY";
+    public DateTime? TransactionDate { get; set; }
 }

@@ -1,39 +1,68 @@
+using GaniPay.Expense.Application.Abstractions;
+using GaniPay.Expense.Application.Requests;
+using GaniPay.Expense.Infrastructure.DependencyInjection;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+builder.Services.AddExpenseInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+app.MapGet("/health", () => Results.Ok("ok"));
 
-app.MapGet("/weatherforecast", () =>
+var group = app.MapGroup("/api/v1/expenses");
+
+// ExpenseDefinition CRUD
+group.MapGet("/", async (IExpenseService service, CancellationToken ct) =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+    var list = await service.ListAsync(ct);
+    return Results.Ok(list);
+});
+
+group.MapGet("/{id:guid}", async (Guid id, IExpenseService service, CancellationToken ct) =>
+{
+    var dto = await service.GetByIdAsync(id, ct);
+    return Results.Ok(dto);
+});
+
+group.MapGet("/code/{code}", async (string code, IExpenseService service, CancellationToken ct) =>
+{
+    var dto = await service.GetByCodeAsync(code, ct);
+    return Results.Ok(dto);
+});
+
+group.MapPost("/", async (CreateExpenseRequest request, IExpenseService service, CancellationToken ct) =>
+{
+    var dto = await service.CreateAsync(request, ct);
+    return Results.Created($"/api/v1/expenses/{dto.Id}", dto);
+});
+
+group.MapPut("/{id:guid}", async (Guid id, UpdateExpenseRequest request, IExpenseService service, CancellationToken ct) =>
+{
+    var dto = await service.UpdateAsync(id, request, ct);
+    return Results.Ok(dto);
+});
+
+group.MapDelete("/{id:guid}", async (Guid id, IExpenseService service, CancellationToken ct) =>
+{
+    await service.DeleteAsync(id, ct);
+    return Results.NoContent();
+});
+
+// Pending create (fee calculation result)
+group.MapPost("/pending", async (CreateExpensePendingRequest request, IExpenseService service, CancellationToken ct) =>
+{
+    var dto = await service.CreatePendingAsync(request, ct);
+    return Results.Created($"/api/v1/expenses/pending/{dto.Id}", dto);
+});
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
