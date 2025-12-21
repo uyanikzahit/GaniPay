@@ -1,8 +1,8 @@
-using GaniPay.Expense.Application.Abstractions;
+ï»¿using GaniPay.Expense.Application.Abstractions;
 using GaniPay.Expense.Application.Contracts.Dtos;
 using GaniPay.Expense.Application.Requests;
 using GaniPay.Expense.Domain.Entities;
-using GaniPay.Expense.Domain.Enums;
+using DomainPendingStatus = GaniPay.Expense.Domain.Enums.ExpensePendingStatus;
 
 namespace GaniPay.Expense.Application.Services;
 
@@ -26,7 +26,7 @@ public sealed class ExpenseService : IExpenseService
     public async Task<ExpenseDto> GetByIdAsync(Guid id, CancellationToken ct)
     {
         var entity = await _expenseRepo.GetByIdAsync(id, ct);
-        if (entity is null) throw new InvalidOperationException("Expense bulunamadý.");
+        if (entity is null) throw new InvalidOperationException("Expense bulunamadÄ±.");
         return MapExpense(entity);
     }
 
@@ -34,21 +34,26 @@ public sealed class ExpenseService : IExpenseService
     {
         code = NormalizeCode(code);
         var entity = await _expenseRepo.GetByCodeAsync(code, ct);
-        if (entity is null) throw new InvalidOperationException("Expense bulunamadý.");
+        if (entity is null) throw new InvalidOperationException("Expense bulunamadÄ±.");
         return MapExpense(entity);
     }
 
     public async Task<ExpenseDto> CreateAsync(CreateExpenseRequest request, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(request.Code)) throw new InvalidOperationException("Code zorunludur.");
-        if (string.IsNullOrWhiteSpace(request.Name)) throw new InvalidOperationException("Name zorunludur.");
+        if (string.IsNullOrWhiteSpace(request.Code))
+            throw new InvalidOperationException("Code zorunludur.");
+
+        if (string.IsNullOrWhiteSpace(request.Name))
+            throw new InvalidOperationException("Name zorunludur.");
 
         var code = NormalizeCode(request.Code);
+        var currency = NormalizeCurrency(request.Currency);
+
+        ValidateRule(request.MinAmount, request.MaxAmount, request.Percent, request.FixedAmount, currency);
 
         var exists = await _expenseRepo.GetByCodeAsync(code, ct);
-        if (exists is not null) throw new InvalidOperationException("Ayný code ile expense zaten var.");
-
-        ValidateRule(request.MinAmount, request.MaxAmount, request.Percent, request.FixedAmount);
+        if (exists is not null)
+            throw new InvalidOperationException("AynÄ± code ile expense zaten var.");
 
         var entity = new ExpenseDefinition
         {
@@ -60,7 +65,7 @@ public sealed class ExpenseService : IExpenseService
             MaxAmount = request.MaxAmount,
             Percent = request.Percent,
             FixedAmount = request.FixedAmount,
-            Currency = NormalizeCurrency(request.Currency),
+            Currency = currency,
             IsVisible = request.IsVisible,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -72,120 +77,141 @@ public sealed class ExpenseService : IExpenseService
 
     public async Task<ExpenseDto> UpdateAsync(Guid id, UpdateExpenseRequest request, CancellationToken ct)
     {
+        // DBâ€™den Ã§ek -> tracked entity
         var entity = await _expenseRepo.GetByIdAsync(id, ct);
-        if (entity is null) throw new InvalidOperationException("Expense bulunamadý.");
+        if (entity is null) throw new InvalidOperationException("Expense bulunamadÄ±.");
 
-        if (string.IsNullOrWhiteSpace(request.Name)) throw new InvalidOperationException("Name zorunludur.");
-        ValidateRule(request.MinAmount, request.MaxAmount, request.Percent, request.FixedAmount);
+        var currency = NormalizeCurrency(request.Currency);
 
-        entity.Name = request.Name.Trim();
+        ValidateRule(request.MinAmount, request.MaxAmount, request.Percent, request.FixedAmount, currency);
+
+        // Tracked entity Ã¼zerinde alan gÃ¼ncelle (code deÄŸiÅŸtirmiyoruz)
+        entity.Name = string.IsNullOrWhiteSpace(request.Name) ? entity.Name : request.Name.Trim();
         entity.Description = request.Description?.Trim();
         entity.MinAmount = request.MinAmount;
         entity.MaxAmount = request.MaxAmount;
         entity.Percent = request.Percent;
         entity.FixedAmount = request.FixedAmount;
-        entity.Currency = NormalizeCurrency(request.Currency);
+        entity.Currency = currency;
         entity.IsVisible = request.IsVisible;
         entity.UpdatedAt = DateTime.UtcNow;
 
         await _expenseRepo.UpdateAsync(entity, ct);
+
         return MapExpense(entity);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct)
     {
         var entity = await _expenseRepo.GetByIdAsync(id, ct);
-        if (entity is null) throw new InvalidOperationException("Expense bulunamadý.");
+        if (entity is null) throw new InvalidOperationException("Expense bulunamadÄ±.");
 
         await _expenseRepo.DeleteAsync(entity, ct);
     }
 
     public async Task<ExpensePendingDto> CreatePendingAsync(CreateExpensePendingRequest request, CancellationToken ct)
     {
-        if (request.AccountingTxId == Guid.Empty) throw new InvalidOperationException("AccountingTxId zorunludur.");
-        if (request.ExpenseId == Guid.Empty) throw new InvalidOperationException("ExpenseId zorunludur.");
-        if (request.BaseAmount <= 0) throw new InvalidOperationException("BaseAmount 0'dan büyük olmalýdýr.");
+        // Bu endpoint "fee calculation result" kaydÄ± iÃ§indir.
+        // Yani hesaplamayÄ± burada yapmak zorunda deÄŸiliz; dÄ±ÅŸ servis (payments/orchestrator) hesaplayÄ±p gÃ¶nderir.
+        if (request.AccountingTxId == Guid.Empty)
+            throw new InvalidOperationException("AccountingTxId zorunludur.");
 
+        if (request.ExpenseId == Guid.Empty)
+            throw new InvalidOperationException("ExpenseId zorunludur.");
+
+        if (request.CalculatedAmount < 0)
+            throw new InvalidOperationException("CalculatedAmount negatif olamaz.");
+
+        // Expense var mÄ± kontrol edelim
         var expense = await _expenseRepo.GetByIdAsync(request.ExpenseId, ct);
-        if (expense is null) throw new InvalidOperationException("ExpenseDefinition bulunamadý.");
+        if (expense is null)
+            throw new InvalidOperationException("Expense tanÄ±mÄ± bulunamadÄ±.");
 
-        // Min/Max kontrolü (varsa)
-        if (expense.MinAmount.HasValue && request.BaseAmount < expense.MinAmount.Value)
-            throw new InvalidOperationException("BaseAmount min_amount altýndadýr.");
-        if (expense.MaxAmount.HasValue && request.BaseAmount > expense.MaxAmount.Value)
-            throw new InvalidOperationException("BaseAmount max_amount üstündedir.");
-
-        // Hesaplama: fixed varsa fixed, yoksa percent * base
-        decimal calculated;
-        if (expense.FixedAmount.HasValue && expense.FixedAmount.Value > 0)
-            calculated = expense.FixedAmount.Value;
-        else if (expense.Percent.HasValue && expense.Percent.Value > 0)
-            calculated = Math.Round(request.BaseAmount * expense.Percent.Value, 2, MidpointRounding.AwayFromZero);
-        else
-            calculated = 0m;
-
-        var now = DateTime.UtcNow;
+        // Currency boÅŸsa expense.currency kullan
+        var currency = string.IsNullOrWhiteSpace(request.Currency)
+            ? expense.Currency
+            : NormalizeCurrency(request.Currency);
 
         var pending = new ExpensePending
         {
             Id = Guid.NewGuid(),
             AccountingTxId = request.AccountingTxId,
-            ExpenseId = expense.Id,
-            CalculatedAmount = calculated,
-            Currency = NormalizeCurrency(request.Currency),
-            PendingStatus = ExpensePendingStatus.Pending,
-            TransactionDate = request.TransactionDate ?? now,
+            ExpenseId = request.ExpenseId,
+            CalculatedAmount = request.CalculatedAmount,
+            Currency = currency,
+            PendingStatus = DomainPendingStatus.Pending,
+            TransactionDate = DateTime.UtcNow,
             TryCount = 0,
-            ResultCode = null,
-            CreatedAt = now,
-            UpdatedAt = now
+            ResultCode = null
         };
 
         await _pendingRepo.AddAsync(pending, ct);
         return MapPending(pending);
     }
 
-    private static void ValidateRule(decimal? min, decimal? max, decimal? percent, decimal? fixedAmount)
+    // --------------------
+    // Helpers
+    // --------------------
+
+    private static string NormalizeCode(string code)
+        => (code ?? string.Empty).Trim().ToUpperInvariant();
+
+    private static string NormalizeCurrency(string currency)
     {
-        if (min.HasValue && min.Value < 0) throw new InvalidOperationException("MinAmount negatif olamaz.");
-        if (max.HasValue && max.Value < 0) throw new InvalidOperationException("MaxAmount negatif olamaz.");
-        if (min.HasValue && max.HasValue && min.Value > max.Value) throw new InvalidOperationException("MinAmount, MaxAmount'tan büyük olamaz.");
+        currency = (currency ?? string.Empty).Trim().ToUpperInvariant();
 
-        if (percent.HasValue && percent.Value < 0) throw new InvalidOperationException("Percent negatif olamaz.");
-        if (percent.HasValue && percent.Value > 1) throw new InvalidOperationException("Percent 1'den büyük olamaz. (0.02 gibi beklenir)");
+        if (string.IsNullOrWhiteSpace(currency))
+            throw new InvalidOperationException("Currency zorunludur.");
 
-        if (fixedAmount.HasValue && fixedAmount.Value < 0) throw new InvalidOperationException("FixedAmount negatif olamaz.");
+        if (currency.Length != 3)
+            throw new InvalidOperationException("Currency 3 karakter olmalÄ±dÄ±r (TRY, USD vb.).");
 
-        // ikisi birden doluysa da sorun yok (öncelik fixed), ama istersen strict yapabilirsin.
+        return currency;
     }
 
-    private static string NormalizeCode(string code) => code.Trim().ToUpperInvariant();
-    private static string NormalizeCurrency(string currency) => string.IsNullOrWhiteSpace(currency) ? "TRY" : currency.Trim().ToUpperInvariant();
-
-    private static ExpenseDto MapExpense(ExpenseDefinition e) => new()
+    private static void ValidateRule(decimal? minAmount, decimal? maxAmount, decimal? percent, decimal? fixedAmount, string currency)
     {
-        Id = e.Id,
-        Code = e.Code,
-        Name = e.Name,
-        Description = e.Description,
-        MinAmount = e.MinAmount,
-        MaxAmount = e.MaxAmount,
-        Percent = e.Percent,
-        FixedAmount = e.FixedAmount,
-        Currency = e.Currency,
-        IsVisible = e.IsVisible
-    };
+        if (minAmount.HasValue && minAmount.Value < 0) throw new InvalidOperationException("min_amount negatif olamaz.");
+        if (maxAmount.HasValue && maxAmount.Value < 0) throw new InvalidOperationException("max_amount negatif olamaz.");
+        if (minAmount.HasValue && maxAmount.HasValue && minAmount.Value > maxAmount.Value)
+            throw new InvalidOperationException("min_amount, max_amount'tan bÃ¼yÃ¼k olamaz.");
 
-    private static ExpensePendingDto MapPending(ExpensePending p) => new()
-    {
-        Id = p.Id,
-        AccountingTxId = p.AccountingTxId,
-        ExpenseId = p.ExpenseId,
-        CalculatedAmount = p.CalculatedAmount,
-        Currency = p.Currency,
-        PendingStatus = p.PendingStatus.ToString(),
-        TransactionDate = p.TransactionDate,
-        TryCount = p.TryCount,
-        ResultCode = p.ResultCode
-    };
+        if (percent.HasValue && percent.Value < 0) throw new InvalidOperationException("percent negatif olamaz.");
+        if (fixedAmount.HasValue && fixedAmount.Value < 0) throw new InvalidOperationException("fixed_amount negatif olamaz.");
+
+        var p = percent.GetValueOrDefault(0);
+        var f = fixedAmount.GetValueOrDefault(0);
+
+        if (p <= 0 && f <= 0)
+            throw new InvalidOperationException("percent veya fixed_amount en az birisi 0'dan bÃ¼yÃ¼k olmalÄ±dÄ±r.");
+    }
+
+    private static ExpenseDto MapExpense(ExpenseDefinition e)
+        => new ExpenseDto
+        {
+            Id = e.Id,
+            Code = e.Code,
+            Name = e.Name,
+            Description = e.Description,
+            MinAmount = e.MinAmount,
+            MaxAmount = e.MaxAmount,
+            Percent = e.Percent,
+            FixedAmount = e.FixedAmount,
+            Currency = e.Currency,
+            IsVisible = e.IsVisible
+        };
+
+    private static ExpensePendingDto MapPending(ExpensePending p)
+        => new ExpensePendingDto
+        {
+            Id = p.Id,
+            AccountingTxId = p.AccountingTxId,
+            ExpenseId = p.ExpenseId,
+            CalculatedAmount = p.CalculatedAmount,
+            Currency = p.Currency,
+            PendingStatus = p.PendingStatus.ToString(),
+            TransactionDate = p.TransactionDate,
+            TryCount = p.TryCount,
+            ResultCode = p.ResultCode
+        };
 }

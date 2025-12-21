@@ -12,7 +12,9 @@ public sealed class ExpenseRepository : IExpenseRepository
     public ExpenseRepository(ExpenseDbContext db) => _db = db;
 
     public Task<List<ExpenseDefinition>> ListAsync(CancellationToken ct)
-        => _db.Expenses.AsNoTracking().OrderBy(x => x.Code).ToListAsync(ct);
+        => _db.Expenses.AsNoTracking()
+            .OrderBy(x => x.Code)
+            .ToListAsync(ct);
 
     public Task<ExpenseDefinition?> GetByIdAsync(Guid id, CancellationToken ct)
         => _db.Expenses.FirstOrDefaultAsync(x => x.Id == id, ct);
@@ -28,7 +30,10 @@ public sealed class ExpenseRepository : IExpenseRepository
 
     public async Task UpdateAsync(ExpenseDefinition entity, CancellationToken ct)
     {
-        _db.Expenses.Update(entity);
+        // IMPORTANT:
+        // Service katmanýnda entity DB'den çekilip güncellendiði için tracked durumdadýr.
+        // Burada Update(entity) çaðýrmak; created_at vb. alanlarýn yanlýþ set edilmesine
+        // veya tam entity overwrite'e sebep olabiliyor.
         await _db.SaveChangesAsync(ct);
     }
 

@@ -2,14 +2,15 @@ namespace GaniPay.Expense.Application.Requests;
 
 public sealed class CreateExpensePendingRequest
 {
+    // Accounting domain transaction id (cross-domain reference)
     public Guid AccountingTxId { get; set; }
 
-    // Expense tanýmýný baðlamak için
+    // ExpenseDefinition id (same DB)
     public Guid ExpenseId { get; set; }
 
-    // Hesaplama için baz tutar (transfer/topup tutarý gibi)
-    public decimal BaseAmount { get; set; }
+    // Calculated fee amount (mandatory)
+    public decimal CalculatedAmount { get; set; }
 
-    public string Currency { get; set; } = "TRY";
-    public DateTime? TransactionDate { get; set; }
+    // Optional (if empty, we will use ExpenseDefinition.Currency)
+    public string? Currency { get; set; }
 }
