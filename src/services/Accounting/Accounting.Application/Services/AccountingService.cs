@@ -26,7 +26,6 @@ public sealed class AccountingService : IAccountingService
         _historyRepository = historyRepository;
         _uow = uow;
     }
-
     public async Task<AccountDto> CreateAccountAsync(CreateAccountRequest request, CancellationToken ct)
     {
         if (request.CustomerId == Guid.Empty)
@@ -40,13 +39,19 @@ public sealed class AccountingService : IAccountingService
         if (await _accountRepository.ExistsAsync(request.CustomerId, currency, ct))
             throw new InvalidOperationException("Account already exists for this customer and currency.");
 
+        // ✅ DB'de NOT NULL olan alan: account_number
+        var accountNumber = GenerateAccountNumber(request.CustomerId, currency);
+
         var account = new Account
         {
             Id = Guid.NewGuid(),
             CustomerId = request.CustomerId,
+            AccountNumber = accountNumber,   // ✅ kritik fix
             Currency = currency,
             Balance = 0m,
             Status = AccountStatus.Active,
+            // Iban nullable ise gerek yok, ama istersen üret:
+            // Iban = GenerateIbanLike(currency),
             CreatedAt = DateTime.UtcNow
         };
 
@@ -54,6 +59,15 @@ public sealed class AccountingService : IAccountingService
         await _uow.SaveChangesAsync(ct);
 
         return MapAccountDto(account);
+    }
+
+    private static string GenerateAccountNumber(Guid customerId, string currency)
+    {
+        // Unique ve kısa bir değer üretelim
+        // örn: ACC-TRY-20251221-9F3A1C2B
+        var suffix = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
+        var date = DateTime.UtcNow.ToString("yyyyMMdd");
+        return $"ACC-{currency}-{date}-{suffix}";
     }
 
     public async Task<BalanceDto> GetBalanceAsync(Guid customerId, string currency, CancellationToken ct)

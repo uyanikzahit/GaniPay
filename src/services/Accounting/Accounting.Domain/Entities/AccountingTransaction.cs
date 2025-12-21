@@ -27,7 +27,7 @@ public sealed class AccountingTransaction
     // camunda/workflow correlation
     public string CorrelationId { get; set; } = default!;
 
-    public TransactionStatus Status { get; set; } = TransactionStatus.Pending;
+    public TransactionStatus Status { get; set; } = TransactionStatus.Booked;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? BookedAt { get; set; }
