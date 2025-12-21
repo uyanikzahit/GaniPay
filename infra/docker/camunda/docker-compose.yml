@@ -48,7 +48,7 @@ services:
       - elastic:/usr/share/elasticsearch/data
     networks:
       - ganipay-net
-
+  
 
   # GaniPay DB (dev ortamı için tek Postgres)
   postgres:

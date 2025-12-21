@@ -9,24 +9,34 @@ public sealed class AccountBalanceHistoryConfiguration : IEntityTypeConfiguratio
     public void Configure(EntityTypeBuilder<AccountBalanceHistory> builder)
     {
         builder.ToTable("account_balance_history");
+
         builder.HasKey(x => x.Id);
+        builder.Property(x => x.Id).HasColumnName("id");
 
-        builder.Property(x => x.AccountId).IsRequired();
-        builder.Property(x => x.Direction).IsRequired();
-        builder.Property(x => x.ChangeAmount).HasPrecision(18, 2).IsRequired();
+        builder.Property(x => x.AccountId).HasColumnName("account_id").IsRequired();
+        builder.Property(x => x.Direction)
+            .HasColumnName("direction")
+            .HasConversion<int>()
+            .IsRequired();
+        builder.Property(x => x.OperationType)
+            .HasColumnName("operation_type")
+            .HasConversion<int>()
+            .IsRequired();
 
-        builder.Property(x => x.BalanceBefore).HasPrecision(18, 2).IsRequired();
-        builder.Property(x => x.BalanceAfter).HasPrecision(18, 2).IsRequired();
+        builder.Property(x => x.Currency).HasColumnName("currency").HasMaxLength(3).IsRequired();
+        builder.Property(x => x.ChangeAmount).HasColumnName("change_amount").HasColumnType("numeric(18,2)").IsRequired();
+        builder.Property(x => x.BalanceBefore).HasColumnName("balance_before").HasColumnType("numeric(18,2)").IsRequired();
+        builder.Property(x => x.BalanceAfter).HasColumnName("balance_after").HasColumnType("numeric(18,2)").IsRequired();
 
-        builder.Property(x => x.Currency).HasMaxLength(3).IsRequired();
-        builder.Property(x => x.OperationType).IsRequired();
+        builder.Property(x => x.ReferenceId).HasColumnName("reference_id").HasMaxLength(150).IsRequired();
+        builder.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("timestamptz").IsRequired();
 
-        builder.Property(x => x.ReferenceId).HasMaxLength(64).IsRequired();
-        builder.Property(x => x.CreatedAt).IsRequired();
+        builder.HasIndex(x => x.AccountId)
+            .HasDatabaseName("ix_account_balance_history_account_id");
 
-        builder.HasOne(x => x.Account)
-               .WithMany()
-               .HasForeignKey(x => x.AccountId)
-               .OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<Account>()
+            .WithMany()
+            .HasForeignKey(x => x.AccountId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
