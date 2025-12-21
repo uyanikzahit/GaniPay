@@ -1,10 +1,9 @@
 namespace GaniPay.Accounting.Domain.Enums;
 
-public enum OperationType : short
+public enum OperationType
 {
     TopUp = 1,
-    TransferOut = 2,
-    TransferIn = 3,
-    Fee = 4,
-    Adjustment = 5
+    TransferIn = 2,
+    TransferOut = 3,
+    Fee = 4
 }
