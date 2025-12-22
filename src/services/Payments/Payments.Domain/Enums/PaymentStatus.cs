@@ -1,4 +1,4 @@
-namespace GaniPay.Payments.Application.Contracts.Enums;
+namespace GaniPay.Payments.Domain.Enums;
 
 public enum PaymentStatus : short
 {
