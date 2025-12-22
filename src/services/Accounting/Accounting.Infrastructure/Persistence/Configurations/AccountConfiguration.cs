@@ -1,52 +1,41 @@
-﻿using Microsoft.EntityFrameworkCore;
+using GaniPay.Accounting.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using DomainAccount = GaniPay.Accounting.Domain.Entities.Account;
 
 namespace GaniPay.Accounting.Infrastructure.Persistence.Configurations;
 
-public sealed class AccountConfiguration : IEntityTypeConfiguration<DomainAccount>
+public sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
 {
-    public void Configure(EntityTypeBuilder<DomainAccount> builder)
+    public void Configure(EntityTypeBuilder<Account> b)
     {
-        builder.ToTable("account");
+        b.ToTable("account");
 
-        builder.HasKey(x => x.Id);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Id).HasColumnName("id");
 
-        builder.Property(x => x.Id)
-            .HasColumnName("id");
+        b.Property(x => x.CustomerId).HasColumnName("customer_id").IsRequired();
 
-        builder.Property(x => x.CustomerId)
-            .HasColumnName("customer_id")
-            .IsRequired();
+        b.Property(x => x.AccountNumber).HasColumnName("account_number").HasMaxLength(100).IsRequired();
 
-        builder.Property(x => x.AccountNumber)
-            .HasColumnName("account_number")
-            .HasMaxLength(64);
+        b.Property(x => x.Currency).HasColumnName("currency").HasMaxLength(10).IsRequired();
 
-        builder.Property(x => x.Currency)
-            .HasColumnName("currency")
-            .HasMaxLength(3)
-            .IsRequired();
+        b.Property(x => x.Balance).HasColumnName("balance").HasPrecision(18, 2).IsRequired();
 
-        builder.Property(x => x.Balance)
-            .HasColumnName("balance")
-            .HasColumnType("numeric(18,2)")
-            .IsRequired();
+        b.Property(x => x.Status).HasColumnName("status").IsRequired();
 
-        // DB’de status integer ise enum’u int olarak map et
-        builder.Property(x => x.Status)
-            .HasColumnName("status")
-            .HasConversion<int>()
-            .IsRequired();
+        b.Property(x => x.Iban).HasColumnName("iban").HasMaxLength(64);
 
-        builder.Property(x => x.Iban)
-            .HasColumnName("iban")
-            .HasMaxLength(64);
+        b.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
 
-        builder.Property(x => x.CreatedAt)
-            .HasColumnName("created_at")
-            .IsRequired();
+        b.HasIndex(x => new { x.CustomerId, x.Currency }).IsUnique();
 
-        builder.HasIndex(x => new { x.CustomerId, x.Currency }).IsUnique();
+        // relations
+        b.HasMany(x => x.Transactions)
+            .WithOne(x => x.Account)
+            .HasForeignKey(x => x.AccountId);
+
+        b.HasMany(x => x.BalanceHistories)
+            .WithOne(x => x.Account)
+            .HasForeignKey(x => x.AccountId);
     }
 }

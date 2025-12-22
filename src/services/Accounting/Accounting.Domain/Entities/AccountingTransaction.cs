@@ -1,5 +1,3 @@
-using GaniPay.Accounting.Domain.Enums;
-
 namespace GaniPay.Accounting.Domain.Entities;
 
 public sealed class AccountingTransaction
@@ -9,26 +7,27 @@ public sealed class AccountingTransaction
     public Guid AccountId { get; set; }
     public Account Account { get; set; } = default!;
 
-    public EntryDirection Direction { get; set; }
-    public OperationType OperationType { get; set; }
+    /// <summary>
+    /// DB: direction (string) => "debit" / "credit"
+    /// </summary>
+    public string Direction { get; set; } = default!;
 
     public decimal Amount { get; set; }
-    public string Currency { get; set; } = "TRY";
+
+    public string Currency { get; set; } = default!;
 
     public decimal BalanceBefore { get; set; }
     public decimal BalanceAfter { get; set; }
 
-    // Payments/Workflow tarafýndaki business referans (transfer-0001 gibi)
-    public string ReferenceId { get; set; } = default!;
+    /// <summary>
+    /// DB: operation_type (int)
+    /// </summary>
+    public int OperationType { get; set; }
 
-    // duplicate booking engellemek için
-    public string IdempotencyKey { get; set; } = default!;
+    /// <summary>
+    /// DB: reference_id (guid) - Payments/topup/transfer kaydý gibi korelasyon.
+    /// </summary>
+    public Guid ReferenceId { get; set; }
 
-    // camunda/workflow correlation
-    public string CorrelationId { get; set; } = default!;
-
-    public TransactionStatus Status { get; set; } = TransactionStatus.Booked;
-
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime? BookedAt { get; set; }
+    public DateTime CreatedAt { get; set; }
 }

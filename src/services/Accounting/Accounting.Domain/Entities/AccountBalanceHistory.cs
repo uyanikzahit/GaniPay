@@ -1,5 +1,3 @@
-﻿using GaniPay.Accounting.Domain.Enums;
-
 namespace GaniPay.Accounting.Domain.Entities;
 
 public sealed class AccountBalanceHistory
@@ -9,17 +7,24 @@ public sealed class AccountBalanceHistory
     public Guid AccountId { get; set; }
     public Account Account { get; set; } = default!;
 
-    public EntryDirection Direction { get; set; }
+    /// <summary>
+    /// DB: direction (string) => "debit" / "credit"
+    /// </summary>
+    public string Direction { get; set; } = default!;
+
+    /// <summary>
+    /// DB: change_amount
+    /// </summary>
     public decimal ChangeAmount { get; set; }
 
     public decimal BalanceBefore { get; set; }
     public decimal BalanceAfter { get; set; }
 
-    public string Currency { get; set; } = "TRY";
-    public OperationType OperationType { get; set; }
+    public string Currency { get; set; } = default!;
 
-    // ✅ string kalıyor. AccountingTransaction.Id’yi yazacaksan: tx.Id.ToString()
-    public string ReferenceId { get; set; } = default!;
+    public int OperationType { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public Guid ReferenceId { get; set; }
+
+    public DateTime CreatedAt { get; set; }
 }

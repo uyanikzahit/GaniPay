@@ -6,50 +6,31 @@ namespace GaniPay.Accounting.Infrastructure.Persistence.Configurations;
 
 public sealed class AccountingTransactionConfiguration : IEntityTypeConfiguration<AccountingTransaction>
 {
-    public void Configure(EntityTypeBuilder<AccountingTransaction> builder)
+    public void Configure(EntityTypeBuilder<AccountingTransaction> b)
     {
-        builder.ToTable("accounting_transaction");
+        b.ToTable("accounting_transaction");
 
-        builder.HasKey(x => x.Id);
-        builder.Property(x => x.Id).HasColumnName("id");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Id).HasColumnName("id");
 
-        builder.Property(x => x.AccountId).HasColumnName("account_id").IsRequired();
-        builder.Property(x => x.Direction)
-            .HasColumnName("direction")
-            .HasConversion<int>()
-            .IsRequired();
-        builder.Property(x => x.OperationType)
-            .HasColumnName("operation_type")
-            .HasConversion<int>()
-            .IsRequired();
-        builder.Property(x => x.Status)
-            .HasColumnName("status")
-            .HasConversion<int>()
-            .IsRequired();
+        b.Property(x => x.AccountId).HasColumnName("account_id").IsRequired();
 
-        builder.Property(x => x.Currency).HasColumnName("currency").HasMaxLength(3).IsRequired();
-        builder.Property(x => x.Amount).HasColumnName("amount").HasColumnType("numeric(18,2)").IsRequired();
-        builder.Property(x => x.BalanceBefore).HasColumnName("balance_before").HasColumnType("numeric(18,2)").IsRequired();
-        builder.Property(x => x.BalanceAfter).HasColumnName("balance_after").HasColumnType("numeric(18,2)").IsRequired();
+        b.Property(x => x.Direction).HasColumnName("direction").HasMaxLength(16).IsRequired();
 
-        builder.Property(x => x.ReferenceId).HasColumnName("reference_id").HasMaxLength(150).IsRequired();
-        builder.Property(x => x.IdempotencyKey).HasColumnName("idempotency_key").HasMaxLength(150).IsRequired();
-        builder.Property(x => x.CorrelationId).HasColumnName("correlation_id").HasMaxLength(150).IsRequired();
+        b.Property(x => x.Amount).HasColumnName("amount").HasPrecision(18, 2).IsRequired();
 
+        b.Property(x => x.Currency).HasColumnName("currency").HasMaxLength(10).IsRequired();
 
-        builder.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("timestamptz").IsRequired();
-        builder.Property(x => x.BookedAt).HasColumnName("booked_at").HasColumnType("timestamptz");
+        b.Property(x => x.BalanceBefore).HasColumnName("balance_before").HasPrecision(18, 2).IsRequired();
+        b.Property(x => x.BalanceAfter).HasColumnName("balance_after").HasPrecision(18, 2).IsRequired();
 
-        builder.HasIndex(x => x.IdempotencyKey)
-            .IsUnique()
-            .HasDatabaseName("ux_accounting_transaction_idempotency");
+        b.Property(x => x.OperationType).HasColumnName("operation_type").IsRequired();
 
-        builder.HasIndex(x => x.AccountId)
-            .HasDatabaseName("ix_accounting_transaction_account_id");
+        b.Property(x => x.ReferenceId).HasColumnName("reference_id").IsRequired();
 
-        builder.HasOne<Account>()
-            .WithMany()
-            .HasForeignKey(x => x.AccountId)
-            .OnDelete(DeleteBehavior.Cascade);
+        b.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
+
+        b.HasIndex(x => x.AccountId);
+        b.HasIndex(x => new { x.Currency, x.CreatedAt });
     }
 }

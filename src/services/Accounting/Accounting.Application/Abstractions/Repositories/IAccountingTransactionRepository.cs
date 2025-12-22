@@ -4,14 +4,18 @@ namespace GaniPay.Accounting.Application.Abstractions.Repositories;
 
 public interface IAccountingTransactionRepository
 {
-    Task<AccountingTransaction?> GetByIdempotencyKeyAsync(Guid accountId, string idempotencyKey, CancellationToken ct);
-    Task AddAsync(AccountingTransaction tx, CancellationToken ct);
+    Task AddAsync(AccountingTransaction tx, CancellationToken ct = default);
 
-    Task<decimal> CalculateUsageAsync(
-        Guid customerId,
-        string currency,
-        string metricType,     // "TransactionCount" | "TransactionAmount"
+    Task<IReadOnlyList<AccountingTransaction>> ListByAccountAndRangeAsync(
+        Guid accountId,
         DateTime fromUtc,
         DateTime toUtc,
-        CancellationToken ct);
+        CancellationToken ct = default);
+
+    Task<IReadOnlyList<AccountingTransaction>> ListByCustomerAndCurrencyAndRangeAsync(
+        Guid customerId,
+        string currency,
+        DateTime fromUtc,
+        DateTime toUtc,
+        CancellationToken ct = default);
 }

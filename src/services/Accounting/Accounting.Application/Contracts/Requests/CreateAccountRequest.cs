@@ -1,7 +1,8 @@
 namespace GaniPay.Accounting.Application.Contracts.Requests;
 
-public sealed class CreateAccountRequest
-{
-    public Guid CustomerId { get; set; }
-    public string Currency { get; set; } = "TRY";
-}
+public sealed record CreateAccountRequest(
+    Guid CustomerId,
+    string Currency,
+    string AccountNumber,
+    string? Iban
+);

@@ -1,7 +1,6 @@
-ï»¿using GaniPay.Accounting.Application.Abstractions;
+using GaniPay.Accounting.Application.Abstractions;
 using GaniPay.Accounting.Application.Abstractions.Repositories;
 using GaniPay.Accounting.Application.Contracts.Dtos;
-using GaniPay.Accounting.Application.Contracts.Enums;
 using GaniPay.Accounting.Application.Contracts.Requests;
 using GaniPay.Accounting.Domain.Entities;
 using GaniPay.Accounting.Domain.Enums;
@@ -26,288 +25,203 @@ public sealed class AccountingService : IAccountingService
         _historyRepository = historyRepository;
         _uow = uow;
     }
+
     public async Task<AccountDto> CreateAccountAsync(CreateAccountRequest request, CancellationToken ct)
     {
-        if (request.CustomerId == Guid.Empty)
-            throw new InvalidOperationException("customerId is required.");
-
         if (string.IsNullOrWhiteSpace(request.Currency))
-            throw new InvalidOperationException("currency is required.");
+            throw new InvalidOperationException("Currency is required.");
 
-        var currency = request.Currency.Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(request.AccountNumber))
+            throw new InvalidOperationException("AccountNumber is required.");
 
-        if (await _accountRepository.ExistsAsync(request.CustomerId, currency, ct))
-            throw new InvalidOperationException("Account already exists for this customer and currency.");
-
-        // âœ… DB'de NOT NULL olan alan: account_number
-        var accountNumber = GenerateAccountNumber(request.CustomerId, currency);
+        var existing = await _accountRepository.GetByCustomerAndCurrencyAsync(request.CustomerId, request.Currency, ct);
+        if (existing is not null)
+            throw new InvalidOperationException("Account already exists for this customer & currency.");
 
         var account = new Account
         {
             Id = Guid.NewGuid(),
             CustomerId = request.CustomerId,
-            AccountNumber = accountNumber,   // âœ… kritik fix
-            Currency = currency,
+            AccountNumber = request.AccountNumber.Trim(),
+            Currency = request.Currency.Trim(),
             Balance = 0m,
             Status = AccountStatus.Active,
-            // Iban nullable ise gerek yok, ama istersen Ã¼ret:
-            // Iban = GenerateIbanLike(currency),
+            Iban = string.IsNullOrWhiteSpace(request.Iban) ? null : request.Iban.Trim(),
             CreatedAt = DateTime.UtcNow
         };
 
         await _accountRepository.AddAsync(account, ct);
         await _uow.SaveChangesAsync(ct);
 
-        return MapAccountDto(account);
-    }
-
-    private static string GenerateAccountNumber(Guid customerId, string currency)
-    {
-        // Unique ve kÄ±sa bir deÄŸer Ã¼retelim
-        // Ã¶rn: ACC-TRY-20251221-9F3A1C2B
-        var suffix = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
-        var date = DateTime.UtcNow.ToString("yyyyMMdd");
-        return $"ACC-{currency}-{date}-{suffix}";
+        return new AccountDto(
+            account.Id,
+            account.CustomerId,
+            account.AccountNumber,
+            account.Currency,
+            account.Balance,
+            (int)account.Status,
+            account.Iban,
+            account.CreatedAt
+        );
     }
 
     public async Task<BalanceDto> GetBalanceAsync(Guid customerId, string currency, CancellationToken ct)
     {
-        if (customerId == Guid.Empty)
-            throw new InvalidOperationException("customerId is required.");
+        var account = await _accountRepository.GetByCustomerAndCurrencyAsync(customerId, currency, ct)
+                      ?? throw new InvalidOperationException("Account not found.");
 
-        if (string.IsNullOrWhiteSpace(currency))
-            throw new InvalidOperationException("currency is required.");
-
-        var cur = currency.Trim().ToUpperInvariant();
-
-        var account = await _accountRepository.GetByCustomerAndCurrencyAsync(customerId, cur, ct);
-        if (account is null)
-            throw new InvalidOperationException("Account not found.");
-
-        if (account.Status != AccountStatus.Active)
-            throw new InvalidOperationException("Account is not active.");
-
-        return new BalanceDto
-        {
-            CustomerId = account.CustomerId,
-            Currency = account.Currency,
-            Balance = account.Balance,
-            AsOfUtc = DateTime.UtcNow
-        };
+        return new BalanceDto(account.Id, account.CustomerId, account.Currency, account.Balance);
     }
 
-    public async Task<AccountingTransactionDto> BookTransactionAsync(BookTransactionRequest request, CancellationToken ct)
+    public async Task<AccountingTransactionDto> PostTransactionAsync(PostAccountingTransactionRequest request, CancellationToken ct)
     {
-        ValidateBookRequest(request);
-
-        var currency = request.Currency.Trim().ToUpperInvariant();
-
-        var account = await _accountRepository.GetByCustomerAndCurrencyAsync(request.CustomerId, currency, ct);
-        if (account is null)
-            throw new InvalidOperationException("Account not found.");
+        var account = await _accountRepository.GetByCustomerAndCurrencyAsync(request.CustomerId, request.Currency, ct)
+                      ?? throw new InvalidOperationException("Account not found.");
 
         if (account.Status != AccountStatus.Active)
             throw new InvalidOperationException("Account is not active.");
 
-        // idempotency check
-        var existing = await _txRepository.GetByIdempotencyKeyAsync(account.Id, request.IdempotencyKey.Trim(), ct);
-        if (existing is not null)
-            return MapTxDto(existing);
+        if (request.Amount <= 0)
+            throw new InvalidOperationException("Amount must be > 0.");
 
-        var domainOp = MapToDomainOperation(request.OperationType);
-        var (direction, signedDelta) = GetEntryEffect(domainOp, request.Amount);
-
+        var directionString = ToDbDirection(request.Direction);
         var balanceBefore = account.Balance;
-        var balanceAfter = balanceBefore + signedDelta;
 
-        if (balanceAfter < 0m)
-            throw new InvalidOperationException("Insufficient funds.");
+        var balanceDelta = request.Direction switch
+        {
+            Contracts.Enums.AccountingDirection.Credit => +request.Amount,
+            Contracts.Enums.AccountingDirection.Debit => -request.Amount,
+            _ => 0m
+        };
 
-        var now = DateTime.UtcNow;
+        var balanceAfter = balanceBefore + balanceDelta;
 
+        // MVP: Negatif bakiye istemiyorsan burada kes:
+        // (Ýstersen bunu Payments/Camunda akýþýnda da kontrol edebiliriz ama burada garanti daha iyi.)
+        if (balanceAfter < 0)
+            throw new InvalidOperationException("Insufficient balance.");
+
+        var createdAt = DateTime.UtcNow;
+
+        // accounting_transaction insert
         var tx = new AccountingTransaction
         {
             Id = Guid.NewGuid(),
             AccountId = account.Id,
-            Direction = direction,
-            OperationType = domainOp,
+            Direction = directionString,
             Amount = request.Amount,
-            Currency = account.Currency,
+            Currency = request.Currency,
             BalanceBefore = balanceBefore,
             BalanceAfter = balanceAfter,
-
-            ReferenceId = request.ReferenceId.Trim(),
-            IdempotencyKey = request.IdempotencyKey.Trim(),
-            CorrelationId = request.CorrelationId.Trim(),
-
-            Status = TransactionStatus.Booked,
-            CreatedAt = now,
-            BookedAt = now
+            OperationType = (int)request.OperationType,
+            ReferenceId = request.ReferenceId,
+            CreatedAt = createdAt
         };
 
         await _txRepository.AddAsync(tx, ct);
 
+        // account_balance_history insert
         var history = new AccountBalanceHistory
         {
             Id = Guid.NewGuid(),
             AccountId = account.Id,
-            Direction = direction,
+            Direction = directionString,
             ChangeAmount = request.Amount,
             BalanceBefore = balanceBefore,
             BalanceAfter = balanceAfter,
-            Currency = account.Currency,
-            OperationType = domainOp,
-
-            // âœ… Guid -> string hatasÄ±nÄ± bitiren net Ã§Ã¶zÃ¼m
-            ReferenceId = tx.Id.ToString(),
-
-            CreatedAt = now
+            Currency = request.Currency,
+            OperationType = (int)request.OperationType,
+            ReferenceId = request.ReferenceId,
+            CreatedAt = createdAt
         };
 
         await _historyRepository.AddAsync(history, ct);
 
+        // account balance update
         account.Balance = balanceAfter;
         await _accountRepository.UpdateAsync(account, ct);
 
         await _uow.SaveChangesAsync(ct);
 
-        return MapTxDto(tx);
+        return new AccountingTransactionDto(
+            tx.Id,
+            tx.AccountId,
+            tx.Direction,
+            tx.Amount,
+            tx.Currency,
+            tx.BalanceBefore,
+            tx.BalanceAfter,
+            tx.OperationType,
+            tx.ReferenceId,
+            tx.CreatedAt
+        );
     }
 
     public async Task<UsageResultDto> GetUsageAsync(UsageQueryRequest request, CancellationToken ct)
     {
-        if (request.CustomerId == Guid.Empty)
-            throw new InvalidOperationException("customerId is required.");
+        var (fromUtc, toUtc, fromDate, toDate) = BuildRange(request.Date, request.Period);
 
-        if (string.IsNullOrWhiteSpace(request.Currency))
-            throw new InvalidOperationException("currency is required.");
-
-        var currency = request.Currency.Trim().ToUpperInvariant();
-
-        var (fromUtc, toUtc) = BuildRange(DateOnly.FromDateTime(DateTime.UtcNow), request.Period);
-
-        var metricString = request.MetricType.ToString();
-
-        var value = await _txRepository.CalculateUsageAsync(
+        var txs = await _txRepository.ListByCustomerAndCurrencyAndRangeAsync(
             request.CustomerId,
-            currency,
-            metricString,
+            request.Currency,
             fromUtc,
             toUtc,
             ct);
 
-        return new UsageResultDto
-        {
-            CustomerId = request.CustomerId,
-            Currency = currency,
-            MetricType = request.MetricType,
-            Period = request.Period,
-            Value = value,
-            FromUtc = fromUtc,
-            ToUtc = toUtc
-        };
+        // MetricType: amount/count
+        var metric = Normalize(request.MetricType);
+
+        var usedCount = txs.Count;
+        var usedAmount = txs.Sum(x => x.Amount);
+
+        // Eðer "count" istiyorsa usedAmount yine de dönüyoruz (debug/monitoring için)
+        // Eðer "amount" istiyorsa usedCount yine de dönüyoruz
+        _ = metric;
+
+        return new UsageResultDto(
+            request.CustomerId,
+            request.Currency,
+            Normalize(request.Period),
+            metric,
+            fromDate,
+            toDate,
+            usedAmount,
+            usedCount
+        );
     }
 
-    private static void ValidateBookRequest(BookTransactionRequest request)
-    {
-        if (request.CustomerId == Guid.Empty) throw new InvalidOperationException("customerId is required.");
-        if (string.IsNullOrWhiteSpace(request.Currency)) throw new InvalidOperationException("currency is required.");
-        if (request.Amount <= 0m) throw new InvalidOperationException("amount must be > 0.");
-        if (string.IsNullOrWhiteSpace(request.ReferenceId)) throw new InvalidOperationException("referenceId is required.");
-        if (string.IsNullOrWhiteSpace(request.IdempotencyKey)) throw new InvalidOperationException("idempotencyKey is required.");
-        if (string.IsNullOrWhiteSpace(request.CorrelationId)) throw new InvalidOperationException("correlationId is required.");
-    }
+    private static string ToDbDirection(Contracts.Enums.AccountingDirection dir)
+        => dir == Contracts.Enums.AccountingDirection.Debit ? "debit" : "credit";
 
-    private static (EntryDirection direction, decimal signedDelta) GetEntryEffect(OperationType opType, decimal amount)
-        => opType switch
-        {
-            OperationType.TopUp => (EntryDirection.Credit, +amount),
-            OperationType.TransferIn => (EntryDirection.Credit, +amount),
-            OperationType.TransferOut => (EntryDirection.Debit, -amount),
-            OperationType.Fee => (EntryDirection.Debit, -amount),
-            _ => (EntryDirection.Credit, +amount)
-        };
+    private static string Normalize(string s)
+        => (s ?? string.Empty).Trim().ToLowerInvariant();
 
-    private static OperationType MapToDomainOperation(AccountingOperationType op) => op switch
+    private static (DateTime fromUtc, DateTime toUtc, DateOnly fromDate, DateOnly toDate) BuildRange(DateOnly date, string period)
     {
-        AccountingOperationType.TopUp => OperationType.TopUp,
-        AccountingOperationType.TransferIn => OperationType.TransferIn,
-        AccountingOperationType.TransferOut => OperationType.TransferOut,
-        AccountingOperationType.Fee => OperationType.Fee,
-        _ => OperationType.TopUp
-    };
+        var p = Normalize(period);
 
-    private static AccountingOperationType MapToContractOperation(OperationType op) => op switch
-    {
-        OperationType.TopUp => AccountingOperationType.TopUp,
-        OperationType.TransferIn => AccountingOperationType.TransferIn,
-        OperationType.TransferOut => AccountingOperationType.TransferOut,
-        OperationType.Fee => AccountingOperationType.Fee,
-        _ => AccountingOperationType.TopUp
-    };
-
-    private static AccountingEntryDirection MapToContractDirection(EntryDirection d) => d switch
-    {
-        EntryDirection.Credit => AccountingEntryDirection.Credit,
-        EntryDirection.Debit => AccountingEntryDirection.Debit,
-        _ => AccountingEntryDirection.Credit
-    };
-
-    private static AccountDto MapAccountDto(Account a) => new()
-    {
-        Id = a.Id,
-        CustomerId = a.CustomerId,
-        Currency = a.Currency,
-        Balance = a.Balance,
-        Status = a.Status,
-        CreatedAt = a.CreatedAt
-    };
-
-    private static AccountingTransactionDto MapTxDto(AccountingTransaction tx) => new()
-    {
-        Id = tx.Id,
-        AccountId = tx.AccountId,
-        Direction = MapToContractDirection(tx.Direction),
-        OperationType = MapToContractOperation(tx.OperationType),
-        Amount = tx.Amount,
-        Currency = tx.Currency,
-        BalanceBefore = tx.BalanceBefore,
-        BalanceAfter = tx.BalanceAfter,
-        ReferenceId = tx.ReferenceId,
-        IdempotencyKey = tx.IdempotencyKey,
-        CorrelationId = tx.CorrelationId,
-        Status = tx.Status,
-        CreatedAt = tx.CreatedAt,
-        BookedAt = tx.BookedAt
-    };
-
-    private static (DateTime fromUtc, DateTime toUtc) BuildRange(DateOnly date, UsagePeriod period)
-    {
         DateOnly fromDate;
         DateOnly toDate;
 
-        switch (period)
+        if (p == "day")
         {
-            case UsagePeriod.Day:
-                fromDate = date;
-                toDate = date;
-                break;
-
-            case UsagePeriod.Month:
-                fromDate = new DateOnly(date.Year, date.Month, 1);
-                toDate = fromDate.AddMonths(1).AddDays(-1);
-                break;
-
-            case UsagePeriod.Year:
-            default:
-                fromDate = new DateOnly(date.Year, 1, 1);
-                toDate = new DateOnly(date.Year, 12, 31);
-                break;
+            fromDate = date;
+            toDate = date;
+        }
+        else if (p == "month")
+        {
+            fromDate = new DateOnly(date.Year, date.Month, 1);
+            toDate = fromDate.AddMonths(1).AddDays(-1);
+        }
+        else // year (default)
+        {
+            fromDate = new DateOnly(date.Year, 1, 1);
+            toDate = new DateOnly(date.Year, 12, 31);
         }
 
         var fromUtc = fromDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         var toUtc = toDate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
 
-        return (fromUtc, toUtc);
+        return (fromUtc, toUtc, fromDate, toDate);
     }
 }

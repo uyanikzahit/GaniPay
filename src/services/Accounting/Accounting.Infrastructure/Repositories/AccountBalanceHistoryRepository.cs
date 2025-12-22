@@ -21,6 +21,7 @@ public sealed class AccountBalanceHistoryRepository : IAccountBalanceHistoryRepo
     {
         return await _db.AccountBalanceHistories.AsNoTracking()
             .Where(x => x.AccountId == accountId && x.CreatedAt >= fromUtc && x.CreatedAt <= toUtc)
+            .OrderBy(x => x.CreatedAt)
             .ToListAsync(ct);
     }
 }

@@ -11,44 +11,20 @@ namespace GaniPay.Accounting.Infrastructure.DependencyInjection;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddAccountingInfrastructure(
-        this IServiceCollection services,
-        IConfiguration configuration)
+    public static IServiceCollection AddAccountingInfrastructure(this IServiceCollection services, IConfiguration config)
     {
-        // Connection string'i net þekilde çek
-        var connStr =
-            configuration.GetConnectionString("AccountingDb")
-            ?? configuration.GetConnectionString("ganipay_accounting")
-            ?? configuration["ConnectionStrings:AccountingDb"]
-            ?? configuration["ConnectionStrings:ganipay_accounting"];
+        var cs = config.GetConnectionString("AccountingDb");
+        if (string.IsNullOrWhiteSpace(cs))
+            throw new InvalidOperationException("ConnectionStrings:AccountingDb is missing.");
 
-        if (string.IsNullOrWhiteSpace(connStr))
-            throw new InvalidOperationException(
-                "Accounting DB connection string bulunamadý. " +
-                "appsettings.json içine ConnectionStrings:AccountingDb ekle.");
+        services.AddDbContext<AccountingDbContext>(opt => opt.UseNpgsql(cs));
 
-        // DbContext REGISTER (en kritik kýsým)
-        services.AddDbContext<AccountingDbContext>(opt =>
-        {
-            opt.UseNpgsql(connStr, npgsql =>
-            {
-                // Migration'lar Infrastructure assembly içinde
-                npgsql.MigrationsAssembly(typeof(AccountingDbContext).Assembly.FullName);
-            });
-
-            // Ýstersen debug için aç:
-            // opt.EnableSensitiveDataLogging();
-            // opt.EnableDetailedErrors();
-        });
-
-        // Repositories
         services.AddScoped<IAccountRepository, AccountRepository>();
         services.AddScoped<IAccountingTransactionRepository, AccountingTransactionRepository>();
         services.AddScoped<IAccountBalanceHistoryRepository, AccountBalanceHistoryRepository>();
-        services.AddScoped<IAccountingService, AccountingService>();
-
-        // UnitOfWork
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        services.AddScoped<IAccountingService, AccountingService>();
 
         return services;
     }

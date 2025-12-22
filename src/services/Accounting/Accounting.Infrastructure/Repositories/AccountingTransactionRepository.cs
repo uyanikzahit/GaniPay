@@ -8,40 +8,37 @@ namespace GaniPay.Accounting.Infrastructure.Repositories;
 public sealed class AccountingTransactionRepository : IAccountingTransactionRepository
 {
     private readonly AccountingDbContext _db;
-
     public AccountingTransactionRepository(AccountingDbContext db) => _db = db;
 
-    public Task<AccountingTransaction?> GetByIdempotencyKeyAsync(Guid accountId, string idempotencyKey, CancellationToken ct)
-        => _db.AccountingTransactions.FirstOrDefaultAsync(
-            x => x.AccountId == accountId && x.IdempotencyKey == idempotencyKey, ct);
+    public async Task AddAsync(AccountingTransaction tx, CancellationToken ct = default)
+        => await _db.AccountingTransactions.AddAsync(tx, ct);
 
-    public Task AddAsync(AccountingTransaction tx, CancellationToken ct)
-        => _db.AccountingTransactions.AddAsync(tx, ct).AsTask();
-
-    public async Task<decimal> CalculateUsageAsync(
-        Guid customerId,
-        string currency,
-        string metricType,
+    public async Task<IReadOnlyList<AccountingTransaction>> ListByAccountAndRangeAsync(
+        Guid accountId,
         DateTime fromUtc,
         DateTime toUtc,
-        CancellationToken ct)
+        CancellationToken ct = default)
     {
-        // Account join
-        var query =
-            from tx in _db.AccountingTransactions.AsNoTracking()
-            join acc in _db.Accounts.AsNoTracking() on tx.AccountId equals acc.Id
-            where acc.CustomerId == customerId
-                  && acc.Currency == currency
-                  && tx.Status == Domain.Enums.TransactionStatus.Booked
-                  && tx.CreatedAt >= fromUtc && tx.CreatedAt <= toUtc
-            select tx;
+        return await _db.AccountingTransactions.AsNoTracking()
+            .Where(x => x.AccountId == accountId && x.CreatedAt >= fromUtc && x.CreatedAt <= toUtc)
+            .OrderBy(x => x.CreatedAt)
+            .ToListAsync(ct);
+    }
 
-        if (string.Equals(metricType, "TransactionAmount", StringComparison.OrdinalIgnoreCase))
-        {
-            return await query.SumAsync(x => x.Amount, ct);
-        }
-
-        // default: TransactionCount
-        return await query.CountAsync(ct);
+    public async Task<IReadOnlyList<AccountingTransaction>> ListByCustomerAndCurrencyAndRangeAsync(
+        Guid customerId,
+        string currency,
+        DateTime fromUtc,
+        DateTime toUtc,
+        CancellationToken ct = default)
+    {
+        return await _db.AccountingTransactions.AsNoTracking()
+            .Where(x =>
+                x.Account.CustomerId == customerId &&
+                x.Currency == currency &&
+                x.CreatedAt >= fromUtc &&
+                x.CreatedAt <= toUtc)
+            .OrderBy(x => x.CreatedAt)
+            .ToListAsync(ct);
     }
 }
