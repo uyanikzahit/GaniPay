@@ -34,20 +34,25 @@ public sealed class AccountingService : IAccountingService
         if (string.IsNullOrWhiteSpace(request.AccountNumber))
             throw new InvalidOperationException("AccountNumber is required.");
 
-        var existing = await _accountRepository.GetByCustomerAndCurrencyAsync(request.CustomerId, request.Currency, ct);
+        var currency = request.Currency.Trim();
+        var accountNumber = request.AccountNumber.Trim();
+
+        var existing = await _accountRepository.GetByCustomerAndCurrencyAsync(request.CustomerId, currency, ct);
         if (existing is not null)
             throw new InvalidOperationException("Account already exists for this customer & currency.");
+
+        var createdAt = EnsureUtc(DateTime.UtcNow);
 
         var account = new Account
         {
             Id = Guid.NewGuid(),
             CustomerId = request.CustomerId,
-            AccountNumber = request.AccountNumber.Trim(),
-            Currency = request.Currency.Trim(),
+            AccountNumber = accountNumber,
+            Currency = currency,
             Balance = 0m,
             Status = AccountStatus.Active,
             Iban = string.IsNullOrWhiteSpace(request.Iban) ? null : request.Iban.Trim(),
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = createdAt
         };
 
         await _accountRepository.AddAsync(account, ct);
@@ -67,7 +72,12 @@ public sealed class AccountingService : IAccountingService
 
     public async Task<BalanceDto> GetBalanceAsync(Guid customerId, string currency, CancellationToken ct)
     {
-        var account = await _accountRepository.GetByCustomerAndCurrencyAsync(customerId, currency, ct)
+        if (string.IsNullOrWhiteSpace(currency))
+            throw new InvalidOperationException("Currency is required.");
+
+        var cur = currency.Trim();
+
+        var account = await _accountRepository.GetByCustomerAndCurrencyAsync(customerId, cur, ct)
                       ?? throw new InvalidOperationException("Account not found.");
 
         return new BalanceDto(account.Id, account.CustomerId, account.Currency, account.Balance);
@@ -75,7 +85,12 @@ public sealed class AccountingService : IAccountingService
 
     public async Task<AccountingTransactionDto> PostTransactionAsync(PostAccountingTransactionRequest request, CancellationToken ct)
     {
-        var account = await _accountRepository.GetByCustomerAndCurrencyAsync(request.CustomerId, request.Currency, ct)
+        if (string.IsNullOrWhiteSpace(request.Currency))
+            throw new InvalidOperationException("Currency is required.");
+
+        var currency = request.Currency.Trim();
+
+        var account = await _accountRepository.GetByCustomerAndCurrencyAsync(request.CustomerId, currency, ct)
                       ?? throw new InvalidOperationException("Account not found.");
 
         if (account.Status != AccountStatus.Active)
@@ -84,7 +99,12 @@ public sealed class AccountingService : IAccountingService
         if (request.Amount <= 0)
             throw new InvalidOperationException("Amount must be > 0.");
 
+        // DB’den gelen datetime’lar bazen Unspecified gelebiliyor.
+        // Update sýrasýnda EF bunu da "touched" ederse timestamptz insert/update patlayabiliyor.
+        account.CreatedAt = EnsureUtc(account.CreatedAt);
+
         var directionString = ToDbDirection(request.Direction);
+
         var balanceBefore = account.Balance;
 
         var balanceDelta = request.Direction switch
@@ -96,12 +116,10 @@ public sealed class AccountingService : IAccountingService
 
         var balanceAfter = balanceBefore + balanceDelta;
 
-        // MVP: Negatif bakiye istemiyorsan burada kes:
-        // (Ýstersen bunu Payments/Camunda akýþýnda da kontrol edebiliriz ama burada garanti daha iyi.)
         if (balanceAfter < 0)
             throw new InvalidOperationException("Insufficient balance.");
 
-        var createdAt = DateTime.UtcNow;
+        var createdAt = EnsureUtc(DateTime.UtcNow);
 
         // accounting_transaction insert
         var tx = new AccountingTransaction
@@ -110,7 +128,7 @@ public sealed class AccountingService : IAccountingService
             AccountId = account.Id,
             Direction = directionString,
             Amount = request.Amount,
-            Currency = request.Currency,
+            Currency = currency,
             BalanceBefore = balanceBefore,
             BalanceAfter = balanceAfter,
             OperationType = (int)request.OperationType,
@@ -129,7 +147,7 @@ public sealed class AccountingService : IAccountingService
             ChangeAmount = request.Amount,
             BalanceBefore = balanceBefore,
             BalanceAfter = balanceAfter,
-            Currency = request.Currency,
+            Currency = currency,
             OperationType = (int)request.OperationType,
             ReferenceId = request.ReferenceId,
             CreatedAt = createdAt
@@ -168,14 +186,11 @@ public sealed class AccountingService : IAccountingService
             toUtc,
             ct);
 
-        // MetricType: amount/count
         var metric = Normalize(request.MetricType);
 
         var usedCount = txs.Count;
         var usedAmount = txs.Sum(x => x.Amount);
 
-        // Eðer "count" istiyorsa usedAmount yine de dönüyoruz (debug/monitoring için)
-        // Eðer "amount" istiyorsa usedCount yine de dönüyoruz
         _ = metric;
 
         return new UsageResultDto(
@@ -195,6 +210,18 @@ public sealed class AccountingService : IAccountingService
 
     private static string Normalize(string s)
         => (s ?? string.Empty).Trim().ToLowerInvariant();
+
+    private static DateTime EnsureUtc(DateTime dt)
+    {
+        // Npgsql timestamptz için Unspecified yazmayý sevmez.
+        // Elimizdeki deðer Unspecified ise UTC varsayarak düzelt.
+        return dt.Kind switch
+        {
+            DateTimeKind.Utc => dt,
+            DateTimeKind.Local => dt.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(dt, DateTimeKind.Utc)
+        };
+    }
 
     private static (DateTime fromUtc, DateTime toUtc, DateOnly fromDate, DateOnly toDate) BuildRange(DateOnly date, string period)
     {
@@ -219,6 +246,7 @@ public sealed class AccountingService : IAccountingService
             toDate = new DateOnly(date.Year, 12, 31);
         }
 
+        // DateOnly -> DateTime (UTC)
         var fromUtc = fromDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         var toUtc = toDate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
 

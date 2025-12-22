@@ -1,8 +1,8 @@
 using GaniPay.Accounting.Application.Contracts.Requests;
 using GaniPay.Accounting.Application.Services;
 using GaniPay.Accounting.Infrastructure.DependencyInjection;
-using System.Text.Json.Serialization;
-using GaniPay.Accounting.Application.Contracts.Enums;
+
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
 
