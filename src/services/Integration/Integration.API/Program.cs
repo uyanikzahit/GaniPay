@@ -1,39 +1,43 @@
+using GaniPay.Integration.Application.Contracts.Requests;
+using GaniPay.Integration.Application.Services;
+using GaniPay.Integration.Infrastructure.DependencyInjection;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// Infrastructure + App services + DbContext
+builder.Services.AddIntegrationInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+app.UseSwagger();
+app.UseSwaggerUI();
 
-app.MapGet("/weatherforecast", () =>
+var group = app.MapGroup("/api/integration").WithTags("Integration");
+
+// 1) Provider call
+group.MapPost("/call", async (IIntegrationService service, CallIntegrationRequest request, CancellationToken ct) =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+    var result = await service.CallAsync(request, ct);
+    return Results.Ok(result);
+});
+
+// 2) Get log by id
+group.MapGet("/logs/{id:guid}", async (IIntegrationService service, Guid id, CancellationToken ct) =>
+{
+    var result = await service.GetAsync(new GetIntegrationLogRequest(id), ct);
+    return Results.Ok(result);
+});
+
+// 3) Get logs by provider id
+group.MapGet("/providers/{providerId:guid}/logs", async (IIntegrationService service, Guid providerId, CancellationToken ct) =>
+{
+    var result = await service.GetProviderLogsAsync(new GetProviderLogsRequest(providerId), ct);
+    return Results.Ok(result);
+});
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

@@ -1,0 +1,34 @@
+@baseUrl = http://localhost:5094
+
+### Health
+GET {{baseUrl}}/health
+
+### Call - TopUp (Success)
+POST {{baseUrl}}/api/integration/call
+Content-Type: application/json
+
+{
+  "providerCode": "MOCK_BANK",
+  "operation": "topup",
+  "requestPayload": "{\"correlationId\":\"2ded...\",\"customerId\":\"050f0a6d-fade-4dd8-b998-b8f30580e037\",\"amount\":100,\"currency\":\"TRY\",\"sourceType\":\"IBAN\",\"sourceIban\":\"TR930006701000000000000001\"}"
+}
+
+### Call - Transfer (Success)
+POST {{baseUrl}}/api/integration/call
+Content-Type: application/json
+
+{
+  "providerCode": "MOCK_BANK",
+  "operation": "transfer",
+  "requestPayload": "{\"correlationId\":\"2ded...\",\"fromWallet\":\"WALLET-0001\",\"toWallet\":\"WALLET-0002\",\"amount\":25,\"currency\":\"TRY\"}"
+}
+
+### Call - Forced Fail
+POST {{baseUrl}}/api/integration/call
+Content-Type: application/json
+
+{
+  "providerCode": "MOCK_BANK",
+  "operation": "topup",
+  "requestPayload": "{\"correlationId\":\"x\",\"amount\":10,\"currency\":\"TRY\",\"sourceType\":\"IBAN\",\"sourceIban\":\"FORCE_FAIL\"}"
+}
