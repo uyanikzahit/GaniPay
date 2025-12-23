@@ -1,7 +1,7 @@
 ﻿using GaniPay.Notification.Application.Contracts.Requests;
 using GaniPay.Notification.Application.Services;
 using GaniPay.Notification.Infrastructure.DependencyInjection;
-using GaniPay.Notification.Infrastructure.Persistence;
+using GaniPay.Notification.Infrastructure.Persistence; // NotificationDbContext buradan geliyor
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,8 +20,7 @@ app.UseSwaggerUI();
 // Health
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
-// ✅ Controlled auto-migration (Dev / Config-based)
-// Development'ta otomatik çalışır. İstersen appsettings ile de aç/kapat yaparsın.
+// ✅ Controlled auto-migration (DEV veya config ile)
 var autoMigrate =
     app.Environment.IsDevelopment() ||
     builder.Configuration.GetValue<bool>("Database:AutoMigrate");

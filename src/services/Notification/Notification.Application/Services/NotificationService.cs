@@ -10,8 +10,9 @@ namespace GaniPay.Notification.Application.Services;
 
 public sealed class NotificationService : INotificationService
 {
+    // DB CHECK constraint uyumlu set: sms / email / inapp / push
     private static readonly HashSet<string> AllowedChannels =
-        new(StringComparer.OrdinalIgnoreCase) { "sms", "email", "push" };
+        new(StringComparer.OrdinalIgnoreCase) { "sms", "email", "inapp", "push" };
 
     private readonly INotificationLogRepository _repo;
     private readonly INotificationProvider _provider;
@@ -33,15 +34,18 @@ public sealed class NotificationService : INotificationService
 
         var normalizedChannel = NormalizeChannel(request.Channel);
 
+        // ✅ LOG OLUŞTURMA KISMI BURASI (SendAsync içinde)
         var log = new NotificationLog
         {
             Id = Guid.NewGuid(),
             CustomerId = request.CustomerId,
-            Channel = normalizedChannel,                 // ✅ DB constraint uyumlu
+            Channel = normalizedChannel,              // ✅ DB constraint uyumlu
             TemplateCode = request.TemplateCode.Trim(),
-            Payload = request.Payload,
+            Payload = request.Payload.Trim(),         // payload boşlukları da temizleyelim
             Status = NotificationStatus.Pending,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            SentAt = null,
+            ErrorMessage = null
         };
 
         await _repo.AddAsync(log, ct);
@@ -59,7 +63,10 @@ public sealed class NotificationService : INotificationService
         {
             log.Status = NotificationStatus.Failed;
             log.SentAt = null;
-            log.ErrorMessage = ex.Message;
+
+            // DB'de 500 limitin var, taşarsa kırp.
+            var msg = ex.Message ?? "unknown error";
+            log.ErrorMessage = msg.Length <= 500 ? msg : msg[..500];
         }
 
         await _repo.UpdateAsync(log, ct);
@@ -104,16 +111,19 @@ public sealed class NotificationService : INotificationService
     {
         var c = channel.Trim().ToLowerInvariant();
 
-        // ufak alias desteği (istersen kaldırırız)
+        // alias desteği
         c = c switch
         {
             "mail" => "email",
             "e-mail" => "email",
+            "in_app" => "inapp",
+            "in-app" => "inapp",
+            "app" => "inapp",
             _ => c
         };
 
         if (!AllowedChannels.Contains(c))
-            throw new InvalidOperationException($"channel is invalid. allowed: sms, email, push");
+            throw new InvalidOperationException("channel is invalid. allowed: sms, email, inapp, push");
 
         return c;
     }
