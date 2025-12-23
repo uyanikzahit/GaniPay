@@ -34,8 +34,8 @@ public sealed class PaymentsService : IPaymentsService
         if (string.IsNullOrWhiteSpace(request.Currency))
             throw new InvalidOperationException("currency is required");
 
-        if (string.IsNullOrWhiteSpace(request.TargetIban))
-            throw new InvalidOperationException("targetIban is required");
+        if (string.IsNullOrWhiteSpace(request.TargetWalletNumber))
+            throw new InvalidOperationException("targetWalletNumber is required");
 
         // 1) Idempotency
         var existing = await _repo.GetByIdempotencyKeyAsync(request.IdempotencyKey, ct);
@@ -67,7 +67,7 @@ public sealed class PaymentsService : IPaymentsService
             process.CustomerId,
             process.Amount,
             process.Currency,
-            request.TargetIban,
+            request.TargetWalletNumber,
             TransferType = request.TransferType.ToString()
         };
 

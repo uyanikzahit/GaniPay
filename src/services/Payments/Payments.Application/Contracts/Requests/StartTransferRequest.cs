@@ -6,7 +6,7 @@ public sealed record StartTransferRequest(
     Guid CustomerId,
     decimal Amount,
     string Currency,
-    string TargetIban,
+    string TargetWalletNumber,
     string IdempotencyKey,
     TransferType TransferType = TransferType.Unknown
 );
