@@ -1,39 +1,57 @@
+﻿using GaniPay.Notification.Application.Contracts.Requests;
+using GaniPay.Notification.Application.Services;
+using GaniPay.Notification.Infrastructure.DependencyInjection;
+using GaniPay.Notification.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+builder.Services.AddNotificationInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+// Swagger
+app.UseSwagger();
+app.UseSwaggerUI();
+
+// Health
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+
+// ✅ Controlled auto-migration (Dev / Config-based)
+// Development'ta otomatik çalışır. İstersen appsettings ile de aç/kapat yaparsın.
+var autoMigrate =
+    app.Environment.IsDevelopment() ||
+    builder.Configuration.GetValue<bool>("Database:AutoMigrate");
+
+if (autoMigrate)
 {
-    app.MapOpenApi();
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<NotificationDbContext>();
+    db.Database.Migrate();
 }
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+// Endpoints
+var group = app.MapGroup("/api/notifications").WithTags("Notifications");
 
-app.MapGet("/weatherforecast", () =>
+group.MapPost("/send", async (INotificationService service, SendNotificationRequest request, CancellationToken ct) =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+    var result = await service.SendAsync(request, ct);
+    return Results.Ok(result);
+});
+
+group.MapGet("/{id:guid}", async (INotificationService service, Guid id, CancellationToken ct) =>
+{
+    var result = await service.GetAsync(new GetNotificationRequest(id), ct);
+    return Results.Ok(result);
+});
+
+group.MapGet("/customers/{customerId:guid}", async (INotificationService service, Guid customerId, CancellationToken ct) =>
+{
+    var result = await service.GetCustomerLogsAsync(new GetCustomerNotificationsRequest(customerId), ct);
+    return Results.Ok(result);
+});
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

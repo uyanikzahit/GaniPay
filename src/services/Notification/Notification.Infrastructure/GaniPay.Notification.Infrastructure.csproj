@@ -12,4 +12,9 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Notification.Application\GaniPay.Notification.Application.csproj" />
+    <ProjectReference Include="..\Notification.Domain\GaniPay.Notification.Domain.csproj" />
+  </ItemGroup>
+
 </Project>
