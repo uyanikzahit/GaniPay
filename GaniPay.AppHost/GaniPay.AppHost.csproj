@@ -1,0 +1,26 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.1.0">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>9f93fd96-9c73-4ceb-8923-56f10d8495e2</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\src\services\Accounting\Accounting.API\GaniPay.Accounting.API.csproj" />
+    <ProjectReference Include="..\src\services\Customer\Customer.API\GaniPay.Customer.API.csproj" />
+    <ProjectReference Include="..\src\services\Expense\Expense.API\GaniPay.Expense.API.csproj" />
+    <ProjectReference Include="..\src\services\Identity\Identity.API\GaniPay.Identity.API.csproj" />
+    <ProjectReference Include="..\src\services\Integration\Integration.API\GaniPay.Integration.API.csproj" />
+    <ProjectReference Include="..\src\services\Notification\Notification.API\GaniPay.Notification.API.csproj" />
+    <ProjectReference Include="..\src\services\Payments\Payments.API\GaniPay.Payments.API.csproj" />
+    <ProjectReference Include="..\src\services\TransactionLimit\TransactionLimit.API\GaniPay.TransactionLimit.API.csproj" />
+  </ItemGroup>
+
+</Project>
