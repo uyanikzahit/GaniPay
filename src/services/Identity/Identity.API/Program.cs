@@ -2,6 +2,11 @@ using GaniPay.Identity.Application.Services;
 using GaniPay.Identity.Domain.Enums;
 using GaniPay.Identity.Infrastructure.DependencyInjection;
 
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using Microsoft.IdentityModel.Tokens;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
@@ -37,17 +42,50 @@ group.MapPost("/registrations/start", async (StartRegistrationBody body, Identit
 });
 
 // POST /api/v1/identity/login
-group.MapPost("/login", async (LoginBody body, IdentityService service, CancellationToken ct) =>
+group.MapPost("/login", async (LoginBody body, IdentityService service, IConfiguration config, CancellationToken ct) =>
 {
     var cred = await service.LoginAsync(body.PhoneNumber, body.Password, ct);
 
+    var jwtSection = config.GetSection("Jwt");
+    var issuer = jwtSection["Issuer"]!;
+    var audience = jwtSection["Audience"]!;
+    var secret = jwtSection["Secret"]!;
+    var expiresMinutes = int.TryParse(jwtSection["ExpiresMinutes"], out var m) ? m : 60;
+
+    if (string.IsNullOrWhiteSpace(secret) || secret.Length < 32)
+        return Results.Problem("Jwt:Secret must be at least 32 chars.");
+
+    var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
+    var signingCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+    var now = DateTime.UtcNow;
+
+    var claims = new List<Claim>
+    {
+        new(JwtRegisteredClaimNames.Sub, cred.Id.ToString()),
+        new("customerId", cred.CustomerId.ToString()),
+        new("loginType", cred.LoginType.ToString()),
+        new("phoneNumber", cred.LoginValue),
+        new(ClaimTypes.Role, "Customer")
+    };
+
+    var token = new JwtSecurityToken(
+        issuer: issuer,
+        audience: audience,
+        claims: claims,
+        notBefore: now,
+        expires: now.AddMinutes(expiresMinutes),
+        signingCredentials: signingCredentials
+    );
+
+    var accessToken = new JwtSecurityTokenHandler().WriteToken(token);
+
     return Results.Ok(new
     {
-        id = cred.Id,
+        success = true,
         customerId = cred.CustomerId,
-        loginType = cred.LoginType,
-        loginValue = cred.LoginValue,
-        lastLoginAt = cred.LastLoginAt
+        accessToken,
+        expiresIn = expiresMinutes * 60
     });
 });
 
