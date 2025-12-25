@@ -31,11 +31,7 @@ public sealed class AccountingService : IAccountingService
         if (string.IsNullOrWhiteSpace(request.Currency))
             throw new InvalidOperationException("Currency is required.");
 
-        if (string.IsNullOrWhiteSpace(request.AccountNumber))
-            throw new InvalidOperationException("AccountNumber is required.");
-
         var currency = request.Currency.Trim();
-        var accountNumber = request.AccountNumber.Trim();
 
         var existing = await _accountRepository.GetByCustomerAndCurrencyAsync(request.CustomerId, currency, ct);
         if (existing is not null)
@@ -43,11 +39,15 @@ public sealed class AccountingService : IAccountingService
 
         var createdAt = EnsureUtc(DateTime.UtcNow);
 
+        // Sistem otomatik üretir: account.Id üzerinden deterministik ve çakýþmasýz.
+        var accountId = Guid.NewGuid();
+        var generatedAccountNumber = accountId.ToString("N"); // 32 chars, unique
+
         var account = new Account
         {
-            Id = Guid.NewGuid(),
+            Id = accountId,
             CustomerId = request.CustomerId,
-            AccountNumber = accountNumber,
+            AccountNumber = generatedAccountNumber,
             Currency = currency,
             Balance = 0m,
             Status = AccountStatus.Active,
