@@ -1,0 +1,470 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions
+  xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+  id="Definitions_RegisterValidation"
+  targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:process id="Register_Validation_Process" name="Register.Validation" isExecutable="true">
+
+    <!-- ========== START ========== -->
+    <bpmn:startEvent id="Start_Validation" name="Start Validation"/>
+    <bpmn:sequenceFlow id="F_01" sourceRef="Start_Validation" targetRef="T_AgeControl"/>
+
+    <!-- ========== 1) Age Control (REAL) ========== -->
+    <bpmn:serviceTask id="T_AgeControl" name="Age Control">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="real.age.control"/>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="F_02" sourceRef="T_AgeControl" targetRef="G_Age"/>
+
+    <bpmn:exclusiveGateway id="G_Age" name="Age Control" default="F_Age_Fail"/>
+    <bpmn:sequenceFlow id="F_Age_Ok" sourceRef="G_Age" targetRef="T_DeviceInfoGet">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="feel">= ageValid = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_Age_Fail" sourceRef="G_Age" targetRef="E_InvalidAge" name="Invalid Age"/>
+
+    <bpmn:endEvent id="E_InvalidAge" name="Invalid Age"/>
+
+    <!-- ========== 2) Device Info Get (MOCK) ========== -->
+    <bpmn:serviceTask id="T_DeviceInfoGet" name="Device Info Get">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.device.info.get"/>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="F_03" sourceRef="T_DeviceInfoGet" targetRef="G_DeviceFound"/>
+
+    <bpmn:exclusiveGateway id="G_DeviceFound" name="Device Found?" default="F_Device_NotFound"/>
+    <bpmn:sequenceFlow id="F_Device_Ok" sourceRef="G_DeviceFound" targetRef="T_CustomerPhoneGet">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="feel">= deviceFound = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_Device_NotFound" sourceRef="G_DeviceFound" targetRef="E_DeviceNotFound" name="Device Not Found"/>
+
+    <bpmn:endEvent id="E_DeviceNotFound" name="Device Not Found"/>
+
+    <!-- ========== 3) Customer Phone Get (MOCK) ========== -->
+    <bpmn:serviceTask id="T_CustomerPhoneGet" name="Customer Phone Get">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.customer.phone.get"/>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="F_04" sourceRef="T_CustomerPhoneGet" targetRef="T_CustomerControl"/>
+
+    <!-- ========== 4) Customer Control (REAL) ========== -->
+    <bpmn:serviceTask id="T_CustomerControl" name="Customer Control">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="real.customer.control"/>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="F_05" sourceRef="T_CustomerControl" targetRef="G_IsNewCustomer"/>
+
+    <bpmn:exclusiveGateway id="G_IsNewCustomer" name="Customer Control" default="F_ExistingCustomer"/>
+    <bpmn:sequenceFlow id="F_NewCustomer" sourceRef="G_IsNewCustomer" targetRef="T_DeviceCustomerLinkCheck">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="feel">= isNewCustomer = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_ExistingCustomer" sourceRef="G_IsNewCustomer" targetRef="E_ExistingCustomer" name="Existing Customer"/>
+
+    <bpmn:endEvent id="E_ExistingCustomer" name="Existing Customer"/>
+
+    <!-- ========== 5) Device–Customer Link Check (MOCK) ========== -->
+    <bpmn:serviceTask id="T_DeviceCustomerLinkCheck" name="Device Customer Link Check">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.device.customer.link.check"/>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="F_06" sourceRef="T_DeviceCustomerLinkCheck" targetRef="G_LinkOk"/>
+
+    <bpmn:exclusiveGateway id="G_LinkOk" name="Device-Customer Link OK?"/>
+    <bpmn:sequenceFlow id="F_Link_Ok" sourceRef="G_LinkOk" targetRef="T_CustomerGetById" name="Link OK"/>
+    <bpmn:sequenceFlow id="F_Link_Fail" sourceRef="G_LinkOk" targetRef="T_UnlinkDevice" name="Link Mismatch"/>
+
+    <bpmn:serviceTask id="T_UnlinkDevice" name="Unlink Device from its Customer">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.unlink.device"/>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="F_07" sourceRef="T_UnlinkDevice" targetRef="T_CustomerGetById"/>
+
+    <!-- ========== 6) Customer Get By Id (REAL) ========== -->
+    <bpmn:serviceTask id="T_CustomerGetById" name="Customer Get By Id">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="real.customer.getById"/>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="F_08" sourceRef="T_CustomerGetById" targetRef="T_PhoneIdentityMatch"/>
+
+    <!-- ========== 7) Phone & Identity Match? (MOCK) ========== -->
+    <bpmn:serviceTask id="T_PhoneIdentityMatch" name="Does Phone and Identity Match">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.phone.identity.match"/>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="F_09" sourceRef="T_PhoneIdentityMatch" targetRef="G_PhoneIdentity"/>
+
+    <bpmn:exclusiveGateway id="G_PhoneIdentity" name="Phone Number Unique?" default="F_PhoneIdentityFail"/>
+    <bpmn:sequenceFlow id="F_PhoneIdentityOk" sourceRef="G_PhoneIdentity" targetRef="T_CitizenNumberExists">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="feel">= phoneIdentityMatch = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_PhoneIdentityFail" sourceRef="G_PhoneIdentity" targetRef="E_PhoneIdentityMismatch" name="Phone and Identity Mismatch"/>
+
+    <bpmn:endEvent id="E_PhoneIdentityMismatch" name="Phone and Identity Mismatch"/>
+
+    <!-- ========== 8) Citizen Number Exists (MOCK) ========== -->
+    <bpmn:serviceTask id="T_CitizenNumberExists" name="Citizen Number Exists">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.citizen.number.exists"/>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="F_10" sourceRef="T_CitizenNumberExists" targetRef="G_CitizenExists"/>
+
+    <bpmn:exclusiveGateway id="G_CitizenExists" name="Citizen Number Exists?" default="F_CitizenMissing"/>
+    <bpmn:sequenceFlow id="F_CitizenOk" sourceRef="G_CitizenExists" targetRef="T_EmailIdentityMatch">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="feel">= citizenNumberExists = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_CitizenMissing" sourceRef="G_CitizenExists" targetRef="E_CitizenMissing" name="Citizen Number Missing"/>
+
+    <bpmn:endEvent id="E_CitizenMissing" name="Citizen Number Missing"/>
+
+    <!-- ========== 9) Email & Identity Match? (MOCK) ========== -->
+    <bpmn:serviceTask id="T_EmailIdentityMatch" name="Does Email Address and Identity Match">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.email.identity.match"/>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="F_11" sourceRef="T_EmailIdentityMatch" targetRef="G_EmailIdentity"/>
+
+    <bpmn:exclusiveGateway id="G_EmailIdentity" name="Does Email Address and Identity Match" default="F_EmailIdentityFail"/>
+    <bpmn:sequenceFlow id="F_EmailIdentityOk" sourceRef="G_EmailIdentity" targetRef="T_SanctionQuery">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="feel">= emailIdentityMatch = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_EmailIdentityFail" sourceRef="G_EmailIdentity" targetRef="E_EmailIdentityMismatch" name="E-mail Address and Identity Mismatch"/>
+
+    <bpmn:endEvent id="E_EmailIdentityMismatch" name="E-mail Address and Identity Mismatch"/>
+
+    <!-- ========== 10) Sanction Query (MOCK) ========== -->
+    <bpmn:serviceTask id="T_SanctionQuery" name="Sanction Query">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.sanction.query"/>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="F_12" sourceRef="T_SanctionQuery" targetRef="G_SanctionOk"/>
+
+    <bpmn:exclusiveGateway id="G_SanctionOk" name="Sanction Query" default="F_SanctionFail"/>
+    <bpmn:sequenceFlow id="F_SanctionOk" sourceRef="G_SanctionOk" targetRef="T_CitizenVerification">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="feel">= sanctionPassed = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_SanctionFail" sourceRef="G_SanctionOk" targetRef="E_SanctionFailed" name="Sanction Query Failed"/>
+
+    <bpmn:endEvent id="E_SanctionFailed" name="Sanction Query Failed"/>
+
+    <!-- ========== 11) Citizen Verification (MOCK) ========== -->
+    <bpmn:serviceTask id="T_CitizenVerification" name="Citizen Verification">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.citizen.verification"/>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="F_13" sourceRef="T_CitizenVerification" targetRef="G_CitizenVerified"/>
+
+    <bpmn:exclusiveGateway id="G_CitizenVerified" name="Is Citizen Verification Succeeded" default="F_CitizenVerifyFail"/>
+    <bpmn:sequenceFlow id="F_CitizenVerifyOk" sourceRef="G_CitizenVerified" targetRef="T_IbanVerification">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="feel">= citizenVerified = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_CitizenVerifyFail" sourceRef="G_CitizenVerified" targetRef="E_CitizenVerifyFailed" name="Citizen Verification Failed"/>
+
+    <bpmn:endEvent id="E_CitizenVerifyFailed" name="Citizen Verification Failed"/>
+
+    <!-- ========== 12) IBAN Verification (MOCK) ========== -->
+    <bpmn:serviceTask id="T_IbanVerification" name="IBAN Verification">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.iban.verification"/>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="F_14" sourceRef="T_IbanVerification" targetRef="G_IbanOk"/>
+
+    <bpmn:exclusiveGateway id="G_IbanOk" name="Is IBAN Verification Succeeded" default="F_IbanFail"/>
+    <bpmn:sequenceFlow id="F_IbanOk" sourceRef="G_IbanOk" targetRef="T_AddressVerification">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="feel">= ibanVerified = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_IbanFail" sourceRef="G_IbanOk" targetRef="E_IbanFailed" name="IBAN Verification Failed"/>
+
+    <bpmn:endEvent id="E_IbanFailed" name="IBAN Verification Failed"/>
+
+    <!-- ========== 13) Address Verification (REAL) ========== -->
+    <bpmn:serviceTask id="T_AddressVerification" name="Governance Address Number Verification">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="real.address.verification"/>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="F_15" sourceRef="T_AddressVerification" targetRef="G_AddressOk"/>
+
+    <bpmn:exclusiveGateway id="G_AddressOk" name="Is Address Number Verification Succeeded" default="F_AddressFail"/>
+    <bpmn:sequenceFlow id="F_AddressOk" sourceRef="G_AddressOk" targetRef="T_SimCheck">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="feel">= addressVerified = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_AddressFail" sourceRef="G_AddressOk" targetRef="E_AddressFailed" name="Governance Address Number Verification Failed"/>
+
+    <bpmn:endEvent id="E_AddressFailed" name="Governance Address Number Verification Failed"/>
+
+    <!-- ========== 14) SIM Check Control (MOCK) ========== -->
+    <bpmn:serviceTask id="T_SimCheck" name="SIM Check Control">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.sim.check.control"/>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="F_16" sourceRef="T_SimCheck" targetRef="G_SimOk"/>
+
+    <bpmn:exclusiveGateway id="G_SimOk" name="SIM Check Control" default="F_SimFail"/>
+    <bpmn:sequenceFlow id="F_SimOk" sourceRef="G_SimOk" targetRef="T_SetSuccess">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="feel">= simCheckPassed = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_SimFail" sourceRef="G_SimOk" targetRef="E_SimFailed" name="SIM Check Failed"/>
+
+    <bpmn:endEvent id="E_SimFailed" name="SIM Check Failed"/>
+
+    <!-- Set Success Variable (so main flow can route) -->
+    <bpmn:serviceTask id="T_SetSuccess" name="Set Validation SUCCESS">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.set.validation.success"/>
+        <zeebe:ioMapping>
+          <zeebe:output source="&quot;SUCCESS&quot;" target="validationStatus"/>
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="F_17" sourceRef="T_SetSuccess" targetRef="E_ValidationSuccess"/>
+
+    <bpmn:endEvent id="E_ValidationSuccess" name="Validation Success"/>
+
+  </bpmn:process>
+
+  <!-- ===================== DIAGRAM (BPMNDI) ===================== -->
+  <bpmndi:BPMNDiagram id="Diagram_RegisterValidation">
+    <bpmndi:BPMNPlane id="Plane_RegisterValidation" bpmnElement="Register_Validation_Process">
+
+      <bpmndi:BPMNShape id="S_Start" bpmnElement="Start_Validation">
+        <dc:Bounds x="120" y="220" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_Age" bpmnElement="T_AgeControl">
+        <dc:Bounds x="200" y="200" width="140" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_GAge" bpmnElement="G_Age" isMarkerVisible="true">
+        <dc:Bounds x="370" y="215" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_EndInvalidAge" bpmnElement="E_InvalidAge">
+        <dc:Bounds x="380" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_Device" bpmnElement="T_DeviceInfoGet">
+        <dc:Bounds x="450" y="200" width="160" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_GDevice" bpmnElement="G_DeviceFound" isMarkerVisible="true">
+        <dc:Bounds x="640" y="215" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_EndDeviceNotFound" bpmnElement="E_DeviceNotFound">
+        <dc:Bounds x="650" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_PhoneGet" bpmnElement="T_CustomerPhoneGet">
+        <dc:Bounds x="720" y="200" width="170" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_CustControl" bpmnElement="T_CustomerControl">
+        <dc:Bounds x="910" y="200" width="170" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_GIsNew" bpmnElement="G_IsNewCustomer" isMarkerVisible="true">
+        <dc:Bounds x="1100" y="215" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_EndExisting" bpmnElement="E_ExistingCustomer">
+        <dc:Bounds x="1110" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_LinkCheck" bpmnElement="T_DeviceCustomerLinkCheck">
+        <dc:Bounds x="1180" y="200" width="210" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_GLink" bpmnElement="G_LinkOk" isMarkerVisible="true">
+        <dc:Bounds x="1410" y="215" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_Unlink" bpmnElement="T_UnlinkDevice">
+        <dc:Bounds x="1315" y="310" width="200" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_GetById" bpmnElement="T_CustomerGetById">
+        <dc:Bounds x="1490" y="200" width="190" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_PhoneIdMatch" bpmnElement="T_PhoneIdentityMatch">
+        <dc:Bounds x="1705" y="200" width="240" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_GPhoneId" bpmnElement="G_PhoneIdentity" isMarkerVisible="true">
+        <dc:Bounds x="1960" y="215" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_EndPhoneIdMismatch" bpmnElement="E_PhoneIdentityMismatch">
+        <dc:Bounds x="1970" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_CitizenExists" bpmnElement="T_CitizenNumberExists">
+        <dc:Bounds x="2040" y="200" width="190" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_GCitizen" bpmnElement="G_CitizenExists" isMarkerVisible="true">
+        <dc:Bounds x="2250" y="215" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_EndCitizenMissing" bpmnElement="E_CitizenMissing">
+        <dc:Bounds x="2260" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_EmailMatch" bpmnElement="T_EmailIdentityMatch">
+        <dc:Bounds x="2325" y="200" width="260" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_GEmail" bpmnElement="G_EmailIdentity" isMarkerVisible="true">
+        <dc:Bounds x="2600" y="215" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_EndEmailMismatch" bpmnElement="E_EmailIdentityMismatch">
+        <dc:Bounds x="2610" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_Sanction" bpmnElement="T_SanctionQuery">
+        <dc:Bounds x="2680" y="200" width="160" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_GSanction" bpmnElement="G_SanctionOk" isMarkerVisible="true">
+        <dc:Bounds x="2860" y="215" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_EndSanction" bpmnElement="E_SanctionFailed">
+        <dc:Bounds x="2870" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_CitVerify" bpmnElement="T_CitizenVerification">
+        <dc:Bounds x="2940" y="200" width="170" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_GCitVerify" bpmnElement="G_CitizenVerified" isMarkerVisible="true">
+        <dc:Bounds x="3130" y="215" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_EndCitVerify" bpmnElement="E_CitizenVerifyFailed">
+        <dc:Bounds x="3140" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_Iban" bpmnElement="T_IbanVerification">
+        <dc:Bounds x="3210" y="200" width="160" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_GIban" bpmnElement="G_IbanOk" isMarkerVisible="true">
+        <dc:Bounds x="3390" y="215" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_EndIban" bpmnElement="E_IbanFailed">
+        <dc:Bounds x="3400" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_Address" bpmnElement="T_AddressVerification">
+        <dc:Bounds x="3470" y="200" width="250" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_GAddress" bpmnElement="G_AddressOk" isMarkerVisible="true">
+        <dc:Bounds x="3740" y="215" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_EndAddress" bpmnElement="E_AddressFailed">
+        <dc:Bounds x="3750" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_Sim" bpmnElement="T_SimCheck">
+        <dc:Bounds x="3820" y="200" width="170" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_GSim" bpmnElement="G_SimOk" isMarkerVisible="true">
+        <dc:Bounds x="4010" y="215" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_EndSim" bpmnElement="E_SimFailed">
+        <dc:Bounds x="4020" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_SetSuccess" bpmnElement="T_SetSuccess">
+        <dc:Bounds x="4090" y="200" width="200" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_EndSuccess" bpmnElement="E_ValidationSuccess">
+        <dc:Bounds x="4320" y="220" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <!-- Edges (basic) -->
+      <bpmndi:BPMNEdge id="E_F01" bpmnElement="F_01"><di:waypoint x="156" y="238"/><di:waypoint x="200" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F02" bpmnElement="F_02"><di:waypoint x="340" y="240"/><di:waypoint x="370" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FAgeOk" bpmnElement="F_Age_Ok"><di:waypoint x="420" y="240"/><di:waypoint x="450" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FAgeFail" bpmnElement="F_Age_Fail"><di:waypoint x="395" y="265"/><di:waypoint x="398" y="340"/></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F03" bpmnElement="F_03"><di:waypoint x="610" y="240"/><di:waypoint x="640" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FDevOk" bpmnElement="F_Device_Ok"><di:waypoint x="690" y="240"/><di:waypoint x="720" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FDevFail" bpmnElement="F_Device_NotFound"><di:waypoint x="665" y="265"/><di:waypoint x="668" y="340"/></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F04" bpmnElement="F_04"><di:waypoint x="890" y="240"/><di:waypoint x="910" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F05" bpmnElement="F_05"><di:waypoint x="1080" y="240"/><di:waypoint x="1100" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FNew" bpmnElement="F_NewCustomer"><di:waypoint x="1150" y="240"/><di:waypoint x="1180" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FExist" bpmnElement="F_ExistingCustomer"><di:waypoint x="1125" y="265"/><di:waypoint x="1128" y="340"/></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F06" bpmnElement="F_06"><di:waypoint x="1390" y="240"/><di:waypoint x="1410" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FLinkOk" bpmnElement="F_Link_Ok"><di:waypoint x="1460" y="240"/><di:waypoint x="1490" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FLinkFail" bpmnElement="F_Link_Fail"><di:waypoint x="1435" y="265"/><di:waypoint x="1415" y="310"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F07" bpmnElement="F_07"><di:waypoint x="1515" y="350"/><di:waypoint x="1490" y="240"/></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F08" bpmnElement="F_08"><di:waypoint x="1680" y="240"/><di:waypoint x="1705" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F09" bpmnElement="F_09"><di:waypoint x="1945" y="240"/><di:waypoint x="1960" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FPIOk" bpmnElement="F_PhoneIdentityOk"><di:waypoint x="2010" y="240"/><di:waypoint x="2040" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FPIFail" bpmnElement="F_PhoneIdentityFail"><di:waypoint x="1985" y="265"/><di:waypoint x="1988" y="340"/></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F10" bpmnElement="F_10"><di:waypoint x="2230" y="240"/><di:waypoint x="2250" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FCitOk" bpmnElement="F_CitizenOk"><di:waypoint x="2300" y="240"/><di:waypoint x="2325" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FCitFail" bpmnElement="F_CitizenMissing"><di:waypoint x="2275" y="265"/><di:waypoint x="2278" y="340"/></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F11" bpmnElement="F_11"><di:waypoint x="2585" y="240"/><di:waypoint x="2600" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FEmailOk" bpmnElement="F_EmailIdentityOk"><di:waypoint x="2650" y="240"/><di:waypoint x="2680" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FEmailFail" bpmnElement="F_EmailIdentityFail"><di:waypoint x="2625" y="265"/><di:waypoint x="2628" y="340"/></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F12" bpmnElement="F_12"><di:waypoint x="2840" y="240"/><di:waypoint x="2860" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FSanOk" bpmnElement="F_SanctionOk"><di:waypoint x="2910" y="240"/><di:waypoint x="2940" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FSanFail" bpmnElement="F_SanctionFail"><di:waypoint x="2885" y="265"/><di:waypoint x="2888" y="340"/></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F13" bpmnElement="F_13"><di:waypoint x="3110" y="240"/><di:waypoint x="3130" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FCVOk" bpmnElement="F_CitizenVerifyOk"><di:waypoint x="3180" y="240"/><di:waypoint x="3210" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FCVFail" bpmnElement="F_CitizenVerifyFail"><di:waypoint x="3155" y="265"/><di:waypoint x="3158" y="340"/></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F14" bpmnElement="F_14"><di:waypoint x="3370" y="240"/><di:waypoint x="3390" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FIbanOk" bpmnElement="F_IbanOk"><di:waypoint x="3440" y="240"/><di:waypoint x="3470" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FIbanFail" bpmnElement="F_IbanFail"><di:waypoint x="3415" y="265"/><di:waypoint x="3418" y="340"/></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F15" bpmnElement="F_15"><di:waypoint x="3720" y="240"/><di:waypoint x="3740" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FAddrOk" bpmnElement="F_AddressOk"><di:waypoint x="3790" y="240"/><di:waypoint x="3820" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FAddrFail" bpmnElement="F_AddressFail"><di:waypoint x="3765" y="265"/><di:waypoint x="3768" y="340"/></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F16" bpmnElement="F_16"><di:waypoint x="3990" y="240"/><di:waypoint x="4010" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FSimOk" bpmnElement="F_SimOk"><di:waypoint x="4060" y="240"/><di:waypoint x="4090" y="240"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_FSimFail" bpmnElement="F_SimFail"><di:waypoint x="4035" y="265"/><di:waypoint x="4038" y="340"/></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F17" bpmnElement="F_17"><di:waypoint x="4290" y="240"/><di:waypoint x="4320" y="238"/></bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+
+</bpmn:definitions>

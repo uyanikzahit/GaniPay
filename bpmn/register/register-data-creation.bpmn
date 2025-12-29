@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions
+  xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+  id="Definitions_register_data_creation"
+  targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <bpmn:process id="Register_DataCreation_Process" name="Register.DataCreation" isExecutable="true">
+
+    <bpmn:startEvent id="StartEvent_DataCreation" name="Start Data Creation" />
+    <bpmn:sequenceFlow id="Flow_D_Start_to_Customer" sourceRef="StartEvent_DataCreation" targetRef="Task_CreateCustomer" />
+
+    <bpmn:serviceTask id="Task_CreateCustomer" name="Create Customer (Customer.API)">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="register.create.customer" retries="3" />
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_D_Customer_to_Identity" sourceRef="Task_CreateCustomer" targetRef="Task_CreateCredential" />
+
+    <bpmn:serviceTask id="Task_CreateCredential" name="Create Credential (Identity.API)">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="register.create.credential" retries="3" />
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_D_Identity_to_Accounting" sourceRef="Task_CreateCredential" targetRef="Task_CreateAccount" />
+
+    <bpmn:serviceTask id="Task_CreateAccount" name="Create Wallet Account (Accounting.API)">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="register.create.account" retries="3" />
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_D_Accounting_to_Result" sourceRef="Task_CreateAccount" targetRef="Task_SetResult" />
+
+    <!-- Sonuç set -->
+    <bpmn:serviceTask id="Task_SetResult" name="Set output (code/message)">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="register.set-output" retries="1" />
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_D_Result_to_End" sourceRef="Task_SetResult" targetRef="EndEvent_DataCreation" />
+
+    <bpmn:endEvent id="EndEvent_DataCreation" name="End Data Creation" />
+
+  </bpmn:process>
+
+  <!-- DI -->
+  <bpmndi:BPMNDiagram id="BPMNDiagram_register_data_creation">
+    <bpmndi:BPMNPlane id="BPMNPlane_register_data_creation" bpmnElement="Register_DataCreation_Process">
+
+      <bpmndi:BPMNShape id="Shape_D_Start" bpmnElement="StartEvent_DataCreation">
+        <dc:Bounds x="160" y="220" width="36" height="36" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_D_Customer" bpmnElement="Task_CreateCustomer">
+        <dc:Bounds x="230" y="190" width="220" height="100" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_D_Identity" bpmnElement="Task_CreateCredential">
+        <dc:Bounds x="480" y="190" width="220" height="100" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_D_Accounting" bpmnElement="Task_CreateAccount">
+        <dc:Bounds x="730" y="190" width="240" height="100" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_D_Result" bpmnElement="Task_SetResult">
+        <dc:Bounds x="1000" y="190" width="200" height="100" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Shape_D_End" bpmnElement="EndEvent_DataCreation">
+        <dc:Bounds x="1230" y="220" width="36" height="36" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="Edge_D_1" bpmnElement="Flow_D_Start_to_Customer">
+        <di:waypoint x="196" y="238" />
+        <di:waypoint x="230" y="240" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Edge_D_2" bpmnElement="Flow_D_Customer_to_Identity">
+        <di:waypoint x="450" y="240" />
+        <di:waypoint x="480" y="240" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Edge_D_3" bpmnElement="Flow_D_Identity_to_Accounting">
+        <di:waypoint x="700" y="240" />
+        <di:waypoint x="730" y="240" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Edge_D_4" bpmnElement="Flow_D_Accounting_to_Result">
+        <di:waypoint x="970" y="240" />
+        <di:waypoint x="1000" y="240" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Edge_D_5" bpmnElement="Flow_D_Result_to_End">
+        <di:waypoint x="1200" y="240" />
+        <di:waypoint x="1230" y="238" />
+      </bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+
+</bpmn:definitions>
