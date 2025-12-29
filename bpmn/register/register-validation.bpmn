@@ -52,36 +52,30 @@
       <bpmn:incoming>Flow_1x5rq0c</bpmn:incoming>
     </bpmn:serviceTask>
     <bpmn:sequenceFlow id="F_12" sourceRef="T_SanctionQuery" targetRef="G_SanctionOk" />
-    <bpmn:exclusiveGateway id="G_SanctionOk">
+    <bpmn:exclusiveGateway id="G_SanctionOk" default="F_SanctionOk">
       <bpmn:outgoing>Flow_024ri35</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="F_SanctionOk" sourceRef="G_SanctionOk" targetRef="T_CitizenVerification">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="feel">= sanctionPassed = true</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_SanctionOk" sourceRef="G_SanctionOk" targetRef="T_CitizenVerification" />
     <bpmn:serviceTask id="T_CitizenVerification" name="Citizen Verification">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="mock.citizen.verification" />
       </bpmn:extensionElements>
     </bpmn:serviceTask>
     <bpmn:sequenceFlow id="F_13" sourceRef="T_CitizenVerification" targetRef="G_CitizenVerified" />
-    <bpmn:exclusiveGateway id="G_CitizenVerified" name="Citizen Verification Succeeded">
+    <bpmn:exclusiveGateway id="G_CitizenVerified" name="Citizen Verification Succeeded" default="F_CitizenVerifyOk">
       <bpmn:outgoing>Flow_1f5kp00</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="F_CitizenVerifyOk" sourceRef="G_CitizenVerified" targetRef="T_IbanVerification">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="feel">= citizenVerified = true</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_CitizenVerifyOk" sourceRef="G_CitizenVerified" targetRef="T_IbanVerification" />
     <bpmn:serviceTask id="T_IbanVerification" name="IBAN Verification">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="mock.iban.verification" />
       </bpmn:extensionElements>
     </bpmn:serviceTask>
     <bpmn:sequenceFlow id="F_14" sourceRef="T_IbanVerification" targetRef="G_IbanOk" />
-    <bpmn:exclusiveGateway id="G_IbanOk" name="Iban Verification Succeeded">
+    <bpmn:exclusiveGateway id="G_IbanOk" name="Iban Verification Succeeded" default="F_IbanOk">
       <bpmn:outgoing>Flow_0ui3mp3</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="F_IbanOk" sourceRef="G_IbanOk" targetRef="Gateway_1roozw8">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="feel">= ibanVerified = true</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_IbanOk" sourceRef="G_IbanOk" targetRef="Gateway_1roozw8" />
     <bpmn:serviceTask id="T_AddressVerification" name="Governance Address Number Verification">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="real.address.verification" />
@@ -328,9 +322,6 @@
           <dc:Bounds x="2151" y="326" width="77" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_CitVerify" bpmnElement="T_CitizenVerification">
-        <dc:Bounds x="2365" y="130" width="170" height="80" />
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="S_GCitVerify" bpmnElement="G_CitizenVerified" isMarkerVisible="true">
         <dc:Bounds x="2605" y="145" width="50" height="50" />
         <bpmndi:BPMNLabel>
@@ -391,10 +382,11 @@
           <dc:Bounds x="3837" y="478" width="47" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_CitVerify" bpmnElement="T_CitizenVerification">
+        <dc:Bounds x="2355" y="130" width="170" height="80" />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="E_F01" bpmnElement="F_01">
-        <di:waypoint x="248" y="169" />
-        <di:waypoint x="272" y="169" />
-        <di:waypoint x="272" y="170" />
+        <di:waypoint x="248" y="170" />
         <di:waypoint x="295" y="170" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="E_FAgeOk" bpmnElement="F_Age_Ok">
@@ -434,10 +426,10 @@
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="E_FSanOk" bpmnElement="F_SanctionOk">
         <di:waypoint x="2255" y="170" />
-        <di:waypoint x="2365" y="170" />
+        <di:waypoint x="2355" y="170" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="E_F13" bpmnElement="F_13">
-        <di:waypoint x="2535" y="170" />
+        <di:waypoint x="2525" y="170" />
         <di:waypoint x="2605" y="170" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="E_FCVOk" bpmnElement="F_CitizenVerifyOk">
