@@ -106,7 +106,7 @@
       <bpmn:incoming>Flow_1voiv6j</bpmn:incoming>
       <bpmn:outgoing>Flow_0cyazdm</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:endEvent id="E_ValidationSuccess" name="Validation Success">
+    <bpmn:endEvent id="E_ValidationSuccess" name="End Validation">
       <bpmn:incoming>Flow_0qb8hz8</bpmn:incoming>
     </bpmn:endEvent>
     <bpmn:intermediateThrowEvent id="Event_0nn8322" name="Invalid Age">
@@ -316,7 +316,7 @@
       <bpmndi:BPMNShape id="S_EndSuccess" bpmnElement="E_ValidationSuccess">
         <dc:Bounds x="3842" y="442" width="36" height="36" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="3837" y="478" width="47" height="27" />
+          <dc:Bounds x="3824" y="483" width="71" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Event_0nn8322_di" bpmnElement="Event_0nn8322">

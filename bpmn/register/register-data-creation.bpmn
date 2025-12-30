@@ -9,7 +9,7 @@
       </bpmn:extensionElements>
       <bpmn:outgoing>Flow_150a30n</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:endEvent id="End_DataCreation" name="Data Creation Completed">
+    <bpmn:endEvent id="End_DataCreation" name="End Data Creation">
       <bpmn:incoming>Flow_1guy4we</bpmn:incoming>
     </bpmn:endEvent>
     <bpmn:serviceTask id="T_CustomerCreate" name="Customer Create">
@@ -101,7 +101,7 @@
       <bpmndi:BPMNShape id="DI_End_DataCreation" bpmnElement="End_DataCreation">
         <dc:Bounds x="402" y="412" width="36" height="36" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="386" y="456" width="68" height="27" />
+          <dc:Bounds x="397" y="456" width="46" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="DI_T_CustomerCreate" bpmnElement="T_CustomerCreate">
