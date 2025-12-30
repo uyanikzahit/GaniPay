@@ -4,7 +4,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Zeebe.Client;
-using Zeebe.Client.Api.Responses;
 using Zeebe.Client.Api.Worker;
 
 namespace GaniPay.DataCreation.Worker;
@@ -62,6 +61,9 @@ public sealed class WorkerHost : IHostedService
         _openedWorkers.Add(Open("customer.email.create", _handlers.HandleCustomerEmailCreate, timeout, pollInterval));
         _openedWorkers.Add(Open("customer.address.create", _handlers.HandleCustomerAddressCreate, timeout, pollInterval));
         _openedWorkers.Add(Open("mock.customer.occupation.create", _handlers.HandleCustomerOccupationCreate, timeout, pollInterval));
+
+        // ✅ SADECE EKLENEN: Identity credential create (BPMN jobType ile birebir aynı olmalı)
+        _openedWorkers.Add(Open("identity.credential.create", _handlers.HandleIdentityCredentialCreate, timeout, pollInterval));
     }
 
     private IDisposable Open(
@@ -74,7 +76,7 @@ public sealed class WorkerHost : IHostedService
 
         var worker = _client.NewWorker()
             .JobType(jobType)
-            .Handler(handler) // ✅ senin pakette void handler bekleniyor
+            .Handler(handler) // ✅ bu pakette JobHandler = void delegate
             .Name(_options.WorkerName)
             .MaxJobsActive(_options.MaxJobsActive)
             .Timeout(timeout)

@@ -1,16 +1,21 @@
-using System.Net.Http.Json;
+ï»¿using System.Net.Http.Headers;
 
 namespace GaniPay.DataCreation.Worker.Services;
 
 public sealed class ApiClients
 {
-    private readonly HttpClient _http;
+    public HttpClient Customer { get; }
+    public HttpClient Accounting { get; }
 
-    public ApiClients(HttpClient http)
+    // âœ… EKLE
+    public HttpClient Identity { get; }
+
+    public ApiClients(IHttpClientFactory factory)
     {
-        _http = http;
-    }
+        Customer = factory.CreateClient("customer");
+        Accounting = factory.CreateClient("accounting");
 
-    // Þu an handler'larda mock üretiyoruz.
-    // Ýleride gerçek servis çaðrýlarý için buraya metot ekleyeceksin.
+        // âœ… EKLE
+        Identity = factory.CreateClient("identity");
+    }
 }
