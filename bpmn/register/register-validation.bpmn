@@ -58,7 +58,7 @@
     <bpmn:sequenceFlow id="F_SanctionOk" sourceRef="G_SanctionOk" targetRef="T_CitizenVerification" />
     <bpmn:serviceTask id="T_CitizenVerification" name="Citizen Verification">
       <bpmn:extensionElements>
-        <zeebe:taskDefinition type="mock.citizen.verification" />
+        <zeebe:taskDefinition type="mock.citizen.verification" retries="" />
       </bpmn:extensionElements>
     </bpmn:serviceTask>
     <bpmn:sequenceFlow id="F_13" sourceRef="T_CitizenVerification" targetRef="G_CitizenVerified" />
@@ -135,14 +135,9 @@
       <bpmn:outgoing>Flow_1qoerz6</bpmn:outgoing>
     </bpmn:intermediateThrowEvent>
     <bpmn:sequenceFlow id="Flow_05af5k3" sourceRef="Gateway_0anm8fs" targetRef="Event_09yf6bw" />
-    <bpmn:task id="Activity_0he60mb" name="Customer Get by E-mail Address">
-      <bpmn:incoming>Flow_1u3hxr5</bpmn:incoming>
-      <bpmn:outgoing>Flow_1l03xs9</bpmn:outgoing>
-    </bpmn:task>
-    <bpmn:sequenceFlow id="Flow_1u3hxr5" sourceRef="Gateway_0anm8fs" targetRef="Activity_0he60mb" />
-    <bpmn:sequenceFlow id="Flow_1l03xs9" sourceRef="Activity_0he60mb" targetRef="Gateway_07r47hh" />
+    <bpmn:sequenceFlow id="Flow_1u3hxr5" sourceRef="Gateway_0anm8fs" targetRef="T_EmailAddress" />
     <bpmn:exclusiveGateway id="Gateway_07r47hh" name="Does Email Address and Identity Match" default="Flow_1x5rq0c">
-      <bpmn:incoming>Flow_1l03xs9</bpmn:incoming>
+      <bpmn:incoming>Flow_17ri083</bpmn:incoming>
       <bpmn:outgoing>Flow_1x5rq0c</bpmn:outgoing>
       <bpmn:outgoing>Flow_05qdqep</bpmn:outgoing>
     </bpmn:exclusiveGateway>
@@ -209,6 +204,14 @@
     <bpmn:sequenceFlow id="Flow_1mz5aar" sourceRef="Event_0z434so" targetRef="Gateway_1ssk200" />
     <bpmn:sequenceFlow id="Flow_1ml36fq" sourceRef="Event_0c8m7ci" targetRef="Gateway_1ssk200" />
     <bpmn:sequenceFlow id="Flow_1nbd0yl" sourceRef="Event_0nn8322" targetRef="Gateway_1ssk200" />
+    <bpmn:serviceTask id="T_EmailAddress" name="Customer Get by E-mail Address">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.customer.getByEmail" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1u3hxr5</bpmn:incoming>
+      <bpmn:outgoing>Flow_17ri083</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_17ri083" sourceRef="T_EmailAddress" targetRef="Gateway_07r47hh" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="Diagram_RegisterValidation">
     <bpmndi:BPMNPlane id="Plane_RegisterValidation" bpmnElement="Register_Validation_Process">
@@ -248,6 +251,51 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="S_GetById" bpmnElement="T_CustomerGetById">
         <dc:Bounds x="1325" y="130" width="190" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Sanction" bpmnElement="T_SanctionQuery">
+        <dc:Bounds x="1990" y="130" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_GSanction" bpmnElement="G_SanctionOk" isMarkerVisible="true">
+        <dc:Bounds x="2205" y="145" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2542" y="102" width="56" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_CitVerify" bpmnElement="T_CitizenVerification">
+        <dc:Bounds x="2355" y="130" width="170" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_GCitVerify" bpmnElement="G_CitizenVerified" isMarkerVisible="true">
+        <dc:Bounds x="2605" y="145" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2602" y="95" width="56" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Iban" bpmnElement="T_IbanVerification">
+        <dc:Bounds x="2730" y="130" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_GIban" bpmnElement="G_IbanOk" isMarkerVisible="true">
+        <dc:Bounds x="2945" y="145" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2931" y="95" width="79" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Address" bpmnElement="T_AddressVerification">
+        <dc:Bounds x="3045" y="270" width="250" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_GAddress" bpmnElement="G_AddressOk" isMarkerVisible="true">
+        <dc:Bounds x="3425" y="285" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3468" y="260" width="83" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Sim" bpmnElement="T_SimCheck">
+        <dc:Bounds x="3555" y="130" width="170" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_EndSuccess" bpmnElement="E_ValidationSuccess">
+        <dc:Bounds x="3842" y="442" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3837" y="478" width="47" height="27" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Event_0nn8322_di" bpmnElement="Event_0nn8322">
         <dc:Bounds x="302" y="382" width="36" height="36" />
@@ -291,56 +339,16 @@
           <dc:Bounds x="1507" y="326" width="86" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_0he60mb_di" bpmnElement="Activity_0he60mb">
-        <dc:Bounds x="1690" y="130" width="100" height="80" />
-        <bpmndi:BPMNLabel />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_07r47hh_di" bpmnElement="Gateway_07r47hh" isMarkerVisible="true">
-        <dc:Bounds x="1845" y="145" width="50" height="50" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="1835" y="102" width="69" height="40" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Event_0lzk0i8_di" bpmnElement="Event_0lzk0i8">
-        <dc:Bounds x="1852" y="382" width="36" height="36" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="1784" y="330" width="71" height="40" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Sanction" bpmnElement="T_SanctionQuery">
-        <dc:Bounds x="1990" y="130" width="160" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_GSanction" bpmnElement="G_SanctionOk" isMarkerVisible="true">
-        <dc:Bounds x="2205" y="145" width="50" height="50" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="2542" y="102" width="56" height="40" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Event_0sx4ud6_di" bpmnElement="Event_0sx4ud6">
         <dc:Bounds x="2212" y="372" width="36" height="36" />
         <bpmndi:BPMNLabel>
           <dc:Bounds x="2151" y="326" width="77" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_GCitVerify" bpmnElement="G_CitizenVerified" isMarkerVisible="true">
-        <dc:Bounds x="2605" y="145" width="50" height="50" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="2602" y="95" width="56" height="40" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Event_0vrfdnm_di" bpmnElement="Event_0vrfdnm">
         <dc:Bounds x="2612" y="372" width="36" height="36" />
         <bpmndi:BPMNLabel>
           <dc:Bounds x="2537" y="326" width="86" height="27" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Iban" bpmnElement="T_IbanVerification">
-        <dc:Bounds x="2730" y="130" width="160" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_GIban" bpmnElement="G_IbanOk" isMarkerVisible="true">
-        <dc:Bounds x="2945" y="145" width="50" height="50" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="2931" y="95" width="79" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Event_1i51yq3_di" bpmnElement="Event_1i51yq3">
@@ -352,17 +360,8 @@
       <bpmndi:BPMNShape id="Gateway_1roozw8_di" bpmnElement="Gateway_1roozw8" isMarkerVisible="true">
         <dc:Bounds x="3115" y="145" width="50" height="50" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Address" bpmnElement="T_AddressVerification">
-        <dc:Bounds x="3045" y="270" width="250" height="80" />
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_1srv49s_di" bpmnElement="Gateway_1srv49s" isMarkerVisible="true">
         <dc:Bounds x="3425" y="145" width="50" height="50" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_GAddress" bpmnElement="G_AddressOk" isMarkerVisible="true">
-        <dc:Bounds x="3425" y="285" width="50" height="50" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="3468" y="260" width="83" height="40" />
-        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Event_0hnl9k5_di" bpmnElement="Event_0hnl9k5">
         <dc:Bounds x="3432" y="382" width="36" height="36" />
@@ -370,20 +369,24 @@
           <dc:Bounds x="3337" y="370" width="86" height="40" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Sim" bpmnElement="T_SimCheck">
-        <dc:Bounds x="3555" y="130" width="170" height="80" />
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_1ssk200_di" bpmnElement="Gateway_1ssk200" isMarkerVisible="true">
         <dc:Bounds x="3745" y="435" width="50" height="50" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_EndSuccess" bpmnElement="E_ValidationSuccess">
-        <dc:Bounds x="3842" y="442" width="36" height="36" />
+      <bpmndi:BPMNShape id="BPMNShape_0a2uodt" bpmnElement="T_EmailAddress">
+        <dc:Bounds x="1660" y="130" width="160" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_07r47hh_di" bpmnElement="Gateway_07r47hh" isMarkerVisible="true">
+        <dc:Bounds x="1875" y="145" width="50" height="50" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="3837" y="478" width="47" height="27" />
+          <dc:Bounds x="1865" y="102" width="69" height="40" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_CitVerify" bpmnElement="T_CitizenVerification">
-        <dc:Bounds x="2355" y="130" width="170" height="80" />
+      <bpmndi:BPMNShape id="Event_0lzk0i8_di" bpmnElement="Event_0lzk0i8">
+        <dc:Bounds x="1882" y="382" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1814" y="330" width="71" height="40" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="E_F01" bpmnElement="F_01">
         <di:waypoint x="248" y="170" />
@@ -483,19 +486,15 @@
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_1u3hxr5_di" bpmnElement="Flow_1u3hxr5">
         <di:waypoint x="1625" y="170" />
-        <di:waypoint x="1690" y="170" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1l03xs9_di" bpmnElement="Flow_1l03xs9">
-        <di:waypoint x="1790" y="170" />
-        <di:waypoint x="1845" y="170" />
+        <di:waypoint x="1660" y="170" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_1x5rq0c_di" bpmnElement="Flow_1x5rq0c">
-        <di:waypoint x="1895" y="170" />
+        <di:waypoint x="1925" y="170" />
         <di:waypoint x="1990" y="170" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_05qdqep_di" bpmnElement="Flow_05qdqep">
-        <di:waypoint x="1870" y="195" />
-        <di:waypoint x="1870" y="382" />
+        <di:waypoint x="1900" y="195" />
+        <di:waypoint x="1900" y="382" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_024ri35_di" bpmnElement="Flow_024ri35">
         <di:waypoint x="2230" y="195" />
@@ -555,8 +554,8 @@
         <di:waypoint x="3745" y="460" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_1y52uee_di" bpmnElement="Flow_1y52uee">
-        <di:waypoint x="1870" y="418" />
-        <di:waypoint x="1870" y="460" />
+        <di:waypoint x="1900" y="418" />
+        <di:waypoint x="1900" y="460" />
         <di:waypoint x="3745" y="460" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_1qoerz6_di" bpmnElement="Flow_1qoerz6">
@@ -578,6 +577,10 @@
         <di:waypoint x="320" y="418" />
         <di:waypoint x="320" y="460" />
         <di:waypoint x="3745" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_17ri083_di" bpmnElement="Flow_17ri083">
+        <di:waypoint x="1820" y="170" />
+        <di:waypoint x="1875" y="170" />
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
