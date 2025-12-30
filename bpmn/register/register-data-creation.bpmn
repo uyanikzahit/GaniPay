@@ -40,25 +40,17 @@
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="accounting.account.create" retries="3" />
       </bpmn:extensionElements>
-      <bpmn:incoming>Flow_1p86iq8</bpmn:incoming>
+      <bpmn:incoming>Flow_0ez6t17</bpmn:incoming>
       <bpmn:outgoing>Flow_0ofeaf6</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:sequenceFlow id="Flow_1r1y3zg" sourceRef="T_CustomerPhoneCreate" targetRef="T_CustomerCommPrefCreate" />
+    <bpmn:sequenceFlow id="Flow_1r1y3zg" sourceRef="T_CustomerPhoneCreate" targetRef="T_LinkDeviceCustomer" />
     <bpmn:serviceTask id="T_LinkDeviceCustomer" name="Link Device and Customer">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="mock.device.customer.link" retries="3" />
       </bpmn:extensionElements>
-      <bpmn:incoming>Flow_1rp389o</bpmn:incoming>
-      <bpmn:outgoing>Flow_1p86iq8</bpmn:outgoing>
-    </bpmn:serviceTask>
-    <bpmn:serviceTask id="T_CustomerCommPrefCreate" name="Customer Communication Preferences Create">
-      <bpmn:extensionElements>
-        <zeebe:taskDefinition type="customer.communication.preferences.create" retries="3" />
-      </bpmn:extensionElements>
       <bpmn:incoming>Flow_1r1y3zg</bpmn:incoming>
-      <bpmn:outgoing>Flow_1rp389o</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0ez6t17</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:sequenceFlow id="Flow_1rp389o" sourceRef="T_CustomerCommPrefCreate" targetRef="T_LinkDeviceCustomer" />
     <bpmn:serviceTask id="T_CustomerEmailCreate" name="Customer E-mail Create">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="customer.email.create" retries="3" />
@@ -71,7 +63,6 @@
       <bpmn:outgoing>Flow_1guy4we</bpmn:outgoing>
     </bpmn:intermediateThrowEvent>
     <bpmn:sequenceFlow id="Flow_1guy4we" sourceRef="Event_049kbti" targetRef="End_DataCreation" />
-    <bpmn:sequenceFlow id="Flow_1p86iq8" sourceRef="T_LinkDeviceCustomer" targetRef="T_AccountCreate" />
     <bpmn:sequenceFlow id="Flow_0ofeaf6" sourceRef="T_AccountCreate" targetRef="T_CustomerEmailCreate" />
     <bpmn:sequenceFlow id="Flow_1ft8n3l" sourceRef="T_CustomerEmailCreate" targetRef="T_CustomerAddressCreate" />
     <bpmn:serviceTask id="T_CustomerAddressCreate" name="Customer Address Create">
@@ -85,11 +76,12 @@
     <bpmn:sequenceFlow id="Flow_132n2fu" sourceRef="T_CustomerAddressCreate" targetRef="T_CustomerOccupationCreate" />
     <bpmn:serviceTask id="T_CustomerOccupationCreate" name="Customer Occupation Create">
       <bpmn:extensionElements>
-        <zeebe:taskDefinition type="customer.occupation.create" retries="3" />
+        <zeebe:taskDefinition type="mock.customer.occupation.create" retries="3" />
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_132n2fu</bpmn:incoming>
       <bpmn:outgoing>Flow_0fqkabn</bpmn:outgoing>
     </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_0ez6t17" sourceRef="T_LinkDeviceCustomer" targetRef="T_AccountCreate" />
     <bpmn:group id="Group_1bsfet4" categoryValueRef="CategoryValue_05nm6dc" />
   </bpmn:process>
   <bpmn:category id="Category_0ytuybq">
@@ -106,45 +98,60 @@
       <bpmndi:BPMNShape id="DI_T_WalletLedgerIdGet" bpmnElement="T_WalletLedgerIdGet">
         <dc:Bounds x="280" y="166" width="140" height="80" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="DI_T_LinkDeviceCustomer" bpmnElement="T_LinkDeviceCustomer">
-        <dc:Bounds x="1330" y="400" width="140" height="60" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="DI_T_AccountCreate" bpmnElement="T_AccountCreate">
-        <dc:Bounds x="1150" y="400" width="120" height="60" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="DI_T_CustomerEmailCreate" bpmnElement="T_CustomerEmailCreate">
-        <dc:Bounds x="965" y="400" width="130" height="60" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="DI_T_CustomerAddressCreate" bpmnElement="T_CustomerAddressCreate">
-        <dc:Bounds x="780" y="400" width="140" height="60" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="DI_T_CustomerOccupationCreate" bpmnElement="T_CustomerOccupationCreate">
-        <dc:Bounds x="590" y="400" width="140" height="60" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Event_049kbti_di" bpmnElement="Event_049kbti">
-        <dc:Bounds x="482" y="412" width="36" height="36" />
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="DI_End_DataCreation" bpmnElement="End_DataCreation">
         <dc:Bounds x="402" y="412" width="36" height="36" />
         <bpmndi:BPMNLabel>
           <dc:Bounds x="386" y="456" width="68" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="DI_T_CustomerCommPrefCreate" bpmnElement="T_CustomerCommPrefCreate">
-        <dc:Bounds x="1320" y="176" width="160" height="60" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="DI_T_CustomerPhoneCreate" bpmnElement="T_CustomerPhoneCreate">
-        <dc:Bounds x="1080" y="176" width="140" height="60" />
+      <bpmndi:BPMNShape id="DI_T_CustomerCreate" bpmnElement="T_CustomerCreate">
+        <dc:Bounds x="600" y="176" width="120" height="60" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="DI_T_CustomerIndividualCreate" bpmnElement="T_CustomerIndividualCreate">
         <dc:Bounds x="830" y="176" width="140" height="60" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="DI_T_CustomerCreate" bpmnElement="T_CustomerCreate">
-        <dc:Bounds x="600" y="176" width="120" height="60" />
+      <bpmndi:BPMNShape id="DI_T_CustomerPhoneCreate" bpmnElement="T_CustomerPhoneCreate">
+        <dc:Bounds x="1080" y="176" width="140" height="60" />
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_049kbti_di" bpmnElement="Event_049kbti">
+        <dc:Bounds x="482" y="412" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DI_T_CustomerOccupationCreate" bpmnElement="T_CustomerOccupationCreate">
+        <dc:Bounds x="590" y="400" width="140" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DI_T_LinkDeviceCustomer" bpmnElement="T_LinkDeviceCustomer">
+        <dc:Bounds x="1320" y="176" width="140" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DI_T_AccountCreate" bpmnElement="T_AccountCreate">
+        <dc:Bounds x="1330" y="400" width="120" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DI_T_CustomerEmailCreate" bpmnElement="T_CustomerEmailCreate">
+        <dc:Bounds x="1085" y="400" width="130" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DI_T_CustomerAddressCreate" bpmnElement="T_CustomerAddressCreate">
+        <dc:Bounds x="830" y="400" width="140" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_0ez6t17_di" bpmnElement="Flow_0ez6t17">
+        <di:waypoint x="1390" y="236" />
+        <di:waypoint x="1390" y="400" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Group_1bsfet4_di" bpmnElement="Group_1bsfet4">
+        <dc:Bounds x="550" y="120" width="980" height="440" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1009" y="127" width="63" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="DI_F_01" bpmnElement="F_01">
+        <di:waypoint x="198" y="207" />
+        <di:waypoint x="280" y="207" />
+      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_0zld6qu_di" bpmnElement="Flow_0zld6qu">
         <di:waypoint x="720" y="206" />
         <di:waypoint x="830" y="206" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_150a30n_di" bpmnElement="Flow_150a30n">
+        <di:waypoint x="420" y="206" />
+        <di:waypoint x="600" y="206" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_0jk1we1_di" bpmnElement="Flow_0jk1we1">
         <di:waypoint x="970" y="206" />
@@ -154,48 +161,26 @@
         <di:waypoint x="1220" y="206" />
         <di:waypoint x="1320" y="206" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1rp389o_di" bpmnElement="Flow_1rp389o">
-        <di:waypoint x="1400" y="236" />
-        <di:waypoint x="1400" y="400" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="DI_F_01" bpmnElement="F_01">
-        <di:waypoint x="198" y="207" />
-        <di:waypoint x="280" y="207" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_150a30n_di" bpmnElement="Flow_150a30n">
-        <di:waypoint x="420" y="206" />
-        <di:waypoint x="600" y="206" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1p86iq8_di" bpmnElement="Flow_1p86iq8">
-        <di:waypoint x="1330" y="430" />
-        <di:waypoint x="1270" y="430" />
+      <bpmndi:BPMNEdge id="Flow_1guy4we_di" bpmnElement="Flow_1guy4we">
+        <di:waypoint x="482" y="430" />
+        <di:waypoint x="438" y="430" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_0ofeaf6_di" bpmnElement="Flow_0ofeaf6">
-        <di:waypoint x="1150" y="430" />
-        <di:waypoint x="1095" y="430" />
+        <di:waypoint x="1330" y="430" />
+        <di:waypoint x="1215" y="430" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_1ft8n3l_di" bpmnElement="Flow_1ft8n3l">
-        <di:waypoint x="965" y="430" />
-        <di:waypoint x="920" y="430" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_132n2fu_di" bpmnElement="Flow_132n2fu">
-        <di:waypoint x="780" y="430" />
-        <di:waypoint x="730" y="430" />
+        <di:waypoint x="1085" y="430" />
+        <di:waypoint x="970" y="430" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_0fqkabn_di" bpmnElement="Flow_0fqkabn">
         <di:waypoint x="590" y="430" />
         <di:waypoint x="518" y="430" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1guy4we_di" bpmnElement="Flow_1guy4we">
-        <di:waypoint x="482" y="430" />
-        <di:waypoint x="438" y="430" />
+      <bpmndi:BPMNEdge id="Flow_132n2fu_di" bpmnElement="Flow_132n2fu">
+        <di:waypoint x="830" y="430" />
+        <di:waypoint x="730" y="430" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNShape id="Group_1bsfet4_di" bpmnElement="Group_1bsfet4">
-        <dc:Bounds x="550" y="120" width="980" height="440" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="1009" y="127" width="63" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>

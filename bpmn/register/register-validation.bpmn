@@ -7,7 +7,7 @@
       <bpmn:incoming>F_01</bpmn:incoming>
     </bpmn:exclusiveGateway>
     <bpmn:sequenceFlow id="F_Age_Ok" sourceRef="G_Age" targetRef="T_DeviceInfoGet">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="feel">= ageValid = true</bpmn:conditionExpression>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=ageControl.ok = true</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="F_Age_Fail" sourceRef="G_Age" targetRef="Event_0nn8322" />
     <bpmn:serviceTask id="T_DeviceInfoGet" name="Device Info Get">
@@ -16,21 +16,25 @@
       </bpmn:extensionElements>
     </bpmn:serviceTask>
     <bpmn:sequenceFlow id="F_03" sourceRef="T_DeviceInfoGet" targetRef="G_DeviceFound" />
-    <bpmn:exclusiveGateway id="G_DeviceFound" default="F_Device_Ok">
+    <bpmn:exclusiveGateway id="G_DeviceFound" default="Flow_10516gv">
       <bpmn:outgoing>Flow_10516gv</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="F_Device_Ok" sourceRef="G_DeviceFound" targetRef="T_CustomerPhoneGet" />
+    <bpmn:sequenceFlow id="F_Device_Ok" sourceRef="G_DeviceFound" targetRef="T_CustomerPhoneGet">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=deviceInfo.ok = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
     <bpmn:serviceTask id="T_CustomerPhoneGet" name="Customer Phone Get">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="mock.customer.phone.get" />
       </bpmn:extensionElements>
     </bpmn:serviceTask>
     <bpmn:sequenceFlow id="F_04" sourceRef="T_CustomerPhoneGet" targetRef="G_IsNewCustomer" />
-    <bpmn:exclusiveGateway id="G_IsNewCustomer" name="Customer Control" default="F_NewCustomer">
+    <bpmn:exclusiveGateway id="G_IsNewCustomer" name="Customer Control" default="Flow_09c4cij">
       <bpmn:incoming>F_04</bpmn:incoming>
       <bpmn:outgoing>Flow_09c4cij</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="F_NewCustomer" sourceRef="G_IsNewCustomer" targetRef="Gateway_0qh7mp5" />
+    <bpmn:sequenceFlow id="F_NewCustomer" sourceRef="G_IsNewCustomer" targetRef="Gateway_0qh7mp5">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=customerControl.ok = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
     <bpmn:serviceTask id="T_UnlinkDevice" name="Unlink Device from its Customer">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="mock.unlink.device" />
@@ -52,30 +56,36 @@
       <bpmn:incoming>Flow_1x5rq0c</bpmn:incoming>
     </bpmn:serviceTask>
     <bpmn:sequenceFlow id="F_12" sourceRef="T_SanctionQuery" targetRef="G_SanctionOk" />
-    <bpmn:exclusiveGateway id="G_SanctionOk" default="F_SanctionOk">
+    <bpmn:exclusiveGateway id="G_SanctionOk" default="Flow_024ri35">
       <bpmn:outgoing>Flow_024ri35</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="F_SanctionOk" sourceRef="G_SanctionOk" targetRef="T_CitizenVerification" />
+    <bpmn:sequenceFlow id="F_SanctionOk" sourceRef="G_SanctionOk" targetRef="T_CitizenVerification">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=sanction.ok = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
     <bpmn:serviceTask id="T_CitizenVerification" name="Citizen Verification">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="mock.citizen.verification" retries="" />
       </bpmn:extensionElements>
     </bpmn:serviceTask>
     <bpmn:sequenceFlow id="F_13" sourceRef="T_CitizenVerification" targetRef="G_CitizenVerified" />
-    <bpmn:exclusiveGateway id="G_CitizenVerified" name="Citizen Verification Succeeded" default="F_CitizenVerifyOk">
+    <bpmn:exclusiveGateway id="G_CitizenVerified" name="Citizen Verification Succeeded" default="Flow_1f5kp00">
       <bpmn:outgoing>Flow_1f5kp00</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="F_CitizenVerifyOk" sourceRef="G_CitizenVerified" targetRef="T_IbanVerification" />
+    <bpmn:sequenceFlow id="F_CitizenVerifyOk" sourceRef="G_CitizenVerified" targetRef="T_IbanVerification">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=citizenVerification.ok = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
     <bpmn:serviceTask id="T_IbanVerification" name="IBAN Verification">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="mock.iban.verification" />
       </bpmn:extensionElements>
     </bpmn:serviceTask>
     <bpmn:sequenceFlow id="F_14" sourceRef="T_IbanVerification" targetRef="G_IbanOk" />
-    <bpmn:exclusiveGateway id="G_IbanOk" name="Iban Verification Succeeded" default="F_IbanOk">
+    <bpmn:exclusiveGateway id="G_IbanOk" name="Iban Verification Succeeded" default="Flow_0ui3mp3">
       <bpmn:outgoing>Flow_0ui3mp3</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="F_IbanOk" sourceRef="G_IbanOk" targetRef="Gateway_1roozw8" />
+    <bpmn:sequenceFlow id="F_IbanOk" sourceRef="G_IbanOk" targetRef="Gateway_1roozw8">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=ibanVerification.ok = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
     <bpmn:serviceTask id="T_AddressVerification" name="Governance Address Number Verification">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="real.address.verification" />
@@ -83,10 +93,12 @@
       <bpmn:incoming>Flow_1fak551</bpmn:incoming>
     </bpmn:serviceTask>
     <bpmn:sequenceFlow id="F_15" sourceRef="T_AddressVerification" targetRef="G_AddressOk" />
-    <bpmn:exclusiveGateway id="G_AddressOk" name="Address Number Verification Succeeded" default="F_AddressOk">
+    <bpmn:exclusiveGateway id="G_AddressOk" name="Address Number Verification Succeeded" default="Flow_07ntwmr">
       <bpmn:outgoing>Flow_07ntwmr</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="F_AddressOk" sourceRef="G_AddressOk" targetRef="Gateway_1srv49s" />
+    <bpmn:sequenceFlow id="F_AddressOk" sourceRef="G_AddressOk" targetRef="Gateway_1srv49s">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=addressVerification.ok = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
     <bpmn:serviceTask id="T_SimCheck" name="SIM Check Control">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="mock.sim.check.control" />
@@ -111,7 +123,7 @@
       <bpmn:outgoing>Flow_1mz5aar</bpmn:outgoing>
     </bpmn:intermediateThrowEvent>
     <bpmn:sequenceFlow id="Flow_09c4cij" sourceRef="G_IsNewCustomer" targetRef="Event_0z434so" />
-    <bpmn:exclusiveGateway id="Gateway_0qh7mp5" name="Device Customer Link Check" default="Flow_1y4fr5q">
+    <bpmn:exclusiveGateway id="Gateway_0qh7mp5" name="Device Customer Link Check" default="Flow_0qi1iik">
       <bpmn:incoming>F_NewCustomer</bpmn:incoming>
       <bpmn:outgoing>Flow_0qi1iik</bpmn:outgoing>
       <bpmn:outgoing>Flow_1y4fr5q</bpmn:outgoing>
@@ -122,10 +134,14 @@
       <bpmn:incoming>Flow_151iyfc</bpmn:incoming>
       <bpmn:outgoing>Flow_16il204</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_1y4fr5q" sourceRef="Gateway_0qh7mp5" targetRef="Gateway_0316qmv" />
+    <bpmn:sequenceFlow id="Flow_1y4fr5q" sourceRef="Gateway_0qh7mp5" targetRef="Gateway_0316qmv">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=deviceCustomerLink.matches = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_151iyfc" sourceRef="T_UnlinkDevice" targetRef="Gateway_0316qmv" />
-    <bpmn:sequenceFlow id="Flow_16il204" sourceRef="Gateway_0316qmv" targetRef="T_CustomerGetById" />
-    <bpmn:exclusiveGateway id="Gateway_0anm8fs" name="PhoneNumber Unique" default="Flow_1u3hxr5">
+    <bpmn:sequenceFlow id="Flow_16il204" sourceRef="Gateway_0316qmv" targetRef="T_CustomerGetById">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:exclusiveGateway id="Gateway_0anm8fs" name="PhoneNumber Unique" default="Flow_05af5k3">
       <bpmn:incoming>F_08</bpmn:incoming>
       <bpmn:outgoing>Flow_05af5k3</bpmn:outgoing>
       <bpmn:outgoing>Flow_1u3hxr5</bpmn:outgoing>
@@ -135,13 +151,17 @@
       <bpmn:outgoing>Flow_1qoerz6</bpmn:outgoing>
     </bpmn:intermediateThrowEvent>
     <bpmn:sequenceFlow id="Flow_05af5k3" sourceRef="Gateway_0anm8fs" targetRef="Event_09yf6bw" />
-    <bpmn:sequenceFlow id="Flow_1u3hxr5" sourceRef="Gateway_0anm8fs" targetRef="T_EmailAddress" />
-    <bpmn:exclusiveGateway id="Gateway_07r47hh" name="Does Email Address and Identity Match" default="Flow_1x5rq0c">
+    <bpmn:sequenceFlow id="Flow_1u3hxr5" sourceRef="Gateway_0anm8fs" targetRef="T_CustomerGetByEmail">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=customerGetById.ok = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:exclusiveGateway id="Gateway_07r47hh" name="Does Email Address and Identity Match" default="Flow_05qdqep">
       <bpmn:incoming>Flow_17ri083</bpmn:incoming>
       <bpmn:outgoing>Flow_1x5rq0c</bpmn:outgoing>
       <bpmn:outgoing>Flow_05qdqep</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_1x5rq0c" sourceRef="Gateway_07r47hh" targetRef="T_SanctionQuery" />
+    <bpmn:sequenceFlow id="Flow_1x5rq0c" sourceRef="Gateway_07r47hh" targetRef="T_SanctionQuery">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=customerGetByEmail.ok = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_05qdqep" sourceRef="Gateway_07r47hh" targetRef="Event_0lzk0i8" />
     <bpmn:intermediateThrowEvent id="Event_0lzk0i8" name="Email Address and Identity Missmatch">
       <bpmn:incoming>Flow_05qdqep</bpmn:incoming>
@@ -158,7 +178,7 @@
       <bpmn:outgoing>Flow_00gspzj</bpmn:outgoing>
     </bpmn:intermediateThrowEvent>
     <bpmn:sequenceFlow id="Flow_0ui3mp3" sourceRef="G_IbanOk" targetRef="Event_1i51yq3" />
-    <bpmn:intermediateThrowEvent id="Event_1i51yq3" name="Iban Verification Succeeded">
+    <bpmn:intermediateThrowEvent id="Event_1i51yq3" name="Iban Verification Failed">
       <bpmn:incoming>Flow_0ui3mp3</bpmn:incoming>
       <bpmn:outgoing>Flow_02i4urb</bpmn:outgoing>
     </bpmn:intermediateThrowEvent>
@@ -168,7 +188,9 @@
       <bpmn:outgoing>Flow_1fak551</bpmn:outgoing>
       <bpmn:outgoing>Flow_0jwx48t</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_1fak551" sourceRef="Gateway_1roozw8" targetRef="T_AddressVerification" />
+    <bpmn:sequenceFlow id="Flow_1fak551" sourceRef="Gateway_1roozw8" targetRef="T_AddressVerification">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=addressVerification.required = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
     <bpmn:exclusiveGateway id="Gateway_1srv49s">
       <bpmn:incoming>F_AddressOk</bpmn:incoming>
       <bpmn:incoming>Flow_0jwx48t</bpmn:incoming>
@@ -204,14 +226,14 @@
     <bpmn:sequenceFlow id="Flow_1mz5aar" sourceRef="Event_0z434so" targetRef="Gateway_1ssk200" />
     <bpmn:sequenceFlow id="Flow_1ml36fq" sourceRef="Event_0c8m7ci" targetRef="Gateway_1ssk200" />
     <bpmn:sequenceFlow id="Flow_1nbd0yl" sourceRef="Event_0nn8322" targetRef="Gateway_1ssk200" />
-    <bpmn:serviceTask id="T_EmailAddress" name="Customer Get by E-mail Address">
+    <bpmn:serviceTask id="T_CustomerGetByEmail" name="Customer Get by E-mail Address">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="mock.customer.getByEmail" />
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_1u3hxr5</bpmn:incoming>
       <bpmn:outgoing>Flow_17ri083</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:sequenceFlow id="Flow_17ri083" sourceRef="T_EmailAddress" targetRef="Gateway_07r47hh" />
+    <bpmn:sequenceFlow id="Flow_17ri083" sourceRef="T_CustomerGetByEmail" targetRef="Gateway_07r47hh" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="Diagram_RegisterValidation">
     <bpmndi:BPMNPlane id="Plane_RegisterValidation" bpmnElement="Register_Validation_Process">
@@ -372,7 +394,7 @@
       <bpmndi:BPMNShape id="Gateway_1ssk200_di" bpmnElement="Gateway_1ssk200" isMarkerVisible="true">
         <dc:Bounds x="3745" y="435" width="50" height="50" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="BPMNShape_0a2uodt" bpmnElement="T_EmailAddress">
+      <bpmndi:BPMNShape id="BPMNShape_0a2uodt" bpmnElement="T_CustomerGetByEmail">
         <dc:Bounds x="1660" y="130" width="160" height="80" />
         <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
