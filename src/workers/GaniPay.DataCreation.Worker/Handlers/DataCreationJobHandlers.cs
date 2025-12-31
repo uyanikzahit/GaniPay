@@ -9,18 +9,21 @@ namespace GaniPay.DataCreation.Worker.Handlers;
 public sealed class DataCreationJobHandlers
 {
     private readonly ILogger<DataCreationJobHandlers> _logger;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IHttpClientFactory _http;
 
     private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
 
     public DataCreationJobHandlers(
         ILogger<DataCreationJobHandlers> logger,
-        IHttpClientFactory httpClientFactory)
+        IHttpClientFactory http)
     {
         _logger = logger;
-        _httpClientFactory = httpClientFactory;
+        _http = http;
     }
 
+    // -------------------------
+    // Helpers
+    // -------------------------
     private static string Vars(IJob job)
     {
         try
@@ -35,18 +38,6 @@ public sealed class DataCreationJobHandlers
         }
     }
 
-    private static void Complete(IJobClient client, IJob job, Dictionary<string, object> variables)
-    {
-        var json = JsonSerializer.Serialize(variables, JsonOpts);
-
-        client.NewCompleteJobCommand(job.Key)
-            .Variables(json)
-            .Send()
-            .GetAwaiter()
-            .GetResult();
-    }
-
-    // ✅ SADECE EKLENEN: job.Variables içinden string okuma (VariablesAsDictionary YOK!)
     private static string GetString(IJob job, string key)
     {
         if (string.IsNullOrWhiteSpace(job.Variables)) return string.Empty;
@@ -71,11 +62,15 @@ public sealed class DataCreationJobHandlers
         }
     }
 
-    // ✅ SADECE EKLENEN: response json içinden guid çekme
+    private static string? GetOrNull(IJob job, string key)
+    {
+        var s = GetString(job, key);
+        return string.IsNullOrWhiteSpace(s) ? null : s;
+    }
+
     private static Guid ExtractGuid(string json, string prop)
     {
         using var doc = JsonDocument.Parse(json);
-
         if (!doc.RootElement.TryGetProperty(prop, out var p))
             throw new InvalidOperationException($"Response does not contain '{prop}'. Raw: {json}");
 
@@ -85,290 +80,336 @@ public sealed class DataCreationJobHandlers
         return p.GetGuid();
     }
 
-    // -------------------------
-    // Job Handlers (void)
-    // -------------------------
+    private static void Complete(IJobClient client, IJob job, Dictionary<string, object> variables)
+    {
+        var json = JsonSerializer.Serialize(variables, JsonOpts);
 
+        client.NewCompleteJobCommand(job.Key)
+            .Variables(json) // string JSON
+            .Send()
+            .GetAwaiter()
+            .GetResult();
+    }
+
+    // -------------------------
+    // 1) accounting.wallet.ledgerid.get (MVP mock)
+    // -------------------------
     public void HandleWalletAccountLedgerIdGet(IJobClient client, IJob job)
     {
         _logger.LogInformation("[accounting.wallet.ledgerid.get] RECEIVED key={Key} retries={Retries} vars={Vars}",
             job.Key, job.Retries, Vars(job));
 
-        try
+        var vars = new Dictionary<string, object>
         {
-            var vars = new Dictionary<string, object>
-            {
-                ["ledgerId"] = Guid.NewGuid().ToString()
-            };
+            ["ledgerId"] = Guid.NewGuid().ToString()
+        };
 
-            Complete(client, job, vars);
+        Complete(client, job, vars);
 
-            _logger.LogInformation("[accounting.wallet.ledgerid.get] COMPLETED key={Key} ledgerId={LedgerId}",
-                job.Key, vars["ledgerId"]);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[accounting.wallet.ledgerid.get] ERROR key={Key}", job.Key);
-            throw;
-        }
+        _logger.LogInformation("[accounting.wallet.ledgerid.get] COMPLETED key={Key} ledgerId={LedgerId}",
+            job.Key, vars["ledgerId"]);
     }
 
+    // -------------------------
+    // 2) customer.create (GERÇEK)
+    // POST https://localhost:7101/api/v1/customers/individual
+    // response: { id: "..." }
+    // -------------------------
     public void HandleCustomerCreate(IJobClient client, IJob job)
     {
         _logger.LogInformation("[customer.create] RECEIVED key={Key} retries={Retries} vars={Vars}",
             job.Key, job.Retries, Vars(job));
 
-        try
-        {
-            var vars = new Dictionary<string, object>
-            {
-                ["customerId"] = Guid.NewGuid().ToString()
-            };
+        var customer = _http.CreateClient("customer");
 
-            Complete(client, job, vars);
-
-            _logger.LogInformation("[customer.create] COMPLETED key={Key} customerId={CustomerId}",
-                job.Key, vars["customerId"]);
-        }
-        catch (Exception ex)
+        var body = new
         {
-            _logger.LogError(ex, "[customer.create] ERROR key={Key}", job.Key);
-            throw;
-        }
+            firstName = GetString(job, "firstName"),
+            lastName = GetString(job, "lastName"),
+            birthDate = GetString(job, "birthDate"),
+            nationality = GetOrNull(job, "nationality"),
+            identityNumber = GetString(job, "identityNumber"),
+            segment = GetString(job, "segment")
+        };
+
+        var resp = customer.PostAsJsonAsync("/api/v1/customers/individual", body)
+                           .GetAwaiter().GetResult();
+
+        var raw = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+
+        if (!resp.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Customer returned {(int)resp.StatusCode}: {raw}");
+
+        var customerId = ExtractGuid(raw, "id").ToString();
+
+        Complete(client, job, new Dictionary<string, object>
+        {
+            ["customerId"] = customerId
+        });
+
+        _logger.LogInformation("[customer.create] COMPLETED key={Key} customerId={CustomerId}", job.Key, customerId);
     }
 
+    // -------------------------
+    // 3) customer.individual.create (NO-OP)
+    // customer.create zaten individual create yaptığı için burada sadece complete ediyoruz.
+    // -------------------------
     public void HandleCustomerIndividualCreate(IJobClient client, IJob job)
     {
         _logger.LogInformation("[customer.individual.create] RECEIVED key={Key} retries={Retries} vars={Vars}",
             job.Key, job.Retries, Vars(job));
 
-        try
+        Complete(client, job, new Dictionary<string, object>
         {
-            var vars = new Dictionary<string, object>
-            {
-                ["customerIndividualId"] = Guid.NewGuid().ToString()
-            };
+            ["customerIndividualCreated"] = true
+        });
 
-            Complete(client, job, vars);
-
-            _logger.LogInformation("[customer.individual.create] COMPLETED key={Key} id={Id}",
-                job.Key, vars["customerIndividualId"]);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[customer.individual.create] ERROR key={Key}", job.Key);
-            throw;
-        }
+        _logger.LogInformation("[customer.individual.create] COMPLETED key={Key}", job.Key);
     }
 
-    public void HandleCustomerPhoneCreate(IJobClient client, IJob job)
-    {
-        _logger.LogInformation("[customer.phone.create] RECEIVED key={Key} retries={Retries} vars={Vars}",
-            job.Key, job.Retries, Vars(job));
-
-        try
-        {
-            var vars = new Dictionary<string, object>
-            {
-                ["customerPhoneId"] = Guid.NewGuid().ToString()
-            };
-
-            Complete(client, job, vars);
-
-            _logger.LogInformation("[customer.phone.create] COMPLETED key={Key} id={Id}",
-                job.Key, vars["customerPhoneId"]);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[customer.phone.create] ERROR key={Key}", job.Key);
-            throw;
-        }
-    }
-
-    public void HandleLinkDeviceAndCustomer(IJobClient client, IJob job)
-    {
-        _logger.LogInformation("[mock.device.customer.link] RECEIVED key={Key} retries={Retries} vars={Vars}",
-            job.Key, job.Retries, Vars(job));
-
-        try
-        {
-            var vars = new Dictionary<string, object>
-            {
-                ["deviceCustomerLinkId"] = Guid.NewGuid().ToString()
-            };
-
-            Complete(client, job, vars);
-
-            _logger.LogInformation("[mock.device.customer.link] COMPLETED key={Key} id={Id}",
-                job.Key, vars["deviceCustomerLinkId"]);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[mock.device.customer.link] ERROR key={Key}", job.Key);
-            throw;
-        }
-    }
-
-    public void HandleAccountCreate(IJobClient client, IJob job)
-    {
-        _logger.LogInformation("[accounting.account.create] RECEIVED key={Key} retries={Retries} vars={Vars}",
-            job.Key, job.Retries, Vars(job));
-
-        try
-        {
-            var vars = new Dictionary<string, object>
-            {
-                ["accountId"] = Guid.NewGuid().ToString(),
-                ["accountNumber"] = $"AC{DateTime.UtcNow:yyyyMMddHHmmssfff}"
-            };
-
-            Complete(client, job, vars);
-
-            _logger.LogInformation("[accounting.account.create] COMPLETED key={Key} accountId={AccountId}",
-                job.Key, vars["accountId"]);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[accounting.account.create] ERROR key={Key}", job.Key);
-            throw;
-        }
-    }
-
+    // -------------------------
+    // 4) customer.email.create (GERÇEK)
+    // POST /api/v1/customers/{customerId}/emails
+    // -------------------------
     public void HandleCustomerEmailCreate(IJobClient client, IJob job)
     {
         _logger.LogInformation("[customer.email.create] RECEIVED key={Key} retries={Retries} vars={Vars}",
             job.Key, job.Retries, Vars(job));
 
-        try
-        {
-            var vars = new Dictionary<string, object>
-            {
-                ["customerEmailId"] = Guid.NewGuid().ToString()
-            };
+        var customerId = GetString(job, "customerId");
+        if (string.IsNullOrWhiteSpace(customerId))
+            throw new InvalidOperationException("customerId variable is missing");
 
-            Complete(client, job, vars);
+        var customer = _http.CreateClient("customer");
 
-            _logger.LogInformation("[customer.email.create] COMPLETED key={Key} id={Id}",
-                job.Key, vars["customerEmailId"]);
-        }
-        catch (Exception ex)
+        var body = new
         {
-            _logger.LogError(ex, "[customer.email.create] ERROR key={Key}", job.Key);
-            throw;
-        }
+            emailAddress = GetString(job, "emailAddress"),
+            type = int.TryParse(GetString(job, "emailType"), out var t) ? t : 1
+        };
+
+        var resp = customer.PostAsJsonAsync($"/api/v1/customers/{customerId}/emails", body)
+                           .GetAwaiter().GetResult();
+
+        var raw = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+
+        if (!resp.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Customer email returned {(int)resp.StatusCode}: {raw}");
+
+        Complete(client, job, new Dictionary<string, object>
+        {
+            ["customerEmailCreated"] = true
+        });
+
+        _logger.LogInformation("[customer.email.create] COMPLETED key={Key} customerId={CustomerId}", job.Key, customerId);
     }
 
+    // -------------------------
+    // 5) customer.phone.create (GERÇEK)
+    // POST /api/v1/customers/{customerId}/phones
+    // -------------------------
+    public void HandleCustomerPhoneCreate(IJobClient client, IJob job)
+    {
+        _logger.LogInformation("[customer.phone.create] RECEIVED key={Key} retries={Retries} vars={Vars}",
+            job.Key, job.Retries, Vars(job));
+
+        var customerId = GetString(job, "customerId");
+        if (string.IsNullOrWhiteSpace(customerId))
+            throw new InvalidOperationException("customerId variable is missing");
+
+        var customer = _http.CreateClient("customer");
+
+        var body = new
+        {
+            countryCode = GetString(job, "countryCode"),
+            phoneNumber = GetString(job, "phoneNumber"),
+            type = int.TryParse(GetString(job, "phoneType"), out var t) ? t : 1
+        };
+
+        var resp = customer.PostAsJsonAsync($"/api/v1/customers/{customerId}/phones", body)
+                           .GetAwaiter().GetResult();
+
+        var raw = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+
+        if (!resp.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Customer phone returned {(int)resp.StatusCode}: {raw}");
+
+        Complete(client, job, new Dictionary<string, object>
+        {
+            ["customerPhoneCreated"] = true
+        });
+
+        _logger.LogInformation("[customer.phone.create] COMPLETED key={Key} customerId={CustomerId}", job.Key, customerId);
+    }
+
+    // -------------------------
+    // 6) customer.address.create (GERÇEK)
+    // POST /api/v1/customers/{customerId}/addresses
+    // -------------------------
     public void HandleCustomerAddressCreate(IJobClient client, IJob job)
     {
         _logger.LogInformation("[customer.address.create] RECEIVED key={Key} retries={Retries} vars={Vars}",
             job.Key, job.Retries, Vars(job));
 
-        try
-        {
-            var vars = new Dictionary<string, object>
-            {
-                ["customerAddressId"] = Guid.NewGuid().ToString()
-            };
+        var customerId = GetString(job, "customerId");
+        if (string.IsNullOrWhiteSpace(customerId))
+            throw new InvalidOperationException("customerId variable is missing");
 
-            Complete(client, job, vars);
+        var customer = _http.CreateClient("customer");
 
-            _logger.LogInformation("[customer.address.create] COMPLETED key={Key} id={Id}",
-                job.Key, vars["customerAddressId"]);
-        }
-        catch (Exception ex)
+        var body = new
         {
-            _logger.LogError(ex, "[customer.address.create] ERROR key={Key}", job.Key);
-            throw;
-        }
+            addressType = int.TryParse(GetString(job, "addressType"), out var at) ? at : 1,
+            city = GetString(job, "city"),
+            district = GetString(job, "district"),
+            postalCode = GetString(job, "postalCode"),
+            addressLine1 = GetString(job, "addressLine1")
+        };
+
+        var resp = customer.PostAsJsonAsync($"/api/v1/customers/{customerId}/addresses", body)
+                           .GetAwaiter().GetResult();
+
+        var raw = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+
+        if (!resp.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Customer address returned {(int)resp.StatusCode}: {raw}");
+
+        Complete(client, job, new Dictionary<string, object>
+        {
+            ["customerAddressCreated"] = true
+        });
+
+        _logger.LogInformation("[customer.address.create] COMPLETED key={Key} customerId={CustomerId}", job.Key, customerId);
     }
 
+    // -------------------------
+    // 7) mock.device.customer.link (mock)
+    // -------------------------
+    public void HandleLinkDeviceAndCustomer(IJobClient client, IJob job)
+    {
+        _logger.LogInformation("[mock.device.customer.link] RECEIVED key={Key} retries={Retries} vars={Vars}",
+            job.Key, job.Retries, Vars(job));
+
+        Complete(client, job, new Dictionary<string, object>
+        {
+            ["deviceCustomerLinkId"] = Guid.NewGuid().ToString()
+        });
+
+        _logger.LogInformation("[mock.device.customer.link] COMPLETED key={Key}", job.Key);
+    }
+
+    // -------------------------
+    // 8) accounting.account.create (GERÇEK)
+    // POST http://localhost:5103/api/accounting/accounts
+    // response: { id: "...", accountNumber: "..." }
+    // -------------------------
+    public void HandleAccountCreate(IJobClient client, IJob job)
+    {
+        _logger.LogInformation("[accounting.account.create] RECEIVED key={Key} retries={Retries} vars={Vars}",
+            job.Key, job.Retries, Vars(job));
+
+        var customerId = GetString(job, "customerId");
+        if (string.IsNullOrWhiteSpace(customerId))
+            throw new InvalidOperationException("customerId variable is missing");
+
+        var accounting = _http.CreateClient("accounting");
+
+        var body = new
+        {
+            customerId = customerId,
+            currency = GetOrNull(job, "currency") ?? "TRY",
+            iban = GetOrNull(job, "iban") ?? "string"
+        };
+
+        var resp = accounting.PostAsJsonAsync("/api/accounting/accounts", body)
+                             .GetAwaiter().GetResult();
+
+        var raw = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+
+        if (!resp.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Accounting returned {(int)resp.StatusCode}: {raw}");
+
+        var accountId = ExtractGuid(raw, "id").ToString();
+
+        string accountNumber = "";
+        try
+        {
+            using var doc = JsonDocument.Parse(raw);
+            if (doc.RootElement.TryGetProperty("accountNumber", out var p))
+                accountNumber = p.GetString() ?? "";
+        }
+        catch { }
+
+        Complete(client, job, new Dictionary<string, object>
+        {
+            ["accountId"] = accountId,
+            ["accountNumber"] = accountNumber
+        });
+
+        _logger.LogInformation("[accounting.account.create] COMPLETED key={Key} accountId={AccountId}", job.Key, accountId);
+    }
+
+    // -------------------------
+    // 9) mock.customer.occupation.create (mock)
+    // -------------------------
     public void HandleCustomerOccupationCreate(IJobClient client, IJob job)
     {
         _logger.LogInformation("[mock.customer.occupation.create] RECEIVED key={Key} retries={Retries} vars={Vars}",
             job.Key, job.Retries, Vars(job));
 
-        try
+        Complete(client, job, new Dictionary<string, object>
         {
-            var vars = new Dictionary<string, object>
-            {
-                ["customerOccupationId"] = Guid.NewGuid().ToString()
-            };
+            ["customerOccupationId"] = Guid.NewGuid().ToString()
+        });
 
-            Complete(client, job, vars);
-
-            _logger.LogInformation("[mock.customer.occupation.create] COMPLETED key={Key} id={Id}",
-                job.Key, vars["customerOccupationId"]);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[mock.customer.occupation.create] ERROR key={Key}", job.Key);
-            throw;
-        }
+        _logger.LogInformation("[mock.customer.occupation.create] COMPLETED key={Key}", job.Key);
     }
 
     // -------------------------
-    // ✅ SADECE EKLENEN: Identity Credential Create
-    // JobType: identity.credential.create
+    // 10) identity.credential.create (GERÇEK)
+    // POST http://localhost:5102/api/v1/identity/registrations/start
+    // response: { id: "..." }
     // -------------------------
     public void HandleIdentityCredentialCreate(IJobClient client, IJob job)
     {
         _logger.LogInformation("[identity.credential.create] RECEIVED key={Key} retries={Retries} vars={Vars}",
             job.Key, job.Retries, Vars(job));
 
-        try
+        var customerId = GetString(job, "customerId");
+        var phoneNumber = GetString(job, "phoneNumber");
+        var password = GetString(job, "password");
+
+        if (string.IsNullOrWhiteSpace(customerId))
+            throw new InvalidOperationException("customerId variable is missing");
+        if (string.IsNullOrWhiteSpace(phoneNumber))
+            throw new InvalidOperationException("phoneNumber variable is missing");
+        if (string.IsNullOrWhiteSpace(password))
+            throw new InvalidOperationException("password variable is missing");
+
+        var identity = _http.CreateClient("identity");
+
+        var body = new
         {
-            // BPMN variables (register request’ten geliyor olmalı)
-            var customerIdStr = GetString(job, "customerId");
-            var phoneNumber = GetString(job, "phoneNumber");
-            var password = GetString(job, "password");
+            customerId = Guid.Parse(customerId),
+            phoneNumber,
+            password
+        };
 
-            if (string.IsNullOrWhiteSpace(customerIdStr))
-                throw new InvalidOperationException("customerId variable is missing");
-            if (string.IsNullOrWhiteSpace(phoneNumber))
-                throw new InvalidOperationException("phoneNumber variable is missing");
-            if (string.IsNullOrWhiteSpace(password))
-                throw new InvalidOperationException("password variable is missing");
+        var resp = identity.PostAsJsonAsync("/api/v1/identity/registrations/start", body)
+                           .GetAwaiter().GetResult();
 
-            var body = new
-            {
-                customerId = Guid.Parse(customerIdStr),
-                phoneNumber,
-                password
-            };
+        var raw = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
 
-            var identityClient = _httpClientFactory.CreateClient("identity");
+        if (!resp.IsSuccessStatusCode)
+            throw new InvalidOperationException($"Identity returned {(int)resp.StatusCode}: {raw}");
 
-            var resp = identityClient
-                .PostAsJsonAsync("/api/v1/identity/registrations/start", body)
-                .GetAwaiter()
-                .GetResult();
+        var credentialId = ExtractGuid(raw, "id").ToString();
 
-            var raw = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-
-            if (!resp.IsSuccessStatusCode)
-            {
-                _logger.LogError("[identity.credential.create] FAILED key={Key} status={Status} body={Body}",
-                    job.Key, (int)resp.StatusCode, raw);
-                throw new InvalidOperationException($"Identity returned {(int)resp.StatusCode}: {raw}");
-            }
-
-            // Identity response: { "id": "...", "customerId": "..." } bekliyoruz
-            var credentialId = ExtractGuid(raw, "id");
-
-            var vars = new Dictionary<string, object>
-            {
-                ["credentialId"] = credentialId.ToString()
-            };
-
-            Complete(client, job, vars);
-
-            _logger.LogInformation("[identity.credential.create] COMPLETED key={Key} credentialId={CredentialId}",
-                job.Key, credentialId);
-        }
-        catch (Exception ex)
+        Complete(client, job, new Dictionary<string, object>
         {
-            _logger.LogError(ex, "[identity.credential.create] ERROR key={Key}", job.Key);
-            throw;
-        }
+            ["credentialId"] = credentialId
+        });
+
+        _logger.LogInformation("[identity.credential.create] COMPLETED key={Key} credentialId={CredentialId}", job.Key, credentialId);
     }
 }

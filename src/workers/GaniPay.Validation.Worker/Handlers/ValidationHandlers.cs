@@ -26,49 +26,61 @@ public sealed class ValidationHandlers
         _integrationApi = integrationApi;
     }
 
-    // 1) worker.age.control
+    // JobType: worker.age.control
     public async Task HandleAgeControl(IJobClient client, IJob job)
     {
         var (vars, raw) = Read(job);
 
-        bool ok;
-        string reason;
+        bool ok = false;
+        string reason = "UNKNOWN";
+        int? computedAge = null;
 
+        // 1) age direkt geldiyse
         if (vars.TryGetInt("age", out var age))
         {
+            computedAge = age;
             ok = age >= _validationOptions.MinAge;
             reason = ok ? "OK" : $"AGE_BELOW_MIN:{age}<{_validationOptions.MinAge}";
         }
-        else if (vars.TryGetString("birthDate", out var bd) || vars.TryGetString("dateOfBirth", out bd))
+        else
         {
-            if (DateOnly.TryParse(bd, out var birth))
+            // 2) birthDate / dateOfBirth geldiyse
+            if (vars.TryGetString("birthDate", out var bd) || vars.TryGetString("dateOfBirth", out bd))
             {
-                var today = DateOnly.FromDateTime(DateTime.UtcNow);
-                var computedAge = today.Year - birth.Year;
-                if (birth.AddYears(computedAge) > today) computedAge--;
+                // ISO bekliyoruz: yyyy-MM-dd (senin gönderdiðin böyle)
+                if (DateOnly.TryParseExact(bd, "yyyy-MM-dd", out var birth))
+                {
+                    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+                    var a = today.Year - birth.Year;
+                    if (birth.AddYears(a) > today) a--;
 
-                ok = computedAge >= _validationOptions.MinAge;
-                reason = ok ? "OK" : $"AGE_BELOW_MIN:{computedAge}<{_validationOptions.MinAge}";
+                    computedAge = a;
+                    ok = a >= _validationOptions.MinAge;
+                    reason = ok ? "OK" : $"AGE_BELOW_MIN:{a}<{_validationOptions.MinAge}";
+                }
+                else
+                {
+                    ok = false;
+                    reason = "INVALID_BIRTHDATE_FORMAT_EXPECTED_yyyy-MM-dd";
+                }
             }
             else
             {
                 ok = false;
-                reason = "INVALID_BIRTHDATE_FORMAT";
+                reason = "MISSING_AGE_OR_BIRTHDATE";
             }
         }
-        else
-        {
-            ok = false;
-            reason = "MISSING_AGE_OR_BIRTHDATE";
-        }
 
+        // Gateway’in okuyacaðý yapý: ageControl.ok (BOOLEAN!)
         var completeVars = new
         {
-            ageControl = new { ok, reason },
-            validation = new { lastStep = "AgeControl" }
+            ageControl = new { ok, reason },   // ok bool
+            computedAge,                       // debug
+            validation = new { lastStep = "AgeControl", passed = ok }
         };
 
-        _log.LogInformation("[AgeControl] ok={Ok} reason={Reason}", ok, reason);
+        _log.LogInformation("[AgeControl] ok={Ok} reason={Reason} computedAge={Age}", ok, reason, computedAge);
+
         await client.NewCompleteJobCommand(job.Key)
             .Variables(JsonSerializer.Serialize(completeVars))
             .Send();

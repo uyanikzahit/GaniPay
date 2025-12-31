@@ -1,36 +1,34 @@
-using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
+using Zeebe.Client;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// JSON options (enumlarý string olarak gönderiyoruz)
 builder.Services.ConfigureHttpJsonOptions(o =>
 {
     o.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
-// Downstream base urls
-var customerBaseUrl = builder.Configuration["Downstream:Customer:BaseUrl"] ?? "https://localhost:7101";
-var identityBaseUrl = builder.Configuration["Downstream:Identity:BaseUrl"] ?? "http://localhost:5102";
-var accountingBaseUrl = builder.Configuration["Downstream:Accounting:BaseUrl"] ?? "http://localhost:5103";
+// Zeebe config
+var zeebeGateway = builder.Configuration["Zeebe:GatewayAddress"] ?? "127.0.0.1:26500";
+var registerProcessId = builder.Configuration["Zeebe:RegisterProcessId"] ?? "register";
 
-// Named HttpClients
-builder.Services.AddHttpClient("customer", c =>
+// Zeebe Client (Singleton)
+builder.Services.AddSingleton<IZeebeClient>(_ =>
 {
-    c.BaseAddress = new Uri(customerBaseUrl);
+    return ZeebeClient.Builder()
+        .UseGatewayAddress(zeebeGateway)
+        .UsePlainText()
+        .Build();
 });
 
-builder.Services.AddHttpClient("identity", c =>
-{
-    c.BaseAddress = new Uri(identityBaseUrl);
-});
-
-builder.Services.AddHttpClient("accounting", c =>
-{
-    c.BaseAddress = new Uri(accountingBaseUrl);
-});
+// Variables serializer (Zeebe’ye JSON string basacaðýz)
+var zeebeJsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+zeebeJsonOptions.Converters.Add(new JsonStringEnumConverter());
 
 var app = builder.Build();
 
@@ -40,30 +38,56 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "workflow" }));
+app.MapGet("/health", (IConfiguration cfg) =>
+{
+    return Results.Ok(new
+    {
+        status = "ok",
+        service = "workflow",
+        zeebeGateway = cfg["Zeebe:GatewayAddress"]
+    });
+});
 
 var group = app.MapGroup("/api/v1/onboarding")
     .WithTags("Onboarding");
 
 // POST /api/v1/onboarding/register
+// Görev: Sadece Zeebe’de main flow’u baþlatmak.
+// Customer/Identity/Accounting çaðrýlarýný Worker’lar yapacak.
 group.MapPost("/register", async (
     RegisterRequest req,
-    IHttpClientFactory httpClientFactory,
+    HttpContext http,
+    IZeebeClient zeebe,
     CancellationToken ct) =>
 {
-    // 1) Customer oluþtur
-    var customerClient = httpClientFactory.CreateClient("customer");
+    // CorrelationId: header varsa onu al, yoksa üret
+    var correlationId =
+        http.Request.Headers.TryGetValue("X-Correlation-Id", out var cid) && !string.IsNullOrWhiteSpace(cid)
+            ? cid.ToString()
+            : Guid.NewGuid().ToString();
 
-    // Customer.API’nin beklediði payload alan isimleri sende farklýysa burada map et.
-    var customerCreateBody = new
+    // Zeebe’ye gidecek variables (DataCreation/Validation tasklerinde lazým olan alanlarý koyuyoruz)
+    // NOT: CustomerId burada yok, çünkü customer.create task’i customerId üretiyor.
+    var variables = new
     {
+        correlationId,
+
+        // Register input
         firstName = req.FirstName,
         lastName = req.LastName,
-        birthDate = req.BirthDate,
+
+        // DateOnly -> string (en güvenlisi)
+        birthDate = req.BirthDate.ToString("yyyy-MM-dd"),
+
         nationality = req.Nationality,
         identityNumber = req.IdentityNumber,
         segment = req.Segment,
-        // zorunlu email + address
+
+        // Identity için lazým
+        phoneNumber = req.PhoneNumber,
+        password = req.Password,
+
+        // Customer email/address için lazým
         email = req.Email,
         address = new
         {
@@ -72,125 +96,48 @@ group.MapPost("/register", async (
             district = req.Address.District,
             postalCode = req.Address.PostalCode,
             addressLine1 = req.Address.AddressLine1
-        }
-    };
+        },
 
-    HttpResponseMessage customerResp;
-    try
-    {
-        customerResp = await customerClient.PostAsJsonAsync("/api/v1/customers/individual", customerCreateBody, ct);
-    }
-    catch (HttpRequestException ex)
-    {
-        return Results.Problem(
-            title: "Customer service unreachable",
-            detail: ex.Message,
-            statusCode: StatusCodes.Status503ServiceUnavailable);
-    }
-
-    if (!customerResp.IsSuccessStatusCode)
-    {
-        var err = await customerResp.Content.ReadAsStringAsync(ct);
-        return Results.Problem(
-            title: "Customer create failed",
-            detail: err,
-            statusCode: (int)customerResp.StatusCode);
-    }
-
-    var createdCustomer = await customerResp.Content.ReadFromJsonAsync<CustomerCreatedResponse>(cancellationToken: ct);
-    if (createdCustomer is null || createdCustomer.Id == Guid.Empty)
-    {
-        return Results.Problem(
-            title: "Customer create failed",
-            detail: "Customer response could not be parsed.");
-    }
-
-    // 2) Identity credential oluþtur (customerId ile)
-    var identityClient = httpClientFactory.CreateClient("identity");
-
-    var identityStartBody = new
-    {
-        customerId = createdCustomer.Id,
-        phoneNumber = req.PhoneNumber,
-        password = req.Password
-    };
-
-    HttpResponseMessage identityResp;
-    try
-    {
-        identityResp = await identityClient.PostAsJsonAsync("/api/v1/identity/registrations/start", identityStartBody, ct);
-    }
-    catch (HttpRequestException ex)
-    {
-        return Results.Problem(
-            title: "Identity service unreachable",
-            detail: ex.Message,
-            statusCode: StatusCodes.Status503ServiceUnavailable);
-    }
-
-    if (!identityResp.IsSuccessStatusCode)
-    {
-        var err = await identityResp.Content.ReadAsStringAsync(ct);
-        return Results.Problem(
-            title: "Identity registration failed",
-            detail: err,
-            statusCode: (int)identityResp.StatusCode);
-    }
-
-    var createdCredential = await identityResp.Content.ReadFromJsonAsync<CredentialCreatedResponse>(cancellationToken: ct);
-    if (createdCredential is null || createdCredential.Id == Guid.Empty)
-    {
-        return Results.Problem(
-            title: "Identity registration failed",
-            detail: "Identity response could not be parsed.");
-    }
-
-    // 3) Accounting wallet account oluþtur (customerId ile)
-    var accountingClient = httpClientFactory.CreateClient("accounting");
-
-    // Accounting endpointin þu an accountNumber istiyorsa, sen düzenleyene kadar geçici olarak dummy gönderebilirsin.
-    // Ama sen accountNumber'ý sistem üretecek þekilde düzeltiyorum dediðin için burada accountNumber yok.
-    var accountingCreateBody = new
-    {
-        customerId = createdCustomer.Id,
+        // Accounting için
         currency = req.Currency ?? "TRY"
     };
 
-    HttpResponseMessage accResp;
+    var variablesJson = JsonSerializer.Serialize(variables, zeebeJsonOptions);
+
     try
     {
-        accResp = await accountingClient.PostAsJsonAsync("/api/accounting/accounts", accountingCreateBody, ct);
+        // Main flow baþlat
+        var resp = await zeebe.NewCreateProcessInstanceCommand()
+            .BpmnProcessId(registerProcessId) // "register"
+            .LatestVersion()
+            .Variables(variablesJson)
+            .Send();
+
+        // 202 Accepted: instance baþladý, bundan sonrasý workflow+workerlar
+        return Results.Accepted(
+            value: new
+            {
+                success = true,
+                correlationId,
+                processId = registerProcessId,
+                processInstanceKey = resp.ProcessInstanceKey
+            });
     }
-    catch (HttpRequestException ex)
+    catch (Exception ex)
     {
+        // Zeebe’ye baðlanamama / deploy yok / processId yanlýþ vb.
         return Results.Problem(
-            title: "Accounting service unreachable",
+            title: "Could not start register workflow",
             detail: ex.Message,
             statusCode: StatusCodes.Status503ServiceUnavailable);
     }
+});
 
-    if (!accResp.IsSuccessStatusCode)
-    {
-        var err = await accResp.Content.ReadAsStringAsync(ct);
-        return Results.Problem(
-            title: "Accounting account create failed",
-            detail: err,
-            statusCode: (int)accResp.StatusCode);
-    }
-
-    // Accounting response modelin birebir bilinmiyor; parse etmeyi esnek tutalým:
-    // Eðer accounting dönen response'u biliyorsan bunu kendi DTO’n ile deðiþtir.
-    var accJson = await accResp.Content.ReadAsStringAsync(ct);
-
-    // 4) MVP response: customerId + credentialId + accounting raw response
-    return Results.Created($"/api/v1/customers/{createdCustomer.Id}", new
-    {
-        success = true,
-        customerId = createdCustomer.Id,
-        credentialId = createdCredential.Id,
-        currency = accountingCreateBody.currency,
-        accounting = accJson
-    });
+app.Lifetime.ApplicationStopping.Register(() =>
+{
+    // Zeebe client dispose
+    if (app.Services.GetService<IZeebeClient>() is IDisposable d)
+        d.Dispose();
 });
 
 app.Run();
@@ -216,9 +163,3 @@ public sealed record RegisterAddress(
     string PostalCode,
     string AddressLine1
 );
-
-// Customer.API response (minimum)
-public sealed record CustomerCreatedResponse(Guid Id);
-
-// Identity response (minimum)
-public sealed record CredentialCreatedResponse(Guid Id, Guid CustomerId);

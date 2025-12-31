@@ -16,7 +16,7 @@ public sealed class WorkerHost : IHostedService
 
     private IZeebeClient? _client;
 
-    // ✅ GC fix
+    // ✅ GC fix: opened worker'ları dispose edebilmek için tutuyoruz
     private readonly List<IDisposable> _openedWorkers = new();
 
     public WorkerHost(
@@ -62,7 +62,7 @@ public sealed class WorkerHost : IHostedService
         _openedWorkers.Add(Open("customer.address.create", _handlers.HandleCustomerAddressCreate, timeout, pollInterval));
         _openedWorkers.Add(Open("mock.customer.occupation.create", _handlers.HandleCustomerOccupationCreate, timeout, pollInterval));
 
-        // ✅ SADECE EKLENEN: Identity credential create (BPMN jobType ile birebir aynı olmalı)
+        // ✅ SADECE EKLENEN: Identity credential create
         _openedWorkers.Add(Open("identity.credential.create", _handlers.HandleIdentityCredentialCreate, timeout, pollInterval));
     }
 
@@ -76,7 +76,7 @@ public sealed class WorkerHost : IHostedService
 
         var worker = _client.NewWorker()
             .JobType(jobType)
-            .Handler(handler) // ✅ bu pakette JobHandler = void delegate
+            .Handler(handler) // void handler
             .Name(_options.WorkerName)
             .MaxJobsActive(_options.MaxJobsActive)
             .Timeout(timeout)
