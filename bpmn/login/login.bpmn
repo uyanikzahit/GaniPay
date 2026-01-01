@@ -1,337 +1,473 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bpmn:definitions
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
-  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
-  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
-  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
-  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
-  id="Definitions_Login_Simple"
-  targetNamespace="http://ganipay/processes/login">
-
-  <bpmn:process id="login" name="Login.Main" isExecutable="true">
-
-    <!-- Start -->
-    <bpmn:startEvent id="Start_Login" name="Start" />
-
-    <!-- 1) Identity Login (phone+password) -->
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" id="Definitions_Login_Pro" targetNamespace="http://ganipay/processes/login" exporter="Camunda Modeler" exporterVersion="5.40.1">
+  <bpmn:process id="login" name="Login" isExecutable="true">
+    <bpmn:startEvent id="Start_Login" name="Start">
+      <bpmn:outgoing>F0</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="T_PrepareContext" name="Prepare Context">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.auth.context.prepare" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=phoneNumber" target="phoneNumber" />
+          <zeebe:input source="=password" target="password" />
+          <zeebe:input source="=ipAddress" target="ipAddress" />
+          <zeebe:input source="=deviceId" target="deviceId" />
+          <zeebe:input source="=channel" target="channel" />
+          <zeebe:input source="=clientVersion" target="clientVersion" />
+          <zeebe:output source="=correlationId" target="correlationId" />
+          <zeebe:output source="=normalizedPhoneNumber" target="phoneNumber" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>F0</bpmn:incoming>
+      <bpmn:outgoing>F1</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="T_BruteForceGuard" name="Brute-Force Guard">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.auth.bruteforce.guard" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=phoneNumber" target="phoneNumber" />
+          <zeebe:input source="=ipAddress" target="ipAddress" />
+          <zeebe:input source="=correlationId" target="correlationId" />
+          <zeebe:output source="=ok" target="guardOk" />
+          <zeebe:output source="=attemptCount" target="attemptCount" />
+          <zeebe:output source="=lockoutUntil" target="lockoutUntil" />
+          <zeebe:output source="=errorCode" target="errorCode" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>F1</bpmn:incoming>
+      <bpmn:outgoing>F2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="G_GuardOk" name="Guard OK" default="Flow_0mkgvvl">
+      <bpmn:incoming>F2</bpmn:incoming>
+      <bpmn:outgoing>F3_OK</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0mkgvvl</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateThrowEvent id="Event_0984otq" name="Guard Failed">
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:output source="=false" target="success" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_0mkgvvl</bpmn:incoming>
+      <bpmn:outgoing>Flow_066ydrk</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
     <bpmn:serviceTask id="T_IdentityLogin" name="Identity Login">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="identity.login" retries="3" />
         <zeebe:ioMapping>
           <zeebe:input source="=phoneNumber" target="phoneNumber" />
           <zeebe:input source="=password" target="password" />
-
-          <!-- outputs (worker set eder) -->
+          <zeebe:input source="=correlationId" target="correlationId" />
           <zeebe:output source="=ok" target="loginOk" />
           <zeebe:output source="=customerId" target="customerId" />
           <zeebe:output source="=errorCode" target="errorCode" />
         </zeebe:ioMapping>
       </bpmn:extensionElements>
+      <bpmn:incoming>F3_OK</bpmn:incoming>
+      <bpmn:outgoing>F4</bpmn:outgoing>
     </bpmn:serviceTask>
-
-    <bpmn:exclusiveGateway id="G_LoginOk" name="Login OK?" />
-
-    <!-- 2) Account Status Check (active/blocked/kyc) -->
-    <bpmn:serviceTask id="T_AccountStatusCheck" name="Account Active?">
-      <bpmn:extensionElements>
-        <zeebe:taskDefinition type="auth.account.status" retries="3" />
-        <zeebe:ioMapping>
-          <zeebe:input source="=customerId" target="customerId" />
-
-          <zeebe:output source="=ok" target="accountOk" />
-          <zeebe:output source="=errorCode" target="errorCode" />
-        </zeebe:ioMapping>
-      </bpmn:extensionElements>
-    </bpmn:serviceTask>
-
-    <bpmn:exclusiveGateway id="G_AccountOk" name="Account OK?" />
-
-    <!-- 3) Device Check (mock risk/new device) -->
-    <bpmn:serviceTask id="T_DeviceCheck" name="Device Check (mock)">
-      <bpmn:extensionElements>
-        <zeebe:taskDefinition type="device.risk.check" retries="3" />
-        <zeebe:ioMapping>
-          <zeebe:input source="=customerId" target="customerId" />
-          <zeebe:input source="=deviceId" target="deviceId" />
-
-          <!-- outputs -->
-          <zeebe:output source="=otpRequired" target="otpRequired" />
-          <zeebe:output source="=errorCode" target="errorCode" />
-        </zeebe:ioMapping>
-      </bpmn:extensionElements>
-    </bpmn:serviceTask>
-
-    <bpmn:exclusiveGateway id="G_OtpRequired" name="OTP Required?" />
-
-    <!-- 4A) OTP Send -->
-    <bpmn:serviceTask id="T_OtpSend" name="OTP Send (mock)">
-      <bpmn:extensionElements>
-        <zeebe:taskDefinition type="auth.otp.send" retries="3" />
-        <zeebe:ioMapping>
-          <zeebe:input source="=customerId" target="customerId" />
-          <zeebe:input source="=phoneNumber" target="phoneNumber" />
-
-          <zeebe:output source="=otpTxId" target="otpTxId" />
-          <zeebe:output source="=errorCode" target="errorCode" />
-        </zeebe:ioMapping>
-      </bpmn:extensionElements>
-    </bpmn:serviceTask>
-
-    <!-- 4B) OTP Verify (mock) -->
-    <bpmn:serviceTask id="T_OtpVerify" name="OTP Verify (mock)">
-      <bpmn:extensionElements>
-        <zeebe:taskDefinition type="auth.otp.verify" retries="3" />
-        <zeebe:ioMapping>
-          <zeebe:input source="=otpTxId" target="otpTxId" />
-          <zeebe:input source="=otpCode" target="otpCode" />
-
-          <zeebe:output source="=ok" target="otpOk" />
-          <zeebe:output source="=errorCode" target="errorCode" />
-        </zeebe:ioMapping>
-      </bpmn:extensionElements>
-    </bpmn:serviceTask>
-
-    <bpmn:exclusiveGateway id="G_OtpOk" name="OTP OK?" />
-
-    <!-- 5) Create Token/Session (mock) -->
-    <bpmn:serviceTask id="T_SessionCreate" name="Create Token/Session">
-      <bpmn:extensionElements>
-        <zeebe:taskDefinition type="auth.session.create" retries="3" />
-        <zeebe:ioMapping>
-          <zeebe:input source="=customerId" target="customerId" />
-
-          <zeebe:output source="=accessToken" target="accessToken" />
-          <zeebe:output source="=refreshToken" target="refreshToken" />
-          <zeebe:output source="=expiresIn" target="expiresIn" />
-          <zeebe:output source="=sessionId" target="sessionId" />
-        </zeebe:ioMapping>
-      </bpmn:extensionElements>
-    </bpmn:serviceTask>
-
-    <!-- Success marker (Intermediate Event) -->
-    <bpmn:intermediateThrowEvent id="E_Success" name="Success">
-      <bpmn:extensionElements>
-        <zeebe:ioMapping>
-          <zeebe:output source="=true" target="success" />
-        </zeebe:ioMapping>
-      </bpmn:extensionElements>
-    </bpmn:intermediateThrowEvent>
-
-    <!-- Fail handler (single intermediate event) -->
-    <bpmn:intermediateThrowEvent id="E_Fail" name="Failed">
+    <bpmn:exclusiveGateway id="G_LoginOk" name="Login OK" default="Flow_078dbki">
+      <bpmn:incoming>F4</bpmn:incoming>
+      <bpmn:outgoing>F5_OK</bpmn:outgoing>
+      <bpmn:outgoing>Flow_078dbki</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateThrowEvent id="Event_0jdcol7" name="Login Failed">
       <bpmn:extensionElements>
         <zeebe:ioMapping>
           <zeebe:output source="=false" target="success" />
         </zeebe:ioMapping>
       </bpmn:extensionElements>
+      <bpmn:incoming>Flow_078dbki</bpmn:incoming>
+      <bpmn:outgoing>Flow_11nibhe</bpmn:outgoing>
     </bpmn:intermediateThrowEvent>
-
-    <!-- Single end -->
-    <bpmn:endEvent id="End_Login" name="End" />
-
-    <!-- SEQUENCE FLOWS -->
-    <bpmn:sequenceFlow id="F0" sourceRef="Start_Login" targetRef="T_IdentityLogin" />
-    <bpmn:sequenceFlow id="F1" sourceRef="T_IdentityLogin" targetRef="G_LoginOk" />
-
-    <bpmn:sequenceFlow id="F2_OK" sourceRef="G_LoginOk" targetRef="T_AccountStatusCheck">
+    <bpmn:serviceTask id="T_AccountActive" name="Account Active">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.auth.account.status" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=customerId" target="customerId" />
+          <zeebe:input source="=correlationId" target="correlationId" />
+          <zeebe:output source="=ok" target="accountOk" />
+          <zeebe:output source="=status" target="accountStatus" />
+          <zeebe:output source="=errorCode" target="errorCode" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>F5_OK</bpmn:incoming>
+      <bpmn:outgoing>Flow_0fogqvp</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="G_AccountOk" name="Account OK" default="Flow_0ymrr9f">
+      <bpmn:incoming>Flow_0fogqvp</bpmn:incoming>
+      <bpmn:outgoing>Flow_10e9t7z</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0ymrr9f</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateThrowEvent id="Event_0siua6s" name="Account Failed">
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:output source="=false" target="success" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_0ymrr9f</bpmn:incoming>
+      <bpmn:outgoing>Flow_1nj0odo</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:serviceTask id="T_DeviceTrust" name="Device Trust Check">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.auth.device.trust" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=customerId" target="customerId" />
+          <zeebe:input source="=deviceId" target="deviceId" />
+          <zeebe:input source="=ipAddress" target="ipAddress" />
+          <zeebe:input source="=channel" target="channel" />
+          <zeebe:input source="=correlationId" target="correlationId" />
+          <zeebe:output source="=ok" target="deviceOk" />
+          <zeebe:output source="=riskLevel" target="riskLevel" />
+          <zeebe:output source="=trustedDevice" target="trustedDevice" />
+          <zeebe:output source="=errorCode" target="errorCode" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_10e9t7z</bpmn:incoming>
+      <bpmn:outgoing>Flow_0knhh1n</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="G_DeviceOk" name="Device OK" default="Flow_1gfzbf8">
+      <bpmn:incoming>Flow_0knhh1n</bpmn:incoming>
+      <bpmn:outgoing>F9_OK</bpmn:outgoing>
+      <bpmn:outgoing>Flow_1gfzbf8</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateThrowEvent id="Event_1uis8sa" name="Device Trust Failed">
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:output source="=false" target="success" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1gfzbf8</bpmn:incoming>
+      <bpmn:outgoing>Flow_0csbw03</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:serviceTask id="T_CreateSession" name="Create Session">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.auth.session.create" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=customerId" target="customerId" />
+          <zeebe:input source="=deviceId" target="deviceId" />
+          <zeebe:input source="=riskLevel" target="riskLevel" />
+          <zeebe:input source="=correlationId" target="correlationId" />
+          <zeebe:output source="=ok" target="sessionOk" />
+          <zeebe:output source="=accessToken" target="accessToken" />
+          <zeebe:output source="=refreshToken" target="refreshToken" />
+          <zeebe:output source="=expiresIn" target="expiresIn" />
+          <zeebe:output source="=sessionId" target="sessionId" />
+          <zeebe:output source="=errorCode" target="errorCode" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>F9_OK</bpmn:incoming>
+      <bpmn:outgoing>F10</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_0w0i781" name="Session OK" default="Flow_024yzcr">
+      <bpmn:incoming>F10</bpmn:incoming>
+      <bpmn:outgoing>Flow_08lbylu</bpmn:outgoing>
+      <bpmn:outgoing>Flow_024yzcr</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateThrowEvent id="Event_0lgls6i" name="Create Session Failed">
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:output source="=false" target="success" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_024yzcr</bpmn:incoming>
+      <bpmn:outgoing>Flow_1de2v1l</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:serviceTask id="T_AuditLog" name="Audit Log">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.auth.audit.log" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=correlationId" target="correlationId" />
+          <zeebe:input source="=customerId" target="customerId" />
+          <zeebe:input source="=phoneNumber" target="phoneNumber" />
+          <zeebe:input source="=ipAddress" target="ipAddress" />
+          <zeebe:input source="=deviceId" target="deviceId" />
+          <zeebe:input source="=riskLevel" target="riskLevel" />
+          <zeebe:input source="=success" target="success" />
+          <zeebe:input source="=errorCode" target="errorCode" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_08lbylu</bpmn:incoming>
+      <bpmn:outgoing>Flow_0klhvdd</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:intermediateThrowEvent id="Event_1l2yhtj" name="Login Success">
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:output source="=true" target="success" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_0klhvdd</bpmn:incoming>
+      <bpmn:outgoing>Flow_1kxlid1</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:exclusiveGateway id="Gateway_029g81o">
+      <bpmn:incoming>Flow_066ydrk</bpmn:incoming>
+      <bpmn:incoming>Flow_1nj0odo</bpmn:incoming>
+      <bpmn:incoming>Flow_0csbw03</bpmn:incoming>
+      <bpmn:incoming>Flow_1de2v1l</bpmn:incoming>
+      <bpmn:incoming>Flow_1kxlid1</bpmn:incoming>
+      <bpmn:incoming>Flow_11nibhe</bpmn:incoming>
+      <bpmn:outgoing>Flow_1aigcaw</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="End_Login" name="End">
+      <bpmn:incoming>Flow_1aigcaw</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="F0" sourceRef="Start_Login" targetRef="T_PrepareContext" />
+    <bpmn:sequenceFlow id="F1" sourceRef="T_PrepareContext" targetRef="T_BruteForceGuard" />
+    <bpmn:sequenceFlow id="F2" sourceRef="T_BruteForceGuard" targetRef="G_GuardOk" />
+    <bpmn:sequenceFlow id="F3_OK" sourceRef="G_GuardOk" targetRef="T_IdentityLogin">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=guardOk = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F4" sourceRef="T_IdentityLogin" targetRef="G_LoginOk" />
+    <bpmn:sequenceFlow id="F5_OK" sourceRef="G_LoginOk" targetRef="T_AccountActive">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=loginOk = true</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="F2_FAIL" sourceRef="G_LoginOk" targetRef="E_Fail">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=loginOk = false</bpmn:conditionExpression>
+    <bpmn:sequenceFlow id="F9_OK" sourceRef="G_DeviceOk" targetRef="T_CreateSession">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=deviceOk = true</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-
-    <bpmn:sequenceFlow id="F3" sourceRef="T_AccountStatusCheck" targetRef="G_AccountOk" />
-
-    <bpmn:sequenceFlow id="F4_OK" sourceRef="G_AccountOk" targetRef="T_DeviceCheck">
+    <bpmn:sequenceFlow id="F10" sourceRef="T_CreateSession" targetRef="Gateway_0w0i781" />
+    <bpmn:sequenceFlow id="Flow_0mkgvvl" sourceRef="G_GuardOk" targetRef="Event_0984otq" />
+    <bpmn:sequenceFlow id="Flow_066ydrk" sourceRef="Event_0984otq" targetRef="Gateway_029g81o" />
+    <bpmn:sequenceFlow id="Flow_078dbki" sourceRef="G_LoginOk" targetRef="Event_0jdcol7" />
+    <bpmn:sequenceFlow id="Flow_0fogqvp" sourceRef="T_AccountActive" targetRef="G_AccountOk" />
+    <bpmn:sequenceFlow id="Flow_10e9t7z" sourceRef="G_AccountOk" targetRef="T_DeviceTrust">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=accountOk = true</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="F4_FAIL" sourceRef="G_AccountOk" targetRef="E_Fail">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=accountOk = false</bpmn:conditionExpression>
+    <bpmn:sequenceFlow id="Flow_0ymrr9f" sourceRef="G_AccountOk" targetRef="Event_0siua6s" />
+    <bpmn:sequenceFlow id="Flow_1nj0odo" sourceRef="Event_0siua6s" targetRef="Gateway_029g81o" />
+    <bpmn:sequenceFlow id="Flow_0knhh1n" sourceRef="T_DeviceTrust" targetRef="G_DeviceOk" />
+    <bpmn:sequenceFlow id="Flow_1gfzbf8" sourceRef="G_DeviceOk" targetRef="Event_1uis8sa" />
+    <bpmn:sequenceFlow id="Flow_0csbw03" sourceRef="Event_1uis8sa" targetRef="Gateway_029g81o" />
+    <bpmn:sequenceFlow id="Flow_08lbylu" sourceRef="Gateway_0w0i781" targetRef="T_AuditLog">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=sessionOk = true</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-
-    <bpmn:sequenceFlow id="F5" sourceRef="T_DeviceCheck" targetRef="G_OtpRequired" />
-
-    <bpmn:sequenceFlow id="F6_OTP" sourceRef="G_OtpRequired" targetRef="T_OtpSend">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=otpRequired = true</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="F6_NOOTP" sourceRef="G_OtpRequired" targetRef="T_SessionCreate">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=otpRequired = false</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
-
-    <bpmn:sequenceFlow id="F7" sourceRef="T_OtpSend" targetRef="T_OtpVerify" />
-    <bpmn:sequenceFlow id="F8" sourceRef="T_OtpVerify" targetRef="G_OtpOk" />
-
-    <bpmn:sequenceFlow id="F9_OK" sourceRef="G_OtpOk" targetRef="T_SessionCreate">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=otpOk = true</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="F9_FAIL" sourceRef="G_OtpOk" targetRef="E_Fail">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=otpOk = false</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
-
-    <bpmn:sequenceFlow id="F10" sourceRef="T_SessionCreate" targetRef="E_Success" />
-    <bpmn:sequenceFlow id="F11" sourceRef="E_Success" targetRef="End_Login" />
-    <bpmn:sequenceFlow id="F12" sourceRef="E_Fail" targetRef="End_Login" />
-
+    <bpmn:sequenceFlow id="Flow_0klhvdd" sourceRef="T_AuditLog" targetRef="Event_1l2yhtj" />
+    <bpmn:sequenceFlow id="Flow_024yzcr" sourceRef="Gateway_0w0i781" targetRef="Event_0lgls6i" />
+    <bpmn:sequenceFlow id="Flow_1de2v1l" sourceRef="Event_0lgls6i" targetRef="Gateway_029g81o" />
+    <bpmn:sequenceFlow id="Flow_1kxlid1" sourceRef="Event_1l2yhtj" targetRef="Gateway_029g81o" />
+    <bpmn:sequenceFlow id="Flow_1aigcaw" sourceRef="Gateway_029g81o" targetRef="End_Login" />
+    <bpmn:sequenceFlow id="Flow_11nibhe" sourceRef="Event_0jdcol7" targetRef="Gateway_029g81o" />
   </bpmn:process>
-
-  <!-- ========================= DIAGRAM (CLEAN UI) ========================= -->
-  <bpmndi:BPMNDiagram id="BPMNDiagram_login_simple">
-    <bpmndi:BPMNPlane id="BPMNPlane_login_simple" bpmnElement="login">
-
-      <!-- MAIN LINE -->
+  <bpmndi:BPMNDiagram id="BPMNDiagram_login_pro">
+    <bpmndi:BPMNPlane id="BPMNPlane_login_pro" bpmnElement="login">
       <bpmndi:BPMNShape id="S_Start" bpmnElement="Start_Login">
-        <dc:Bounds x="120" y="190" width="36" height="36" />
+        <dc:Bounds x="152" y="507" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="158" y="543" width="25" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-
-      <bpmndi:BPMNShape id="S_IdentityLogin" bpmnElement="T_IdentityLogin">
-        <dc:Bounds x="200" y="165" width="170" height="80" />
+      <bpmndi:BPMNShape id="S_Prepare" bpmnElement="T_PrepareContext">
+        <dc:Bounds x="235" y="485" width="210" height="80" />
+        <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
-
+      <bpmndi:BPMNShape id="S_Guard" bpmnElement="T_BruteForceGuard">
+        <dc:Bounds x="510" y="485" width="220" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_G_GuardOk" bpmnElement="G_GuardOk" isMarkerVisible="true">
+        <dc:Bounds x="605" y="365" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="542" y="383" width="51" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0984otq_di" bpmnElement="Event_0984otq">
+        <dc:Bounds x="612" y="162" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="548" y="203" width="64" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Identity" bpmnElement="T_IdentityLogin">
+        <dc:Bounds x="760" y="350" width="220" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="S_G_LoginOk" bpmnElement="G_LoginOk" isMarkerVisible="true">
-        <dc:Bounds x="410" y="185" width="50" height="50" />
+        <dc:Bounds x="1115" y="365" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1178" y="383" width="47" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-
-      <bpmndi:BPMNShape id="S_AccountStatus" bpmnElement="T_AccountStatusCheck">
-        <dc:Bounds x="500" y="165" width="170" height="80" />
+      <bpmndi:BPMNShape id="Event_0jdcol7_di" bpmnElement="Event_0jdcol7">
+        <dc:Bounds x="1122" y="162" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1060" y="203" width="60" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-
+      <bpmndi:BPMNShape id="S_Account" bpmnElement="T_AccountActive">
+        <dc:Bounds x="1030" y="490" width="220" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="S_G_AccountOk" bpmnElement="G_AccountOk" isMarkerVisible="true">
-        <dc:Bounds x="710" y="185" width="50" height="50" />
+        <dc:Bounds x="1335" y="505" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1331" y="555" width="59" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-
-      <bpmndi:BPMNShape id="S_DeviceCheck" bpmnElement="T_DeviceCheck">
-        <dc:Bounds x="800" y="165" width="190" height="80" />
+      <bpmndi:BPMNShape id="Event_0siua6s_di" bpmnElement="Event_0siua6s">
+        <dc:Bounds x="1342" y="162" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1264" y="203" width="72" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-
-      <bpmndi:BPMNShape id="S_G_OtpRequired" bpmnElement="G_OtpRequired" isMarkerVisible="true">
-        <dc:Bounds x="1030" y="185" width="50" height="50" />
+      <bpmndi:BPMNShape id="S_Device" bpmnElement="T_DeviceTrust">
+        <dc:Bounds x="1460" y="485" width="220" height="80" />
+        <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
-
-      <bpmndi:BPMNShape id="S_SessionCreate" bpmnElement="T_SessionCreate">
-        <dc:Bounds x="1120" y="165" width="190" height="80" />
+      <bpmndi:BPMNShape id="S_G_DeviceOk" bpmnElement="G_DeviceOk" isMarkerVisible="true">
+        <dc:Bounds x="1725" y="500" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1724" y="550" width="54" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-
-      <bpmndi:BPMNShape id="S_Success" bpmnElement="E_Success">
-        <dc:Bounds x="1350" y="192" width="36" height="36" />
+      <bpmndi:BPMNShape id="Event_1uis8sa_di" bpmnElement="Event_1uis8sa">
+        <dc:Bounds x="1732" y="162" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1657" y="196" width="65" height="27" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-
+      <bpmndi:BPMNShape id="S_Session" bpmnElement="T_CreateSession">
+        <dc:Bounds x="1820" y="485" width="220" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_0w0i781_di" bpmnElement="Gateway_0w0i781" isMarkerVisible="true">
+        <dc:Bounds x="2095" y="500" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2091" y="557" width="59" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0lgls6i_di" bpmnElement="Event_0lgls6i">
+        <dc:Bounds x="2102" y="162" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2009" y="196" width="76" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Audit" bpmnElement="T_AuditLog">
+        <dc:Bounds x="2200" y="485" width="200" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_1l2yhtj_di" bpmnElement="Event_1l2yhtj">
+        <dc:Bounds x="2492" y="507" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2474" y="550" width="73" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_029g81o_di" bpmnElement="Gateway_029g81o" isMarkerVisible="true">
+        <dc:Bounds x="2595" y="500" width="50" height="50" />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="S_End" bpmnElement="End_Login">
-        <dc:Bounds x="1450" y="190" width="36" height="36" />
+        <dc:Bounds x="2702" y="507" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2710" y="543" width="20" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-
-      <!-- OTP BRANCH (TOP) -->
-      <bpmndi:BPMNShape id="S_OtpSend" bpmnElement="T_OtpSend">
-        <dc:Bounds x="1120" y="55" width="170" height="80" />
-      </bpmndi:BPMNShape>
-
-      <bpmndi:BPMNShape id="S_OtpVerify" bpmnElement="T_OtpVerify">
-        <dc:Bounds x="1320" y="55" width="170" height="80" />
-      </bpmndi:BPMNShape>
-
-      <bpmndi:BPMNShape id="S_G_OtpOk" bpmnElement="G_OtpOk" isMarkerVisible="true">
-        <dc:Bounds x="1520" y="75" width="50" height="50" />
-      </bpmndi:BPMNShape>
-
-      <!-- FAIL HANDLER (BOTTOM) -->
-      <bpmndi:BPMNShape id="S_Fail" bpmnElement="E_Fail">
-        <dc:Bounds x="1240" y="305" width="36" height="36" />
-      </bpmndi:BPMNShape>
-
-      <!-- EDGES -->
-      <bpmndi:BPMNEdge id="E_F0" bpmnElement="F0">
-        <di:waypoint x="156" y="208" />
-        <di:waypoint x="200" y="205" />
+      <bpmndi:BPMNEdge id="Flow_1x1rrs1_di" bpmnElement="F0">
+        <di:waypoint x="188" y="525" />
+        <di:waypoint x="235" y="525" />
       </bpmndi:BPMNEdge>
-
       <bpmndi:BPMNEdge id="E_F1" bpmnElement="F1">
-        <di:waypoint x="370" y="205" />
-        <di:waypoint x="410" y="210" />
+        <di:waypoint x="445" y="525" />
+        <di:waypoint x="510" y="525" />
       </bpmndi:BPMNEdge>
-
-      <bpmndi:BPMNEdge id="E_F2_OK" bpmnElement="F2_OK">
-        <di:waypoint x="460" y="210" />
-        <di:waypoint x="500" y="205" />
+      <bpmndi:BPMNEdge id="E_F2" bpmnElement="F2">
+        <di:waypoint x="630" y="485" />
+        <di:waypoint x="630" y="415" />
       </bpmndi:BPMNEdge>
-
-      <bpmndi:BPMNEdge id="E_F3" bpmnElement="F3">
-        <di:waypoint x="670" y="205" />
-        <di:waypoint x="710" y="210" />
+      <bpmndi:BPMNEdge id="E_F3_OK" bpmnElement="F3_OK">
+        <di:waypoint x="655" y="390" />
+        <di:waypoint x="760" y="390" />
       </bpmndi:BPMNEdge>
-
-      <bpmndi:BPMNEdge id="E_F4_OK" bpmnElement="F4_OK">
-        <di:waypoint x="760" y="210" />
-        <di:waypoint x="800" y="205" />
+      <bpmndi:BPMNEdge id="E_F4" bpmnElement="F4">
+        <di:waypoint x="980" y="390" />
+        <di:waypoint x="1115" y="390" />
       </bpmndi:BPMNEdge>
-
-      <bpmndi:BPMNEdge id="E_F5" bpmnElement="F5">
-        <di:waypoint x="990" y="205" />
-        <di:waypoint x="1030" y="210" />
+      <bpmndi:BPMNEdge id="E_F5_OK" bpmnElement="F5_OK">
+        <di:waypoint x="1140" y="415" />
+        <di:waypoint x="1140" y="490" />
       </bpmndi:BPMNEdge>
-
-      <bpmndi:BPMNEdge id="E_F6_NOOTP" bpmnElement="F6_NOOTP">
-        <di:waypoint x="1080" y="210" />
-        <di:waypoint x="1120" y="205" />
-      </bpmndi:BPMNEdge>
-
-      <bpmndi:BPMNEdge id="E_F10" bpmnElement="F10">
-        <di:waypoint x="1310" y="205" />
-        <di:waypoint x="1350" y="210" />
-      </bpmndi:BPMNEdge>
-
-      <bpmndi:BPMNEdge id="E_F11" bpmnElement="F11">
-        <di:waypoint x="1386" y="210" />
-        <di:waypoint x="1450" y="208" />
-      </bpmndi:BPMNEdge>
-
-      <bpmndi:BPMNEdge id="E_F12" bpmnElement="F12">
-        <di:waypoint x="1276" y="323" />
-        <di:waypoint x="1468" y="226" />
-      </bpmndi:BPMNEdge>
-
-      <!-- OTP branch edges -->
-      <bpmndi:BPMNEdge id="E_F6_OTP" bpmnElement="F6_OTP">
-        <di:waypoint x="1055" y="185" />
-        <di:waypoint x="1055" y="95" />
-        <di:waypoint x="1120" y="95" />
-      </bpmndi:BPMNEdge>
-
-      <bpmndi:BPMNEdge id="E_F7" bpmnElement="F7">
-        <di:waypoint x="1290" y="95" />
-        <di:waypoint x="1320" y="95" />
-      </bpmndi:BPMNEdge>
-
-      <bpmndi:BPMNEdge id="E_F8" bpmnElement="F8">
-        <di:waypoint x="1490" y="95" />
-        <di:waypoint x="1520" y="100" />
-      </bpmndi:BPMNEdge>
-
       <bpmndi:BPMNEdge id="E_F9_OK" bpmnElement="F9_OK">
-        <di:waypoint x="1570" y="100" />
-        <di:waypoint x="1570" y="205" />
-        <di:waypoint x="1120" y="205" />
+        <di:waypoint x="1775" y="525" />
+        <di:waypoint x="1820" y="525" />
       </bpmndi:BPMNEdge>
-
-      <!-- FAIL ROUTES (to single fail handler) -->
-      <bpmndi:BPMNEdge id="E_F2_FAIL" bpmnElement="F2_FAIL">
-        <di:waypoint x="435" y="235" />
-        <di:waypoint x="435" y="323" />
-        <di:waypoint x="1240" y="323" />
+      <bpmndi:BPMNEdge id="E_F10" bpmnElement="F10">
+        <di:waypoint x="2040" y="525" />
+        <di:waypoint x="2095" y="525" />
       </bpmndi:BPMNEdge>
-
-      <bpmndi:BPMNEdge id="E_F4_FAIL" bpmnElement="F4_FAIL">
-        <di:waypoint x="735" y="235" />
-        <di:waypoint x="735" y="323" />
-        <di:waypoint x="1240" y="323" />
+      <bpmndi:BPMNEdge id="Flow_0mkgvvl_di" bpmnElement="Flow_0mkgvvl">
+        <di:waypoint x="630" y="365" />
+        <di:waypoint x="630" y="198" />
       </bpmndi:BPMNEdge>
-
-      <bpmndi:BPMNEdge id="E_F9_FAIL" bpmnElement="F9_FAIL">
-        <di:waypoint x="1545" y="125" />
-        <di:waypoint x="1545" y="323" />
-        <di:waypoint x="1276" y="323" />
+      <bpmndi:BPMNEdge id="Flow_066ydrk_di" bpmnElement="Flow_066ydrk">
+        <di:waypoint x="630" y="162" />
+        <di:waypoint x="630" y="80" />
+        <di:waypoint x="2620" y="80" />
+        <di:waypoint x="2620" y="500" />
       </bpmndi:BPMNEdge>
-
+      <bpmndi:BPMNEdge id="Flow_078dbki_di" bpmnElement="Flow_078dbki">
+        <di:waypoint x="1140" y="365" />
+        <di:waypoint x="1140" y="198" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0fogqvp_di" bpmnElement="Flow_0fogqvp">
+        <di:waypoint x="1250" y="530" />
+        <di:waypoint x="1335" y="530" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10e9t7z_di" bpmnElement="Flow_10e9t7z">
+        <di:waypoint x="1385" y="530" />
+        <di:waypoint x="1460" y="530" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0ymrr9f_di" bpmnElement="Flow_0ymrr9f">
+        <di:waypoint x="1360" y="505" />
+        <di:waypoint x="1360" y="198" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1nj0odo_di" bpmnElement="Flow_1nj0odo">
+        <di:waypoint x="1360" y="162" />
+        <di:waypoint x="1360" y="80" />
+        <di:waypoint x="2620" y="80" />
+        <di:waypoint x="2620" y="500" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0knhh1n_di" bpmnElement="Flow_0knhh1n">
+        <di:waypoint x="1680" y="525" />
+        <di:waypoint x="1725" y="525" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1gfzbf8_di" bpmnElement="Flow_1gfzbf8">
+        <di:waypoint x="1750" y="500" />
+        <di:waypoint x="1750" y="198" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0csbw03_di" bpmnElement="Flow_0csbw03">
+        <di:waypoint x="1750" y="162" />
+        <di:waypoint x="1750" y="80" />
+        <di:waypoint x="2620" y="80" />
+        <di:waypoint x="2620" y="500" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_08lbylu_di" bpmnElement="Flow_08lbylu">
+        <di:waypoint x="2145" y="525" />
+        <di:waypoint x="2200" y="525" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0klhvdd_di" bpmnElement="Flow_0klhvdd">
+        <di:waypoint x="2400" y="525" />
+        <di:waypoint x="2492" y="525" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_024yzcr_di" bpmnElement="Flow_024yzcr">
+        <di:waypoint x="2120" y="500" />
+        <di:waypoint x="2120" y="198" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1de2v1l_di" bpmnElement="Flow_1de2v1l">
+        <di:waypoint x="2120" y="162" />
+        <di:waypoint x="2120" y="80" />
+        <di:waypoint x="2620" y="80" />
+        <di:waypoint x="2620" y="500" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1kxlid1_di" bpmnElement="Flow_1kxlid1">
+        <di:waypoint x="2528" y="525" />
+        <di:waypoint x="2595" y="525" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1aigcaw_di" bpmnElement="Flow_1aigcaw">
+        <di:waypoint x="2645" y="525" />
+        <di:waypoint x="2702" y="525" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11nibhe_di" bpmnElement="Flow_11nibhe">
+        <di:waypoint x="1140" y="162" />
+        <di:waypoint x="1140" y="80" />
+        <di:waypoint x="2620" y="80" />
+        <di:waypoint x="2620" y="500" />
+      </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
-
 </bpmn:definitions>

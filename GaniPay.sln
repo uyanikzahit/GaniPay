@@ -157,10 +157,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Notification.Infrastructure
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GaniPay.Notification.Infrastructure", "src\services\Notification\Notification.Infrastructure\GaniPay.Notification.Infrastructure.csproj", "{5CE05A2F-1808-490C-AD09-50053B861687}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflow", "workflow", "{5581274B-02F6-C591-4A9B-D5600EAF20C0}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Workflow.PaymentProcessWorker", "Workflow.PaymentProcessWorker", "{E8687983-3E8E-864E-6D5A-7E52E5F6A8E1}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GaniPay.AppHost", "GaniPay.AppHost\GaniPay.AppHost.csproj", "{EE5C0D69-7F0E-48BC-BCE6-431399694AD5}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GaniPay.Workflow.API", "src\workflow\GaniPay.Workflow.API\GaniPay.Workflow.API.csproj", "{F1123138-EEC2-E56F-EFAA-5D29B571CA39}"
@@ -170,6 +166,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GaniPay.Validation.Worker", "src\workers\GaniPay.Validation.Worker\GaniPay.Validation.Worker.csproj", "{C5178739-F160-4D78-9577-844291A953EB}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GaniPay.DataCreation.Worker", "src\workers\GaniPay.DataCreation.Worker\GaniPay.DataCreation.Worker.csproj", "{F36E8944-8BB0-4162-97CB-4B5B00C89A6B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GaniPay.Login.Worker", "src\workers\GaniPay.Login.Worker\GaniPay.Login.Worker.csproj", "{961A5194-D1B5-4A98-B31C-1569F8278535}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -637,6 +635,18 @@ Global
 		{F36E8944-8BB0-4162-97CB-4B5B00C89A6B}.Release|x64.Build.0 = Release|Any CPU
 		{F36E8944-8BB0-4162-97CB-4B5B00C89A6B}.Release|x86.ActiveCfg = Release|Any CPU
 		{F36E8944-8BB0-4162-97CB-4B5B00C89A6B}.Release|x86.Build.0 = Release|Any CPU
+		{961A5194-D1B5-4A98-B31C-1569F8278535}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{961A5194-D1B5-4A98-B31C-1569F8278535}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{961A5194-D1B5-4A98-B31C-1569F8278535}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{961A5194-D1B5-4A98-B31C-1569F8278535}.Debug|x64.Build.0 = Debug|Any CPU
+		{961A5194-D1B5-4A98-B31C-1569F8278535}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{961A5194-D1B5-4A98-B31C-1569F8278535}.Debug|x86.Build.0 = Debug|Any CPU
+		{961A5194-D1B5-4A98-B31C-1569F8278535}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{961A5194-D1B5-4A98-B31C-1569F8278535}.Release|Any CPU.Build.0 = Release|Any CPU
+		{961A5194-D1B5-4A98-B31C-1569F8278535}.Release|x64.ActiveCfg = Release|Any CPU
+		{961A5194-D1B5-4A98-B31C-1569F8278535}.Release|x64.Build.0 = Release|Any CPU
+		{961A5194-D1B5-4A98-B31C-1569F8278535}.Release|x86.ActiveCfg = Release|Any CPU
+		{961A5194-D1B5-4A98-B31C-1569F8278535}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -718,11 +728,10 @@ Global
 		{24BA8DC2-4245-47F3-B7B5-ABE268B98A00} = {CD601324-ED21-4078-1B5E-700EFB8672C7}
 		{09C806D7-6BCC-7545-CD29-322726BF5EBD} = {C5FBE174-8E0F-F5A3-B929-8BD0C55C0A32}
 		{5CE05A2F-1808-490C-AD09-50053B861687} = {09C806D7-6BCC-7545-CD29-322726BF5EBD}
-		{5581274B-02F6-C591-4A9B-D5600EAF20C0} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
-		{E8687983-3E8E-864E-6D5A-7E52E5F6A8E1} = {5581274B-02F6-C591-4A9B-D5600EAF20C0}
 		{02EA681E-C7D8-13C7-8484-4AC65E1B71E8} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{C5178739-F160-4D78-9577-844291A953EB} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{F36E8944-8BB0-4162-97CB-4B5B00C89A6B} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+		{961A5194-D1B5-4A98-B31C-1569F8278535} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {65C888F5-C115-40B8-91C0-BD5F26B2BEAF}
