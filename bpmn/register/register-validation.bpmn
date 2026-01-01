@@ -3,13 +3,13 @@
   <bpmn:process id="Register_Validation_Process" name="Register.Validation" isExecutable="true">
     <bpmn:startEvent id="Start_Validation" name="Start Validation" />
     <bpmn:sequenceFlow id="F_01" sourceRef="Start_Validation" targetRef="G_Age" />
-    <bpmn:exclusiveGateway id="G_Age" name="Age Control" default="F_Age_Fail">
+    <bpmn:exclusiveGateway id="G_Age" name="Age Control" default="F_Age_Ok">
       <bpmn:incoming>F_01</bpmn:incoming>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="F_Age_Ok" sourceRef="G_Age" targetRef="T_DeviceInfoGet">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=ageControlOk = true</bpmn:conditionExpression>
+    <bpmn:sequenceFlow id="F_Age_Ok" sourceRef="G_Age" targetRef="T_DeviceInfoGet" />
+    <bpmn:sequenceFlow id="F_Age_Fail" sourceRef="G_Age" targetRef="Event_0nn8322">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=ageControl.ok = false</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="F_Age_Fail" sourceRef="G_Age" targetRef="Event_0nn8322" />
     <bpmn:serviceTask id="T_DeviceInfoGet" name="Device Info Get">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="mock.device.info.get" />
@@ -116,8 +116,8 @@
     <bpmn:intermediateThrowEvent id="Event_0nn8322" name="Invalid Age">
       <bpmn:extensionElements>
         <zeebe:ioMapping>
-          <zeebe:output source="=&#34;AGE_UNDER_18&#34;" target="responseVariable.code" />
-          <zeebe:output source="=&#34;Customer age is below minimum allowed limit&#34;" target="responseVariable.massege" />
+          <zeebe:output source="=&#34;age control &#60;18 failed&#34;" target="responseVariable.massege" />
+          <zeebe:output source="=AGE_UNDER_18" target="responseVariable.code" />
         </zeebe:ioMapping>
       </bpmn:extensionElements>
       <bpmn:incoming>F_Age_Fail</bpmn:incoming>

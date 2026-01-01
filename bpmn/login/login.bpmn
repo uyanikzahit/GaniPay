@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+  id="Definitions_Login_Simple"
+  targetNamespace="http://ganipay/processes/login">
+
+  <bpmn:process id="login" name="Login.Main" isExecutable="true">
+
+    <!-- Start -->
+    <bpmn:startEvent id="Start_Login" name="Start" />
+
+    <!-- 1) Identity Login (phone+password) -->
+    <bpmn:serviceTask id="T_IdentityLogin" name="Identity Login">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="identity.login" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=phoneNumber" target="phoneNumber" />
+          <zeebe:input source="=password" target="password" />
+
+          <!-- outputs (worker set eder) -->
+          <zeebe:output source="=ok" target="loginOk" />
+          <zeebe:output source="=customerId" target="customerId" />
+          <zeebe:output source="=errorCode" target="errorCode" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="G_LoginOk" name="Login OK?" />
+
+    <!-- 2) Account Status Check (active/blocked/kyc) -->
+    <bpmn:serviceTask id="T_AccountStatusCheck" name="Account Active?">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="auth.account.status" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=customerId" target="customerId" />
+
+          <zeebe:output source="=ok" target="accountOk" />
+          <zeebe:output source="=errorCode" target="errorCode" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="G_AccountOk" name="Account OK?" />
+
+    <!-- 3) Device Check (mock risk/new device) -->
+    <bpmn:serviceTask id="T_DeviceCheck" name="Device Check (mock)">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="device.risk.check" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=customerId" target="customerId" />
+          <zeebe:input source="=deviceId" target="deviceId" />
+
+          <!-- outputs -->
+          <zeebe:output source="=otpRequired" target="otpRequired" />
+          <zeebe:output source="=errorCode" target="errorCode" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="G_OtpRequired" name="OTP Required?" />
+
+    <!-- 4A) OTP Send -->
+    <bpmn:serviceTask id="T_OtpSend" name="OTP Send (mock)">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="auth.otp.send" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=customerId" target="customerId" />
+          <zeebe:input source="=phoneNumber" target="phoneNumber" />
+
+          <zeebe:output source="=otpTxId" target="otpTxId" />
+          <zeebe:output source="=errorCode" target="errorCode" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+
+    <!-- 4B) OTP Verify (mock) -->
+    <bpmn:serviceTask id="T_OtpVerify" name="OTP Verify (mock)">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="auth.otp.verify" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=otpTxId" target="otpTxId" />
+          <zeebe:input source="=otpCode" target="otpCode" />
+
+          <zeebe:output source="=ok" target="otpOk" />
+          <zeebe:output source="=errorCode" target="errorCode" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="G_OtpOk" name="OTP OK?" />
+
+    <!-- 5) Create Token/Session (mock) -->
+    <bpmn:serviceTask id="T_SessionCreate" name="Create Token/Session">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="auth.session.create" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=customerId" target="customerId" />
+
+          <zeebe:output source="=accessToken" target="accessToken" />
+          <zeebe:output source="=refreshToken" target="refreshToken" />
+          <zeebe:output source="=expiresIn" target="expiresIn" />
+          <zeebe:output source="=sessionId" target="sessionId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+
+    <!-- Success marker (Intermediate Event) -->
+    <bpmn:intermediateThrowEvent id="E_Success" name="Success">
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:output source="=true" target="success" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+    </bpmn:intermediateThrowEvent>
+
+    <!-- Fail handler (single intermediate event) -->
+    <bpmn:intermediateThrowEvent id="E_Fail" name="Failed">
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:output source="=false" target="success" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+    </bpmn:intermediateThrowEvent>
+
+    <!-- Single end -->
+    <bpmn:endEvent id="End_Login" name="End" />
+
+    <!-- SEQUENCE FLOWS -->
+    <bpmn:sequenceFlow id="F0" sourceRef="Start_Login" targetRef="T_IdentityLogin" />
+    <bpmn:sequenceFlow id="F1" sourceRef="T_IdentityLogin" targetRef="G_LoginOk" />
+
+    <bpmn:sequenceFlow id="F2_OK" sourceRef="G_LoginOk" targetRef="T_AccountStatusCheck">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=loginOk = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F2_FAIL" sourceRef="G_LoginOk" targetRef="E_Fail">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=loginOk = false</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+    <bpmn:sequenceFlow id="F3" sourceRef="T_AccountStatusCheck" targetRef="G_AccountOk" />
+
+    <bpmn:sequenceFlow id="F4_OK" sourceRef="G_AccountOk" targetRef="T_DeviceCheck">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=accountOk = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F4_FAIL" sourceRef="G_AccountOk" targetRef="E_Fail">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=accountOk = false</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+    <bpmn:sequenceFlow id="F5" sourceRef="T_DeviceCheck" targetRef="G_OtpRequired" />
+
+    <bpmn:sequenceFlow id="F6_OTP" sourceRef="G_OtpRequired" targetRef="T_OtpSend">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=otpRequired = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F6_NOOTP" sourceRef="G_OtpRequired" targetRef="T_SessionCreate">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=otpRequired = false</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+    <bpmn:sequenceFlow id="F7" sourceRef="T_OtpSend" targetRef="T_OtpVerify" />
+    <bpmn:sequenceFlow id="F8" sourceRef="T_OtpVerify" targetRef="G_OtpOk" />
+
+    <bpmn:sequenceFlow id="F9_OK" sourceRef="G_OtpOk" targetRef="T_SessionCreate">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=otpOk = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F9_FAIL" sourceRef="G_OtpOk" targetRef="E_Fail">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=otpOk = false</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+    <bpmn:sequenceFlow id="F10" sourceRef="T_SessionCreate" targetRef="E_Success" />
+    <bpmn:sequenceFlow id="F11" sourceRef="E_Success" targetRef="End_Login" />
+    <bpmn:sequenceFlow id="F12" sourceRef="E_Fail" targetRef="End_Login" />
+
+  </bpmn:process>
+
+  <!-- ========================= DIAGRAM (CLEAN UI) ========================= -->
+  <bpmndi:BPMNDiagram id="BPMNDiagram_login_simple">
+    <bpmndi:BPMNPlane id="BPMNPlane_login_simple" bpmnElement="login">
+
+      <!-- MAIN LINE -->
+      <bpmndi:BPMNShape id="S_Start" bpmnElement="Start_Login">
+        <dc:Bounds x="120" y="190" width="36" height="36" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_IdentityLogin" bpmnElement="T_IdentityLogin">
+        <dc:Bounds x="200" y="165" width="170" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_G_LoginOk" bpmnElement="G_LoginOk" isMarkerVisible="true">
+        <dc:Bounds x="410" y="185" width="50" height="50" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_AccountStatus" bpmnElement="T_AccountStatusCheck">
+        <dc:Bounds x="500" y="165" width="170" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_G_AccountOk" bpmnElement="G_AccountOk" isMarkerVisible="true">
+        <dc:Bounds x="710" y="185" width="50" height="50" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_DeviceCheck" bpmnElement="T_DeviceCheck">
+        <dc:Bounds x="800" y="165" width="190" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_G_OtpRequired" bpmnElement="G_OtpRequired" isMarkerVisible="true">
+        <dc:Bounds x="1030" y="185" width="50" height="50" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_SessionCreate" bpmnElement="T_SessionCreate">
+        <dc:Bounds x="1120" y="165" width="190" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_Success" bpmnElement="E_Success">
+        <dc:Bounds x="1350" y="192" width="36" height="36" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_End" bpmnElement="End_Login">
+        <dc:Bounds x="1450" y="190" width="36" height="36" />
+      </bpmndi:BPMNShape>
+
+      <!-- OTP BRANCH (TOP) -->
+      <bpmndi:BPMNShape id="S_OtpSend" bpmnElement="T_OtpSend">
+        <dc:Bounds x="1120" y="55" width="170" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_OtpVerify" bpmnElement="T_OtpVerify">
+        <dc:Bounds x="1320" y="55" width="170" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="S_G_OtpOk" bpmnElement="G_OtpOk" isMarkerVisible="true">
+        <dc:Bounds x="1520" y="75" width="50" height="50" />
+      </bpmndi:BPMNShape>
+
+      <!-- FAIL HANDLER (BOTTOM) -->
+      <bpmndi:BPMNShape id="S_Fail" bpmnElement="E_Fail">
+        <dc:Bounds x="1240" y="305" width="36" height="36" />
+      </bpmndi:BPMNShape>
+
+      <!-- EDGES -->
+      <bpmndi:BPMNEdge id="E_F0" bpmnElement="F0">
+        <di:waypoint x="156" y="208" />
+        <di:waypoint x="200" y="205" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F1" bpmnElement="F1">
+        <di:waypoint x="370" y="205" />
+        <di:waypoint x="410" y="210" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F2_OK" bpmnElement="F2_OK">
+        <di:waypoint x="460" y="210" />
+        <di:waypoint x="500" y="205" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F3" bpmnElement="F3">
+        <di:waypoint x="670" y="205" />
+        <di:waypoint x="710" y="210" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F4_OK" bpmnElement="F4_OK">
+        <di:waypoint x="760" y="210" />
+        <di:waypoint x="800" y="205" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F5" bpmnElement="F5">
+        <di:waypoint x="990" y="205" />
+        <di:waypoint x="1030" y="210" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F6_NOOTP" bpmnElement="F6_NOOTP">
+        <di:waypoint x="1080" y="210" />
+        <di:waypoint x="1120" y="205" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F10" bpmnElement="F10">
+        <di:waypoint x="1310" y="205" />
+        <di:waypoint x="1350" y="210" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F11" bpmnElement="F11">
+        <di:waypoint x="1386" y="210" />
+        <di:waypoint x="1450" y="208" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F12" bpmnElement="F12">
+        <di:waypoint x="1276" y="323" />
+        <di:waypoint x="1468" y="226" />
+      </bpmndi:BPMNEdge>
+
+      <!-- OTP branch edges -->
+      <bpmndi:BPMNEdge id="E_F6_OTP" bpmnElement="F6_OTP">
+        <di:waypoint x="1055" y="185" />
+        <di:waypoint x="1055" y="95" />
+        <di:waypoint x="1120" y="95" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F7" bpmnElement="F7">
+        <di:waypoint x="1290" y="95" />
+        <di:waypoint x="1320" y="95" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F8" bpmnElement="F8">
+        <di:waypoint x="1490" y="95" />
+        <di:waypoint x="1520" y="100" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F9_OK" bpmnElement="F9_OK">
+        <di:waypoint x="1570" y="100" />
+        <di:waypoint x="1570" y="205" />
+        <di:waypoint x="1120" y="205" />
+      </bpmndi:BPMNEdge>
+
+      <!-- FAIL ROUTES (to single fail handler) -->
+      <bpmndi:BPMNEdge id="E_F2_FAIL" bpmnElement="F2_FAIL">
+        <di:waypoint x="435" y="235" />
+        <di:waypoint x="435" y="323" />
+        <di:waypoint x="1240" y="323" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F4_FAIL" bpmnElement="F4_FAIL">
+        <di:waypoint x="735" y="235" />
+        <di:waypoint x="735" y="323" />
+        <di:waypoint x="1240" y="323" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="E_F9_FAIL" bpmnElement="F9_FAIL">
+        <di:waypoint x="1545" y="125" />
+        <di:waypoint x="1545" y="323" />
+        <di:waypoint x="1276" y="323" />
+      </bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+
+</bpmn:definitions>

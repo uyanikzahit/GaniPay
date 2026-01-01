@@ -499,4 +499,11 @@ public sealed class DataCreationJobHandlers
 
         _logger.LogInformation("[identity.credential.create] COMPLETED key={Key} credentialId={CredentialId}", job.Key, credentialId);
     }
+
+    public void HandleCustomerPhoneCreate_Void(IJobClient client, IJob job)
+    => HandleCustomerPhoneCreate(client, job).GetAwaiter().GetResult();
+
+    // Wrapper: WorkerHost JobHandler (void) beklediği için
+    public void HandleCustomerAddressCreate_Void(IJobClient client, IJob job)
+        => HandleCustomerAddressCreate(client, job).GetAwaiter().GetResult();
 }

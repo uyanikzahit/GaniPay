@@ -55,11 +55,12 @@ public sealed class WorkerHost : IHostedService
         _openedWorkers.Add(Open("accounting.wallet.ledgerid.get", _handlers.HandleWalletAccountLedgerIdGet, timeout, pollInterval));
         _openedWorkers.Add(Open("customer.create", _handlers.HandleCustomerCreate, timeout, pollInterval));
         _openedWorkers.Add(Open("customer.individual.create", _handlers.HandleCustomerIndividualCreate, timeout, pollInterval));
-        _openedWorkers.Add(Open("customer.phone.create", _handlers.HandleCustomerPhoneCreate, timeout, pollInterval));
+        _openedWorkers.Add(Open("customer.phone.create", _handlers.HandleCustomerPhoneCreate_Void, timeout, pollInterval));
+
         _openedWorkers.Add(Open("mock.device.customer.link", _handlers.HandleLinkDeviceAndCustomer, timeout, pollInterval));
         _openedWorkers.Add(Open("accounting.account.create", _handlers.HandleAccountCreate, timeout, pollInterval));
         _openedWorkers.Add(Open("customer.email.create", _handlers.HandleCustomerEmailCreate, timeout, pollInterval));
-        _openedWorkers.Add(Open("customer.address.create", _handlers.HandleCustomerAddressCreate, timeout, pollInterval));
+        _openedWorkers.Add(Open("customer.address.create", _handlers.HandleCustomerAddressCreate_Void, timeout, pollInterval));
         _openedWorkers.Add(Open("mock.customer.occupation.create", _handlers.HandleCustomerOccupationCreate, timeout, pollInterval));
 
         // ✅ SADECE EKLENEN: Identity credential create
