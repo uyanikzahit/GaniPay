@@ -31,6 +31,12 @@
     <bpmn:serviceTask id="T_CustomerPhoneCreate" name="Customer Phone Create">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="customer.phone.create" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=customerId" target="customerId" />
+          <zeebe:input source="=countryCode" target="countryCode" />
+          <zeebe:input source="=phoneNumber" target="phoneNumber" />
+          <zeebe:input source="=phoneType" target="phoneType" />
+        </zeebe:ioMapping>
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_0jk1we1</bpmn:incoming>
       <bpmn:outgoing>Flow_1r1y3zg</bpmn:outgoing>
@@ -68,6 +74,14 @@
     <bpmn:serviceTask id="T_CustomerAddressCreate" name="Customer Address Create">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="customer.address.create" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=address.addressType" target="addressType" />
+          <zeebe:input source="=address.city" target="city" />
+          <zeebe:input source="=address.district" target="district" />
+          <zeebe:input source="=address.postalCode" target="postalCode" />
+          <zeebe:input source="=address.addressLine1" target="addressLine1" />
+          <zeebe:input source="=customerId" target="customerId" />
+        </zeebe:ioMapping>
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_1ft8n3l</bpmn:incoming>
       <bpmn:outgoing>Flow_132n2fu</bpmn:outgoing>
@@ -97,6 +111,15 @@
   </bpmn:category>
   <bpmndi:BPMNDiagram id="BPMNDiagram_Register_DataCreation">
     <bpmndi:BPMNPlane id="BPMNPlane_Register_DataCreation" bpmnElement="Register_DataCreation_Process">
+      <bpmndi:BPMNShape id="DI_Start_DataCreation" bpmnElement="Start_DataCreation">
+        <dc:Bounds x="162" y="188" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="155" y="224" width="50" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DI_T_WalletLedgerIdGet" bpmnElement="T_WalletLedgerIdGet">
+        <dc:Bounds x="240" y="166" width="140" height="80" />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="DI_End_DataCreation" bpmnElement="End_DataCreation">
         <dc:Bounds x="272" y="412" width="36" height="36" />
         <bpmndi:BPMNLabel>
@@ -106,8 +129,11 @@
       <bpmndi:BPMNShape id="DI_T_CustomerCreate" bpmnElement="T_CustomerCreate">
         <dc:Bounds x="470" y="176" width="120" height="60" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Event_049kbti_di" bpmnElement="Event_049kbti">
-        <dc:Bounds x="352" y="412" width="36" height="36" />
+      <bpmndi:BPMNShape id="DI_T_CustomerIndividualCreate" bpmnElement="T_CustomerIndividualCreate">
+        <dc:Bounds x="720" y="176" width="140" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DI_T_CustomerPhoneCreate" bpmnElement="T_CustomerPhoneCreate">
+        <dc:Bounds x="990" y="176" width="140" height="60" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="DI_T_AccountCreate" bpmnElement="T_AccountCreate">
         <dc:Bounds x="1240" y="400" width="120" height="60" />
@@ -115,14 +141,11 @@
       <bpmndi:BPMNShape id="DI_T_LinkDeviceCustomer" bpmnElement="T_LinkDeviceCustomer">
         <dc:Bounds x="1230" y="176" width="140" height="60" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="DI_T_CustomerPhoneCreate" bpmnElement="T_CustomerPhoneCreate">
-        <dc:Bounds x="990" y="176" width="140" height="60" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="DI_T_CustomerIndividualCreate" bpmnElement="T_CustomerIndividualCreate">
-        <dc:Bounds x="720" y="176" width="140" height="60" />
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="DI_T_CustomerEmailCreate" bpmnElement="T_CustomerEmailCreate">
         <dc:Bounds x="1045" y="400" width="130" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_049kbti_di" bpmnElement="Event_049kbti">
+        <dc:Bounds x="352" y="412" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="DI_T_CustomerAddressCreate" bpmnElement="T_CustomerAddressCreate">
         <dc:Bounds x="840" y="400" width="140" height="60" />
@@ -134,23 +157,6 @@
         <dc:Bounds x="450" y="400" width="140" height="60" />
         <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="DI_T_WalletLedgerIdGet" bpmnElement="T_WalletLedgerIdGet">
-        <dc:Bounds x="240" y="166" width="140" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="DI_Start_DataCreation" bpmnElement="Start_DataCreation">
-        <dc:Bounds x="162" y="188" width="36" height="36" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="155" y="224" width="50" height="27" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNEdge id="Flow_0ez6t17_di" bpmnElement="Flow_0ez6t17">
-        <di:waypoint x="1300" y="236" />
-        <di:waypoint x="1300" y="400" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_0n94wm9_di" bpmnElement="Flow_0n94wm9">
-        <di:waypoint x="450" y="430" />
-        <di:waypoint x="388" y="430" />
-      </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape id="Group_1bsfet4_di" bpmnElement="Group_1bsfet4">
         <dc:Bounds x="420" y="120" width="980" height="440" />
         <bpmndi:BPMNLabel>
@@ -196,6 +202,14 @@
       <bpmndi:BPMNEdge id="Flow_132n2fu_di" bpmnElement="Flow_132n2fu">
         <di:waypoint x="840" y="430" />
         <di:waypoint x="770" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0ez6t17_di" bpmnElement="Flow_0ez6t17">
+        <di:waypoint x="1300" y="236" />
+        <di:waypoint x="1300" y="400" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0n94wm9_di" bpmnElement="Flow_0n94wm9">
+        <di:waypoint x="450" y="430" />
+        <di:waypoint x="388" y="430" />
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>

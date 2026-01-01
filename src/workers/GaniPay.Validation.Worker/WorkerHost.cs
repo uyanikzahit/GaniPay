@@ -32,6 +32,7 @@ public sealed class WorkerHost : IHostedService
             .Build();
 
         // JOB TYPES (BPMN ile birebir aynı olmalı)
+
         OpenWorker("mock.device.info.get", HandleDeviceInfoGet);
         OpenWorker("mock.customer.phone.get", HandleCustomerPhoneGet);
         OpenWorker("mock.unlink.device", HandleUnlinkDevice);

@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Zeebe.Client.Api.Responses;
 using Zeebe.Client.Api.Worker;
@@ -167,119 +168,205 @@ public sealed class DataCreationJobHandlers
         _logger.LogInformation("[customer.individual.create] COMPLETED key={Key}", job.Key);
     }
 
-    // -------------------------
     // 4) customer.email.create (GERÇEK)
     // POST /api/v1/customers/{customerId}/emails
-    // -------------------------
     public void HandleCustomerEmailCreate(IJobClient client, IJob job)
     {
         _logger.LogInformation("[customer.email.create] RECEIVED key={Key} retries={Retries} vars={Vars}",
             job.Key, job.Retries, Vars(job));
 
+        // 1) customerId kesin lazım
         var customerId = GetString(job, "customerId");
         if (string.IsNullOrWhiteSpace(customerId))
             throw new InvalidOperationException("customerId variable is missing");
 
+        // 2) job variables dictionary
+        var vars = JsonSerializer.Deserialize<Dictionary<string, object>>(job.Variables)
+                   ?? new Dictionary<string, object>();
+
+        // 3) emailAddress/email oku
+        string? emailAddress = null;
+
+        if (vars.TryGetValue("emailAddress", out var eaObj) && eaObj != null)
+            emailAddress = eaObj.ToString();
+
+        if (string.IsNullOrWhiteSpace(emailAddress) &&
+            vars.TryGetValue("email", out var eObj) && eObj != null)
+            emailAddress = eObj.ToString();
+
+        if (string.IsNullOrWhiteSpace(emailAddress))
+            throw new InvalidOperationException("emailAddress/email variable is missing");
+
+        // 4) emailType/type oku (default 1)
+        int emailType = 1;
+
+        object? emailTypeObj = null;
+        if (vars.TryGetValue("emailType", out var etObj) && etObj != null) emailTypeObj = etObj;
+        else if (vars.TryGetValue("type", out var tObj) && tObj != null) emailTypeObj = tObj;
+
+        if (emailTypeObj != null)
+        {
+            if (emailTypeObj is JsonElement je)
+            {
+                if (je.ValueKind == JsonValueKind.Number && je.TryGetInt32(out var i)) emailType = i;
+                else if (je.ValueKind == JsonValueKind.String && int.TryParse(je.GetString(), out var s)) emailType = s;
+                else if (je.ValueKind == JsonValueKind.True) emailType = 1;
+                else if (je.ValueKind == JsonValueKind.False) emailType = 0;
+            }
+            else if (int.TryParse(emailTypeObj.ToString(), out var parsed))
+            {
+                emailType = parsed;
+            }
+        }
+
+        // 5) Customer API call
         var customer = _http.CreateClient("customer");
 
         var body = new
         {
-            emailAddress = GetString(job, "emailAddress"),
-            type = int.TryParse(GetString(job, "emailType"), out var t) ? t : 1
+            emailAddress = emailAddress,
+            type = emailType
         };
 
         var resp = customer.PostAsJsonAsync($"/api/v1/customers/{customerId}/emails", body)
-                           .GetAwaiter().GetResult();
+            .GetAwaiter().GetResult();
 
         var raw = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
 
         if (!resp.IsSuccessStatusCode)
             throw new InvalidOperationException($"Customer email returned {(int)resp.StatusCode}: {raw}");
 
+        // 6) Complete job
         Complete(client, job, new Dictionary<string, object>
         {
             ["customerEmailCreated"] = true
         });
 
-        _logger.LogInformation("[customer.email.create] COMPLETED key={Key} customerId={CustomerId}", job.Key, customerId);
+        _logger.LogInformation("[customer.email.create] COMPLETED key={Key} customerId={CustomerId} email={Email}",
+            job.Key, customerId, emailAddress);
     }
 
-    // -------------------------
-    // 5) customer.phone.create (GERÇEK)
+    // 5) customer.phone.create
     // POST /api/v1/customers/{customerId}/phones
-    // -------------------------
-    public void HandleCustomerPhoneCreate(IJobClient client, IJob job)
+    public async Task HandleCustomerPhoneCreate(IJobClient client, IJob job)
     {
-        _logger.LogInformation("[customer.phone.create] RECEIVED key={Key} retries={Retries} vars={Vars}",
-            job.Key, job.Retries, Vars(job));
-
+        // 1) BPMN Input Mapping: customerId, countryCode, phoneNumber, phoneType
         var customerId = GetString(job, "customerId");
+        var countryCode = GetString(job, "countryCode");
+        var phoneNumber = GetString(job, "phoneNumber");
+        var phoneTypeStr = GetString(job, "phoneType");
+
         if (string.IsNullOrWhiteSpace(customerId))
-            throw new InvalidOperationException("customerId variable is missing");
+            throw new InvalidOperationException("customerId missing");
+        if (string.IsNullOrWhiteSpace(countryCode))
+            throw new InvalidOperationException("countryCode missing");
+        if (string.IsNullOrWhiteSpace(phoneNumber))
+            throw new InvalidOperationException("phoneNumber missing");
 
-        var customer = _http.CreateClient("customer");
+        // Swagger’da çalışan formata yaklaştır
+        phoneNumber = phoneNumber.Trim().Replace(" ", "").Replace("-", "");
 
-        var body = new
+        var type = int.TryParse(phoneTypeStr, out var t) ? t : 1;
+
+        var http = _http.CreateClient("customer");
+
+        // Customer API: POST /api/v1/customers/{customerId}/phones
+        var url = $"/api/v1/customers/{customerId}/phones";
+
+        var resp = await http.PostAsJsonAsync(url, new
         {
-            countryCode = GetString(job, "countryCode"),
-            phoneNumber = GetString(job, "phoneNumber"),
-            type = int.TryParse(GetString(job, "phoneType"), out var t) ? t : 1
-        };
+            countryCode,
+            phoneNumber,
+            type
+        });
 
-        var resp = customer.PostAsJsonAsync($"/api/v1/customers/{customerId}/phones", body)
-                           .GetAwaiter().GetResult();
-
-        var raw = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+        var raw = await resp.Content.ReadAsStringAsync();
 
         if (!resp.IsSuccessStatusCode)
             throw new InvalidOperationException($"Customer phone returned {(int)resp.StatusCode}: {raw}");
 
-        Complete(client, job, new Dictionary<string, object>
-        {
-            ["customerPhoneCreated"] = true
-        });
-
-        _logger.LogInformation("[customer.phone.create] COMPLETED key={Key} customerId={CustomerId}", job.Key, customerId);
+        // 2) Zeebe Complete (en uyumlu yöntem: JSON string ver)
+        await client.NewCompleteJobCommand(job.Key)
+            .Variables("{\"customerPhoneCreated\":true}")
+            .Send();
     }
 
     // -------------------------
     // 6) customer.address.create (GERÇEK)
     // POST /api/v1/customers/{customerId}/addresses
     // -------------------------
-    public void HandleCustomerAddressCreate(IJobClient client, IJob job)
+    public async Task HandleCustomerAddressCreate(IJobClient client, IJob job)
     {
-        _logger.LogInformation("[customer.address.create] RECEIVED key={Key} retries={Retries} vars={Vars}",
-            job.Key, job.Retries, Vars(job));
-
+        // 1) Vars
         var customerId = GetString(job, "customerId");
-        if (string.IsNullOrWhiteSpace(customerId))
-            throw new InvalidOperationException("customerId variable is missing");
+        var addressType = GetString(job, "addressType");   // "Home" / "Work" / "1" gelebilir
+        var city = GetString(job, "city");
+        var district = GetString(job, "district");
+        var postalCode = GetString(job, "postalCode");
+        var addressLine1 = GetString(job, "addressLine1");
 
-        var customer = _http.CreateClient("customer");
+        // 2) Validation
+        if (string.IsNullOrWhiteSpace(customerId))
+            throw new InvalidOperationException("customerId missing (BPMN input mapping kontrol et)");
+
+        if (string.IsNullOrWhiteSpace(city) ||
+            string.IsNullOrWhiteSpace(district) ||
+            string.IsNullOrWhiteSpace(postalCode) ||
+            string.IsNullOrWhiteSpace(addressLine1))
+            throw new InvalidOperationException("Address fields missing (city/district/postalCode/addressLine1)");
+
+        // 3) addressType -> int (Swagger format)
+        // Swagger genelde 1=Home, 2=Work gibi.
+        int addressTypeInt = MapAddressType(addressType);
 
         var body = new
         {
-            addressType = int.TryParse(GetString(job, "addressType"), out var at) ? at : 1,
-            city = GetString(job, "city"),
-            district = GetString(job, "district"),
-            postalCode = GetString(job, "postalCode"),
-            addressLine1 = GetString(job, "addressLine1")
+            addressType = addressTypeInt,
+            city,
+            district,
+            postalCode,
+            addressLine1
         };
 
-        var resp = customer.PostAsJsonAsync($"/api/v1/customers/{customerId}/addresses", body)
-                           .GetAwaiter().GetResult();
+        // 4) Call Customer API
+        var http = _http.CreateClient("customer"); // base address: https://localhost:7101 vs
+        var url = $"/api/v1/customers/{customerId}/addresses";
 
-        var raw = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+        using var resp = await http.PostAsync(
+            url,
+            new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json")
+        );
+
+        var raw = await resp.Content.ReadAsStringAsync();
 
         if (!resp.IsSuccessStatusCode)
             throw new InvalidOperationException($"Customer address returned {(int)resp.StatusCode}: {raw}");
 
-        Complete(client, job, new Dictionary<string, object>
-        {
-            ["customerAddressCreated"] = true
-        });
+        // 5) Complete Job (DOĞRU YÖNTEM)
+        var completeVarsJson = JsonSerializer.Serialize(new { customerAddressCreated = true });
 
-        _logger.LogInformation("[customer.address.create] COMPLETED key={Key} customerId={CustomerId}", job.Key, customerId);
+        await client
+            .NewCompleteJobCommand(job.Key)
+            .Variables(completeVarsJson)
+            .Send();
+    }
+
+    private static int MapAddressType(string? addressType)
+    {
+        if (string.IsNullOrWhiteSpace(addressType))
+            return 1; // default Home
+
+        // "1" / "2" geldiyse direkt
+        if (int.TryParse(addressType, out var numeric))
+            return numeric;
+
+        // "Home" / "Work" geldiyse map
+        return addressType.Trim().ToLowerInvariant() switch
+        {
+            "home" => 1,
+            "work" => 2,
+            _ => 1
+        };
     }
 
     // -------------------------

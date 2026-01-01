@@ -1,4 +1,5 @@
 using Aspire.Hosting;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -6,11 +7,8 @@ using System.Threading;
 
 static void OpenBrowser(string url)
 {
-    try
-    {
-        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-    }
-    catch { }
+    try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
+    catch { /* ignore */ }
 }
 
 static void HookDashboardAutoOpen()
@@ -43,15 +41,58 @@ HookDashboardAutoOpen();
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-// --- APIs ---
-builder.AddProject<Projects.GaniPay_Accounting_API>("accounting-api").WithExternalHttpEndpoints();
-builder.AddProject<Projects.GaniPay_Customer_API>("customer-api").WithExternalHttpEndpoints();
-builder.AddProject<Projects.GaniPay_Expense_API>("expense-api").WithExternalHttpEndpoints();
-builder.AddProject<Projects.GaniPay_Identity_API>("identity-api").WithExternalHttpEndpoints();
-builder.AddProject<Projects.GaniPay_Integration_API>("integration-api").WithExternalHttpEndpoints();
-builder.AddProject<Projects.GaniPay_Notification_API>("notification-api").WithExternalHttpEndpoints();
-builder.AddProject<Projects.GaniPay_Payments_API>("payments-api").WithExternalHttpEndpoints();
-builder.AddProject<Projects.GaniPay_TransactionLimit_API>("transactionlimit-api").WithExternalHttpEndpoints();
+// -------------------- APIs (mevcutlarýný BOZMADAN) --------------------
+var accountingApi = builder.AddProject<Projects.GaniPay_Accounting_API>("accounting-api")
+    .WithExternalHttpEndpoints();
+
+var customerApi = builder.AddProject<Projects.GaniPay_Customer_API>("customer-api")
+    .WithExternalHttpEndpoints();
+
+var expenseApi = builder.AddProject<Projects.GaniPay_Expense_API>("expense-api")
+    .WithExternalHttpEndpoints();
+
+var identityApi = builder.AddProject<Projects.GaniPay_Identity_API>("identity-api")
+    .WithExternalHttpEndpoints();
+
+var integrationApi = builder.AddProject<Projects.GaniPay_Integration_API>("integration-api")
+    .WithExternalHttpEndpoints();
+
+var notificationApi = builder.AddProject<Projects.GaniPay_Notification_API>("notification-api")
+    .WithExternalHttpEndpoints();
+
+var paymentsApi = builder.AddProject<Projects.GaniPay_Payments_API>("payments-api")
+    .WithExternalHttpEndpoints();
+
+var transactionLimitApi = builder.AddProject<Projects.GaniPay_TransactionLimit_API>("transactionlimit-api")
+    .WithExternalHttpEndpoints();
+
+// -------------------- WORKERS (Executable) --------------------
+// ÖNEMLÝ: WorkingDirectory worker klasörü olmalý (appsettings.json doðru okunsun).
+var appHostDir = builder.AppHostDirectory;
+var repoRoot = Path.GetFullPath(Path.Combine(appHostDir, "..")); // solution root varsayýmý
+var workersRoot = Path.Combine(repoRoot, "src", "workers");
+
+var dataCreationWorkerDir = Path.Combine(workersRoot, "GaniPay.DataCreation.Worker");
+var validationWorkerDir = Path.Combine(workersRoot, "GaniPay.Validation.Worker");
+
+var dataCreationWorkerCsproj = Path.Combine(dataCreationWorkerDir, "GaniPay.DataCreation.Worker.csproj");
+var validationWorkerCsproj = Path.Combine(validationWorkerDir, "GaniPay.Validation.Worker.csproj");
+
+// DataCreation Worker
+builder.AddExecutable("data-creation-worker", "dotnet", dataCreationWorkerDir)
+    .WithArgs("run", "--project", dataCreationWorkerCsproj, "--no-launch-profile")
+    .WithEnvironment("DOTNET_ENVIRONMENT", "Development")
+    // Ýstersen baðýmlýlýk olarak API'ler ayakta olsun diye:
+    .WaitFor(accountingApi)
+    .WaitFor(customerApi)
+    .WaitFor(identityApi);
+
+// Validation Worker
+builder.AddExecutable("validation-worker", "dotnet", validationWorkerDir)
+    .WithArgs("run", "--project", validationWorkerCsproj, "--no-launch-profile")
+    .WithEnvironment("DOTNET_ENVIRONMENT", "Development")
+    .WaitFor(customerApi)
+    .WaitFor(integrationApi);
 
 builder.Build().Run();
 

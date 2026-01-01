@@ -1,4 +1,4 @@
-using System.Text.Json;
+ï»¿using System.Text.Json;
 using GaniPay.Validation.Worker.Options;
 using GaniPay.Validation.Worker.Services;
 using Microsoft.Extensions.Logging;
@@ -26,66 +26,43 @@ public sealed class ValidationHandlers
         _integrationApi = integrationApi;
     }
 
-    // JobType: worker.age.control
     public async Task HandleAgeControl(IJobClient client, IJob job)
     {
-        var (vars, raw) = Read(job);
+        var vars = JsonSerializer.Deserialize<Dictionary<string, object>>(job.Variables);
 
-        bool ok = false;
-        string reason = "UNKNOWN";
-        int? computedAge = null;
+        var birthDateStr = vars?.GetValueOrDefault("birthDate")?.ToString(); // "1999-11-08"
 
-        // 1) age direkt geldiyse
-        if (vars.TryGetInt("age", out var age))
+        if (string.IsNullOrWhiteSpace(birthDateStr) || !DateOnly.TryParse(birthDateStr, out var birthDate))
         {
-            computedAge = age;
-            ok = age >= _validationOptions.MinAge;
-            reason = ok ? "OK" : $"AGE_BELOW_MIN:{age}<{_validationOptions.MinAge}";
-        }
-        else
-        {
-            // 2) birthDate / dateOfBirth geldiyse
-            if (vars.TryGetString("birthDate", out var bd) || vars.TryGetString("dateOfBirth", out bd))
+            var completeVars = new
             {
-                // ISO bekliyoruz: yyyy-MM-dd (senin gönderdiðin böyle)
-                if (DateOnly.TryParseExact(bd, "yyyy-MM-dd", out var birth))
-                {
-                    var today = DateOnly.FromDateTime(DateTime.UtcNow);
-                    var a = today.Year - birth.Year;
-                    if (birth.AddYears(a) > today) a--;
+                ageControlOk = false,
+                ageControlReason = "BIRTHDATE_INVALID"
+            };
 
-                    computedAge = a;
-                    ok = a >= _validationOptions.MinAge;
-                    reason = ok ? "OK" : $"AGE_BELOW_MIN:{a}<{_validationOptions.MinAge}";
-                }
-                else
-                {
-                    ok = false;
-                    reason = "INVALID_BIRTHDATE_FORMAT_EXPECTED_yyyy-MM-dd";
-                }
-            }
-            else
-            {
-                ok = false;
-                reason = "MISSING_AGE_OR_BIRTHDATE";
-            }
+            await client.NewCompleteJobCommand(job.Key)
+                .Variables(JsonSerializer.Serialize(completeVars))
+                .Send();
+
+            return;
         }
 
-        // Gateway’in okuyacaðý yapý: ageControl.ok (BOOLEAN!)
-        var completeVars = new
+        var today = DateOnly.FromDateTime(DateTime.UtcNow); // TR local istersen Now da olur
+        var ok = today >= birthDate.AddYears(18);
+
+        var resultVars = new
         {
-            ageControl = new { ok, reason },   // ok bool
-            computedAge,                       // debug
-            validation = new { lastStep = "AgeControl", passed = ok }
+            ageControlOk = ok,
+            ageControlReason = ok ? "OK" : "AGE_UNDER_18"
         };
 
-        _log.LogInformation("[AgeControl] ok={Ok} reason={Reason} computedAge={Age}", ok, reason, computedAge);
+        _log.LogInformation("age.control birthDate={BirthDate} today={Today} ok={Ok}",
+            birthDate, today, ok);
 
         await client.NewCompleteJobCommand(job.Key)
-            .Variables(JsonSerializer.Serialize(completeVars))
+            .Variables(JsonSerializer.Serialize(resultVars))
             .Send();
     }
-
     // 2) mock.device.info.get
     public async Task HandleDeviceInfoGet(IJobClient client, IJob job)
     {
@@ -305,7 +282,7 @@ public sealed class ValidationHandlers
     {
         var (_, raw) = Read(job);
 
-        // Integration endpoint'inin kesin sözleþmesini bilmediðimiz için esnek payload
+        // Integration endpoint'inin kesin sÃ¶zleÅŸmesini bilmediÄŸimiz iÃ§in esnek payload
         var payload = new
         {
             provider = "AddressVerification",
