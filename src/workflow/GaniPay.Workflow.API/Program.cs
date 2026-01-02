@@ -16,6 +16,7 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 // Zeebe config
 var zeebeGateway = builder.Configuration["Zeebe:GatewayAddress"] ?? "127.0.0.1:26500";
 var registerProcessId = builder.Configuration["Zeebe:RegisterProcessId"] ?? "register";
+var loginProcessId = builder.Configuration["Zeebe:LoginProcessId"] ?? "login";
 
 // Zeebe Client (Singleton)
 builder.Services.AddSingleton<IZeebeClient>(_ =>
@@ -48,8 +49,16 @@ app.MapGet("/health", (IConfiguration cfg) =>
     });
 });
 
+
+
+//register
 var group = app.MapGroup("/api/v1/onboarding")
     .WithTags("Onboarding");
+
+
+//login
+var authGroup = app.MapGroup("/api/v1/auth")
+    .WithTags("Auth");
 
 // POST /api/v1/onboarding/register
 // Görev: Sadece Zeebe’de main flow’u baþlatmak.
@@ -133,6 +142,69 @@ group.MapPost("/register", async (
     }
 });
 
+
+authGroup.MapPost("/login", async (
+    LoginRequest req,
+    HttpContext http,
+    IZeebeClient zeebe,
+    CancellationToken ct) =>
+{
+    // Basit validasyon
+    if (string.IsNullOrWhiteSpace(req.PhoneNumber) || string.IsNullOrWhiteSpace(req.Password))
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "phoneNumber ve password zorunludur."
+        });
+    }
+
+    // CorrelationId: header varsa onu al, yoksa üret
+    var correlationId =
+        http.Request.Headers.TryGetValue("X-Correlation-Id", out var cid) && !string.IsNullOrWhiteSpace(cid)
+            ? cid.ToString()
+            : Guid.NewGuid().ToString();
+
+    // Login workerlarýnýn beklediði variable isimleriyle birebir
+    var variables = new
+    {
+        correlationId,
+        phoneNumber = req.PhoneNumber,
+        password = req.Password,
+        ipAddress = req.IpAddress,
+        deviceId = req.DeviceId,
+        channel = req.Channel,
+        clientVersion = req.ClientVersion
+    };
+
+    var variablesJson = JsonSerializer.Serialize(variables, zeebeJsonOptions);
+
+    try
+    {
+        var resp = await zeebe.NewCreateProcessInstanceCommand()
+            .BpmnProcessId(loginProcessId) // appsettings: "login"
+            .LatestVersion()
+            .Variables(variablesJson)
+            .Send();
+
+        return Results.Accepted(
+        value: new
+        {
+            success = true,
+            correlationId,
+            processId = loginProcessId,
+            processInstanceKey = resp.ProcessInstanceKey
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Could not start login workflow",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+});
+
 app.Lifetime.ApplicationStopping.Register(() =>
 {
     // Zeebe client dispose
@@ -162,4 +234,14 @@ public sealed record RegisterAddress(
     string District,
     string PostalCode,
     string AddressLine1
+);
+
+
+public sealed record LoginRequest(
+    string PhoneNumber,
+    string Password,
+    string? IpAddress,
+    string? DeviceId,
+    string? Channel,
+    string? ClientVersion
 );

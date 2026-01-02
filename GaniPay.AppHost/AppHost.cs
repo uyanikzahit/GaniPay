@@ -94,6 +94,15 @@ builder.AddExecutable("validation-worker", "dotnet", validationWorkerDir)
     .WaitFor(customerApi)
     .WaitFor(integrationApi);
 
+
+
+var loginWorkerDir = Path.Combine(workersRoot, "GaniPay.Login.Worker");
+var loginWorkerCsproj = Path.Combine(loginWorkerDir, "GaniPay.Login.Worker.csproj");
+
+builder.AddExecutable("login-worker", "dotnet", loginWorkerDir)
+    .WithArgs("run", "--project", loginWorkerCsproj, "--no-launch-profile")
+    .WithEnvironment("DOTNET_ENVIRONMENT", "Development");
+
 builder.Build().Run();
 
 sealed class AutoOpenWriter : TextWriter

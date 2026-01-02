@@ -49,7 +49,7 @@
         </zeebe:ioMapping>
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_0mkgvvl</bpmn:incoming>
-      <bpmn:outgoing>Flow_066ydrk</bpmn:outgoing>
+      <bpmn:outgoing>Flow_1fsap2f</bpmn:outgoing>
     </bpmn:intermediateThrowEvent>
     <bpmn:serviceTask id="T_IdentityLogin" name="Identity Login">
       <bpmn:extensionElements>
@@ -106,7 +106,7 @@
         </zeebe:ioMapping>
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_0ymrr9f</bpmn:incoming>
-      <bpmn:outgoing>Flow_1nj0odo</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0ta0sq7</bpmn:outgoing>
     </bpmn:intermediateThrowEvent>
     <bpmn:serviceTask id="T_DeviceTrust" name="Device Trust Check">
       <bpmn:extensionElements>
@@ -138,7 +138,7 @@
         </zeebe:ioMapping>
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_1gfzbf8</bpmn:incoming>
-      <bpmn:outgoing>Flow_0csbw03</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0dofzux</bpmn:outgoing>
     </bpmn:intermediateThrowEvent>
     <bpmn:serviceTask id="T_CreateSession" name="Create Session">
       <bpmn:extensionElements>
@@ -171,7 +171,7 @@
         </zeebe:ioMapping>
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_024yzcr</bpmn:incoming>
-      <bpmn:outgoing>Flow_1de2v1l</bpmn:outgoing>
+      <bpmn:outgoing>Flow_1syvlen</bpmn:outgoing>
     </bpmn:intermediateThrowEvent>
     <bpmn:serviceTask id="T_AuditLog" name="Audit Log">
       <bpmn:extensionElements>
@@ -200,12 +200,12 @@
       <bpmn:outgoing>Flow_1kxlid1</bpmn:outgoing>
     </bpmn:intermediateThrowEvent>
     <bpmn:exclusiveGateway id="Gateway_029g81o">
-      <bpmn:incoming>Flow_066ydrk</bpmn:incoming>
-      <bpmn:incoming>Flow_1nj0odo</bpmn:incoming>
-      <bpmn:incoming>Flow_0csbw03</bpmn:incoming>
-      <bpmn:incoming>Flow_1de2v1l</bpmn:incoming>
       <bpmn:incoming>Flow_1kxlid1</bpmn:incoming>
       <bpmn:incoming>Flow_11nibhe</bpmn:incoming>
+      <bpmn:incoming>Flow_1fsap2f</bpmn:incoming>
+      <bpmn:incoming>Flow_0ta0sq7</bpmn:incoming>
+      <bpmn:incoming>Flow_0dofzux</bpmn:incoming>
+      <bpmn:incoming>Flow_1syvlen</bpmn:incoming>
       <bpmn:outgoing>Flow_1aigcaw</bpmn:outgoing>
     </bpmn:exclusiveGateway>
     <bpmn:endEvent id="End_Login" name="End">
@@ -226,26 +226,26 @@
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="F10" sourceRef="T_CreateSession" targetRef="Gateway_0w0i781" />
     <bpmn:sequenceFlow id="Flow_0mkgvvl" sourceRef="G_GuardOk" targetRef="Event_0984otq" />
-    <bpmn:sequenceFlow id="Flow_066ydrk" sourceRef="Event_0984otq" targetRef="Gateway_029g81o" />
     <bpmn:sequenceFlow id="Flow_078dbki" sourceRef="G_LoginOk" targetRef="Event_0jdcol7" />
     <bpmn:sequenceFlow id="Flow_0fogqvp" sourceRef="T_AccountActive" targetRef="G_AccountOk" />
     <bpmn:sequenceFlow id="Flow_10e9t7z" sourceRef="G_AccountOk" targetRef="T_DeviceTrust">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=accountOk = true</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_0ymrr9f" sourceRef="G_AccountOk" targetRef="Event_0siua6s" />
-    <bpmn:sequenceFlow id="Flow_1nj0odo" sourceRef="Event_0siua6s" targetRef="Gateway_029g81o" />
     <bpmn:sequenceFlow id="Flow_0knhh1n" sourceRef="T_DeviceTrust" targetRef="G_DeviceOk" />
     <bpmn:sequenceFlow id="Flow_1gfzbf8" sourceRef="G_DeviceOk" targetRef="Event_1uis8sa" />
-    <bpmn:sequenceFlow id="Flow_0csbw03" sourceRef="Event_1uis8sa" targetRef="Gateway_029g81o" />
     <bpmn:sequenceFlow id="Flow_08lbylu" sourceRef="Gateway_0w0i781" targetRef="T_AuditLog">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=sessionOk = true</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_0klhvdd" sourceRef="T_AuditLog" targetRef="Event_1l2yhtj" />
     <bpmn:sequenceFlow id="Flow_024yzcr" sourceRef="Gateway_0w0i781" targetRef="Event_0lgls6i" />
-    <bpmn:sequenceFlow id="Flow_1de2v1l" sourceRef="Event_0lgls6i" targetRef="Gateway_029g81o" />
     <bpmn:sequenceFlow id="Flow_1kxlid1" sourceRef="Event_1l2yhtj" targetRef="Gateway_029g81o" />
     <bpmn:sequenceFlow id="Flow_1aigcaw" sourceRef="Gateway_029g81o" targetRef="End_Login" />
     <bpmn:sequenceFlow id="Flow_11nibhe" sourceRef="Event_0jdcol7" targetRef="Gateway_029g81o" />
+    <bpmn:sequenceFlow id="Flow_1fsap2f" sourceRef="Event_0984otq" targetRef="Gateway_029g81o" />
+    <bpmn:sequenceFlow id="Flow_0ta0sq7" sourceRef="Event_0siua6s" targetRef="Gateway_029g81o" />
+    <bpmn:sequenceFlow id="Flow_0dofzux" sourceRef="Event_1uis8sa" targetRef="Gateway_029g81o" />
+    <bpmn:sequenceFlow id="Flow_1syvlen" sourceRef="Event_0lgls6i" targetRef="Gateway_029g81o" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_login_pro">
     <bpmndi:BPMNPlane id="BPMNPlane_login_pro" bpmnElement="login">
@@ -394,12 +394,6 @@
         <di:waypoint x="630" y="365" />
         <di:waypoint x="630" y="198" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_066ydrk_di" bpmnElement="Flow_066ydrk">
-        <di:waypoint x="630" y="162" />
-        <di:waypoint x="630" y="80" />
-        <di:waypoint x="2620" y="80" />
-        <di:waypoint x="2620" y="500" />
-      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_078dbki_di" bpmnElement="Flow_078dbki">
         <di:waypoint x="1140" y="365" />
         <di:waypoint x="1140" y="198" />
@@ -416,12 +410,6 @@
         <di:waypoint x="1360" y="505" />
         <di:waypoint x="1360" y="198" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1nj0odo_di" bpmnElement="Flow_1nj0odo">
-        <di:waypoint x="1360" y="162" />
-        <di:waypoint x="1360" y="80" />
-        <di:waypoint x="2620" y="80" />
-        <di:waypoint x="2620" y="500" />
-      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_0knhh1n_di" bpmnElement="Flow_0knhh1n">
         <di:waypoint x="1680" y="525" />
         <di:waypoint x="1725" y="525" />
@@ -429,12 +417,6 @@
       <bpmndi:BPMNEdge id="Flow_1gfzbf8_di" bpmnElement="Flow_1gfzbf8">
         <di:waypoint x="1750" y="500" />
         <di:waypoint x="1750" y="198" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_0csbw03_di" bpmnElement="Flow_0csbw03">
-        <di:waypoint x="1750" y="162" />
-        <di:waypoint x="1750" y="80" />
-        <di:waypoint x="2620" y="80" />
-        <di:waypoint x="2620" y="500" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_08lbylu_di" bpmnElement="Flow_08lbylu">
         <di:waypoint x="2145" y="525" />
@@ -448,12 +430,6 @@
         <di:waypoint x="2120" y="500" />
         <di:waypoint x="2120" y="198" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1de2v1l_di" bpmnElement="Flow_1de2v1l">
-        <di:waypoint x="2120" y="162" />
-        <di:waypoint x="2120" y="80" />
-        <di:waypoint x="2620" y="80" />
-        <di:waypoint x="2620" y="500" />
-      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_1kxlid1_di" bpmnElement="Flow_1kxlid1">
         <di:waypoint x="2528" y="525" />
         <di:waypoint x="2595" y="525" />
@@ -465,6 +441,30 @@
       <bpmndi:BPMNEdge id="Flow_11nibhe_di" bpmnElement="Flow_11nibhe">
         <di:waypoint x="1140" y="162" />
         <di:waypoint x="1140" y="80" />
+        <di:waypoint x="2620" y="80" />
+        <di:waypoint x="2620" y="500" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1fsap2f_di" bpmnElement="Flow_1fsap2f">
+        <di:waypoint x="630" y="162" />
+        <di:waypoint x="630" y="80" />
+        <di:waypoint x="2620" y="80" />
+        <di:waypoint x="2620" y="500" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0ta0sq7_di" bpmnElement="Flow_0ta0sq7">
+        <di:waypoint x="1360" y="162" />
+        <di:waypoint x="1360" y="80" />
+        <di:waypoint x="2620" y="80" />
+        <di:waypoint x="2620" y="500" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0dofzux_di" bpmnElement="Flow_0dofzux">
+        <di:waypoint x="1750" y="162" />
+        <di:waypoint x="1750" y="80" />
+        <di:waypoint x="2620" y="80" />
+        <di:waypoint x="2620" y="500" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1syvlen_di" bpmnElement="Flow_1syvlen">
+        <di:waypoint x="2120" y="162" />
+        <di:waypoint x="2120" y="80" />
         <di:waypoint x="2620" y="80" />
         <di:waypoint x="2620" y="500" />
       </bpmndi:BPMNEdge>

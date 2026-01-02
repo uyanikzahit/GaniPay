@@ -102,12 +102,13 @@ public sealed class AuthFlowJobHandler
 
     private static object CreateSession(Dictionary<string, object?> v)
     {
-        // Mock session create
         var accessToken = "mock_access_" + Guid.NewGuid().ToString("N");
         var refreshToken = "mock_refresh_" + Guid.NewGuid().ToString("N");
 
         return new
         {
+            ok = true,                 // <-- EN ÖNEMLİSİ
+            errorCode = (string?)null,  // (opsiyonel ama temiz)
             accessToken,
             refreshToken,
             expiresIn = 3600,
