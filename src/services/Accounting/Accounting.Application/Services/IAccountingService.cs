@@ -11,4 +11,6 @@ public interface IAccountingService
     Task<AccountingTransactionDto> PostTransactionAsync(PostAccountingTransactionRequest request, CancellationToken ct);
 
     Task<UsageResultDto> GetUsageAsync(UsageQueryRequest request, CancellationToken ct);
+    Task<AccountStatusDto> GetAccountStatusAsync(Guid customerId, string currency, CancellationToken ct);
+
 }

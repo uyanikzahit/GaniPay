@@ -65,4 +65,18 @@ group.MapPost("/usage", async (
 
 
 
+group.MapGet("/accounts/status", async (
+    IAccountingService service,
+    Guid accountId,
+    Guid customerId,
+    string currency,
+    CancellationToken ct) =>
+{
+    var result = await service.GetAccountStatusAsync(customerId, currency, ct);
+    return Results.Ok(result);
+})
+.WithName("GetAccountStatus");
+
+
+
 app.Run();

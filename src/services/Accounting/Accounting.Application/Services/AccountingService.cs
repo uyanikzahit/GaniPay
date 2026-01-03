@@ -252,4 +252,25 @@ public sealed class AccountingService : IAccountingService
 
         return (fromUtc, toUtc, fromDate, toDate);
     }
+
+    public async Task<AccountStatusDto> GetAccountStatusAsync(Guid customerId, string currency, CancellationToken ct)
+    {
+        if (customerId == Guid.Empty)
+            throw new InvalidOperationException("CustomerId is required.");
+
+        if (string.IsNullOrWhiteSpace(currency))
+            throw new InvalidOperationException("Currency is required.");
+
+        var account = await _accountRepository.GetByCustomerAndCurrencyAsync(customerId, currency.Trim(), ct);
+
+        if (account is null)
+            throw new InvalidOperationException("Account not found."); // istersen 404’e maplersin
+
+        return new AccountStatusDto(
+            AccountId: account.Id,
+            CustomerId: account.CustomerId,
+            Currency: account.Currency,
+            Status: (int)account.Status
+        );
+    }
 }

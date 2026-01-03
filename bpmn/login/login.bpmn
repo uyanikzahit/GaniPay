@@ -21,7 +21,7 @@
       <bpmn:incoming>F0</bpmn:incoming>
       <bpmn:outgoing>F1</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:serviceTask id="T_BruteForceGuard" name="Brute-Force Guard">
+    <bpmn:serviceTask id="T_BruteForceGuard" name="Authentication Risk Gate">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="mock.auth.bruteforce.guard" retries="3" />
         <zeebe:ioMapping>
@@ -82,7 +82,7 @@
     </bpmn:intermediateThrowEvent>
     <bpmn:serviceTask id="T_AccountActive" name="Account Active">
       <bpmn:extensionElements>
-        <zeebe:taskDefinition type="mock.auth.account.status" retries="3" />
+        <zeebe:taskDefinition type="auth.account.status" retries="3" />
         <zeebe:ioMapping>
           <zeebe:input source="=customerId" target="customerId" />
           <zeebe:input source="=correlationId" target="correlationId" />
