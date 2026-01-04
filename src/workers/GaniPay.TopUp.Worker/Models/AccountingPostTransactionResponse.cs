@@ -1,12 +1,19 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace GaniPay.TopUp.Worker.Models;
 
-namespace GaniPay.TopUp.Worker.Models
+public sealed class AccountingPostTransactionResponse
 {
-    internal class AccountingPostTransactionResponse
-    {
-    }
+    public string Id { get; set; } = default!;
+    public Guid AccountId { get; set; }
+
+    // API’nin döndürdüğü örneğe göre string de gelebilir, ikisini de tolere etmek için string tuttuk
+    public string Direction { get; set; } = default!; // "credit" gibi
+    public decimal Amount { get; set; }
+    public string Currency { get; set; } = default!;
+
+    public decimal BalanceBefore { get; set; }
+    public decimal BalanceAfter { get; set; }
+
+    public int OperationType { get; set; }
+    public string ReferenceId { get; set; } = default!;
+    public DateTime CreatedAt { get; set; }
 }

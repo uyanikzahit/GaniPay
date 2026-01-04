@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace GaniPay.TopUp.Worker.Models;
 
-namespace GaniPay.TopUp.Worker.Models
+public sealed class PaymentsStatusUpdateResponse
 {
-    internal class PaymentsStatusUpdateResponse
-    {
-    }
+    public bool Ok { get; set; }
 }

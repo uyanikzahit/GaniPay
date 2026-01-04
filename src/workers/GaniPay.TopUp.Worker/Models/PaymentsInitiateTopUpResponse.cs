@@ -1,12 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace GaniPay.TopUp.Worker.Models;
 
-namespace GaniPay.TopUp.Worker.Models
+public sealed class PaymentsInitiateTopUpResponse
 {
-    internal class PaymentsInitiateTopUpResponse
-    {
-    }
+    public string CorrelationId { get; set; } = default!;
+    public string Status { get; set; } = default!; // "Running" vs
 }
