@@ -40,4 +40,10 @@ group.MapGet("/{correlationId}", async (IPaymentsService service, string correla
     return Results.Ok(result);
 });
 
+group.MapPost("/status", async (IPaymentsService service, UpdatePaymentStatusRequest request, CancellationToken ct) =>
+{
+    await service.UpdateStatusAsync(request, ct);
+    return Results.Ok(new { ok = true });
+});
+
 app.Run();

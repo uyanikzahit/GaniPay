@@ -5,3 +5,4 @@ public enum AccountingDirection
     Debit = 1,
     Credit = 2
 }
+

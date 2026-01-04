@@ -8,12 +8,10 @@ namespace GaniPay.Accounting.Application.Contracts.Requests;
 /// DB'ye göre: accounting_transaction + account_balance_history + account.balance update.
 /// </summary>
 public sealed record PostAccountingTransactionRequest(
-    Guid CustomerId,
-    string Currency,
-    [property: JsonConverter(typeof(JsonStringEnumConverter))]
-    AccountingDirection Direction,
+    Guid AccountId,
+    int Direction,
     decimal Amount,
-    [property: JsonConverter(typeof(JsonStringEnumConverter))]
-    AccountingOperationType OperationType,
+    string Currency,
+    int OperationType,
     Guid ReferenceId
 );

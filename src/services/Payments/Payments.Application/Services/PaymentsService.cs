@@ -1,4 +1,4 @@
-using GaniPay.Payments.Application.Abstractions;
+﻿using GaniPay.Payments.Application.Abstractions;
 using GaniPay.Payments.Application.Abstractions.Repositories;
 using GaniPay.Payments.Application.Contracts.Dtos;
 using GaniPay.Payments.Application.Contracts.Requests;
@@ -158,5 +158,35 @@ public sealed class PaymentsService : IPaymentsService
             process.CreatedAt,
             process.UpdatedAt
         );
+    }
+
+    public async Task UpdateStatusAsync(UpdatePaymentStatusRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.CorrelationId))
+            throw new InvalidOperationException("correlationId is required");
+
+        if (string.IsNullOrWhiteSpace(request.Status))
+            throw new InvalidOperationException("status is required");
+
+        var process = await _repo.GetByCorrelationIdAsync(request.CorrelationId, ct)
+                      ?? throw new InvalidOperationException("payment not found");
+
+        // Sadece Running/Initiated → terminal state geçişine izin ver (sektörel doğru davranış)
+        if (process.Status is PaymentStatus.Succeeded or PaymentStatus.Failed)
+            return; // idempotent: zaten bitmiş
+
+        if (!Enum.TryParse<PaymentStatus>(request.Status, ignoreCase: true, out var newStatus))
+            throw new InvalidOperationException("invalid status");
+
+        if (newStatus is not (PaymentStatus.Succeeded or PaymentStatus.Failed))
+            throw new InvalidOperationException("only Succeeded/Failed allowed");
+
+        process.Status = newStatus;
+        process.ErrorCode = request.ErrorCode;
+        process.ErrorMessage = request.ErrorMessage;
+        process.UpdatedAt = DateTime.UtcNow;
+
+        await _repo.UpdateAsync(process, ct);
+        await _uow.SaveChangesAsync(ct);
     }
 }

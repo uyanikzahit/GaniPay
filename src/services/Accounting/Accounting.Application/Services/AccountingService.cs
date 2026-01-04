@@ -1,4 +1,4 @@
-using GaniPay.Accounting.Application.Abstractions;
+ï»¿using GaniPay.Accounting.Application.Abstractions;
 using GaniPay.Accounting.Application.Abstractions.Repositories;
 using GaniPay.Accounting.Application.Contracts.Dtos;
 using GaniPay.Accounting.Application.Contracts.Requests;
@@ -39,7 +39,7 @@ public sealed class AccountingService : IAccountingService
 
         var createdAt = EnsureUtc(DateTime.UtcNow);
 
-        // Sistem otomatik üretir: account.Id üzerinden deterministik ve çakýþmasýz.
+        // Sistem otomatik Ã¼retir: account.Id Ã¼zerinden deterministik ve Ã§akÄ±ÅŸmasÄ±z.
         var accountId = Guid.NewGuid();
         var generatedAccountNumber = accountId.ToString("N"); // 32 chars, unique
 
@@ -88,10 +88,14 @@ public sealed class AccountingService : IAccountingService
         if (string.IsNullOrWhiteSpace(request.Currency))
             throw new InvalidOperationException("Currency is required.");
 
-        var currency = request.Currency.Trim();
+        var currency = request.Currency.Trim().ToUpperInvariant();
 
-        var account = await _accountRepository.GetByCustomerAndCurrencyAsync(request.CustomerId, currency, ct)
-                      ?? throw new InvalidOperationException("Account not found.");
+        var account = await _accountRepository.GetByIdAsync(request.AccountId, ct)
+            ?? throw new InvalidOperationException("Account not found.");
+
+
+        if (!string.Equals(account.Currency, currency, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Currency mismatch.");
 
         if (account.Status != AccountStatus.Active)
             throw new InvalidOperationException("Account is not active.");
@@ -99,19 +103,19 @@ public sealed class AccountingService : IAccountingService
         if (request.Amount <= 0)
             throw new InvalidOperationException("Amount must be > 0.");
 
-        // DB’den gelen datetime’lar bazen Unspecified gelebiliyor.
-        // Update sýrasýnda EF bunu da "touched" ederse timestamptz insert/update patlayabiliyor.
+        // DBâ€™den gelen datetimeâ€™lar bazen Unspecified gelebiliyor.
+        // Update sÄ±rasÄ±nda EF bunu da "touched" ederse timestamptz insert/update patlayabiliyor.
         account.CreatedAt = EnsureUtc(account.CreatedAt);
 
-        var directionString = ToDbDirection(request.Direction);
+        var directionString = ToDbDirection(request.Direction).ToLowerInvariant();
 
         var balanceBefore = account.Balance;
 
         var balanceDelta = request.Direction switch
         {
-            Contracts.Enums.AccountingDirection.Credit => +request.Amount,
-            Contracts.Enums.AccountingDirection.Debit => -request.Amount,
-            _ => 0m
+            2 => +request.Amount, // Credit
+            1 => -request.Amount, // Debit
+            _ => throw new InvalidOperationException("Invalid direction.")
         };
 
         var balanceAfter = balanceBefore + balanceDelta;
@@ -205,16 +209,23 @@ public sealed class AccountingService : IAccountingService
         );
     }
 
-    private static string ToDbDirection(Contracts.Enums.AccountingDirection dir)
-        => dir == Contracts.Enums.AccountingDirection.Debit ? "debit" : "credit";
+    private static string ToDbDirection(int direction)
+    {
+        return direction switch
+        {
+            (int)AccountingDirection.Debit => "DEBIT",
+            (int)AccountingDirection.Credit => "CREDIT",
+            _ => throw new InvalidOperationException("Invalid direction.")
+        };
+    }
 
     private static string Normalize(string s)
         => (s ?? string.Empty).Trim().ToLowerInvariant();
 
     private static DateTime EnsureUtc(DateTime dt)
     {
-        // Npgsql timestamptz için Unspecified yazmayý sevmez.
-        // Elimizdeki deðer Unspecified ise UTC varsayarak düzelt.
+        // Npgsql timestamptz iÃ§in Unspecified yazmayÄ± sevmez.
+        // Elimizdeki deÄŸer Unspecified ise UTC varsayarak dÃ¼zelt.
         return dt.Kind switch
         {
             DateTimeKind.Utc => dt,
@@ -264,7 +275,7 @@ public sealed class AccountingService : IAccountingService
         var account = await _accountRepository.GetByCustomerAndCurrencyAsync(customerId, currency.Trim(), ct);
 
         if (account is null)
-            throw new InvalidOperationException("Account not found."); // istersen 404’e maplersin
+            throw new InvalidOperationException("Account not found."); // istersen 404â€™e maplersin
 
         return new AccountStatusDto(
             AccountId: account.Id,
@@ -273,4 +284,6 @@ public sealed class AccountingService : IAccountingService
             Status: (int)account.Status
         );
     }
+
+
 }
