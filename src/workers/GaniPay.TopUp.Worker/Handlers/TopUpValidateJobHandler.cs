@@ -1,7 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
-using System;
-using System.Text.Json;
-using System.Threading.Tasks;
+﻿using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Zeebe.Client.Api.Responses;
 using Zeebe.Client.Api.Worker;
 
@@ -18,10 +16,9 @@ public sealed class TopUpValidateJobHandler
 
     public async Task Handle(IJobClient client, IJob job)
     {
-        _logger.LogInformation("VALIDATE START | jobKey={JobKey} | type={Type} | vars={Vars}",
+        _logger.LogInformation("VALIDATE START | key={Key} | type={Type} | vars={Vars}",
             job.Key, job.Type, job.Variables);
 
-        // job.Variables = JSON string
         using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(job.Variables) ? "{}" : job.Variables);
         var root = doc.RootElement;
 
@@ -31,74 +28,45 @@ public sealed class TopUpValidateJobHandler
         decimal GetDecimal(string name)
         {
             if (!root.TryGetProperty(name, out var p)) return 0m;
-            try
+            return p.ValueKind switch
             {
-                return p.ValueKind switch
-                {
-                    JsonValueKind.Number => p.GetDecimal(),
-                    JsonValueKind.String => decimal.TryParse(p.GetString(), out var d) ? d : 0m,
-                    _ => 0m
-                };
-            }
-            catch { return 0m; }
+                JsonValueKind.Number => p.GetDecimal(),
+                JsonValueKind.String => decimal.TryParse(p.GetString(), out var d) ? d : 0m,
+                _ => 0m
+            };
         }
 
         var customerId = GetString("customerId");
         var accountId = GetString("accountId");
         var currency = GetString("currency");
         var idempotencyKey = GetString("idempotencyKey");
-
-        // BPMN input: correlationId -> target workflowCorrelationId
-        var workflowCorrelationId = GetString("workflowCorrelationId");
-
         var amount = GetDecimal("amount");
 
-        // --- Validation ---
-        var validateOk = true;
+        bool validateOk = true;
         string? errorCode = null;
         string? errorMessage = null;
 
         if (string.IsNullOrWhiteSpace(customerId))
         {
-            validateOk = false;
-            errorCode = "VALIDATION_CUSTOMERID_MISSING";
-            errorMessage = "customerId is required";
+            validateOk = false; errorCode = "VALIDATION_CUSTOMERID_MISSING"; errorMessage = "customerId is required";
         }
         else if (string.IsNullOrWhiteSpace(accountId))
         {
-            validateOk = false;
-            errorCode = "VALIDATION_ACCOUNTID_MISSING";
-            errorMessage = "accountId is required";
+            validateOk = false; errorCode = "VALIDATION_ACCOUNTID_MISSING"; errorMessage = "accountId is required";
         }
         else if (amount <= 0)
         {
-            validateOk = false;
-            errorCode = "VALIDATION_AMOUNT_INVALID";
-            errorMessage = "amount must be greater than 0";
+            validateOk = false; errorCode = "VALIDATION_AMOUNT_INVALID"; errorMessage = "amount must be greater than 0";
         }
         else if (string.IsNullOrWhiteSpace(currency))
         {
-            validateOk = false;
-            errorCode = "VALIDATION_CURRENCY_MISSING";
-            errorMessage = "currency is required";
+            validateOk = false; errorCode = "VALIDATION_CURRENCY_MISSING"; errorMessage = "currency is required";
         }
         else if (string.IsNullOrWhiteSpace(idempotencyKey))
         {
-            validateOk = false;
-            errorCode = "VALIDATION_IDEMPOTENCY_MISSING";
-            errorMessage = "idempotencyKey is required";
-        }
-        else if (string.IsNullOrWhiteSpace(workflowCorrelationId))
-        {
-            validateOk = false;
-            errorCode = "VALIDATION_CORRELATION_MISSING";
-            errorMessage = "correlationId is required";
+            validateOk = false; errorCode = "VALIDATION_IDEMPOTENCY_MISSING"; errorMessage = "idempotencyKey is required";
         }
 
-        _logger.LogInformation("VALIDATE RESULT | ok={Ok} | errorCode={Code} | errorMessage={Msg}",
-            validateOk, errorCode, errorMessage);
-
-        // OUTPUT: Zeebe bu sürümde Variables(string json) istiyor
         var outJson = JsonSerializer.Serialize(new
         {
             validateOk,
@@ -111,6 +79,6 @@ public sealed class TopUpValidateJobHandler
             .Variables(outJson)
             .Send();
 
-        _logger.LogInformation("VALIDATE COMPLETE SENT | jobKey={JobKey}", job.Key);
+        _logger.LogInformation("VALIDATE COMPLETE | key={Key} | ok={Ok}", job.Key, validateOk);
     }
 }

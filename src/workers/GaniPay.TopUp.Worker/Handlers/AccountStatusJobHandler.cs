@@ -18,7 +18,7 @@ public sealed class AccountStatusJobHandler
     {
         try
         {
-            using var doc = JsonDocument.Parse(job.Variables);
+            using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(job.Variables) ? "{}" : job.Variables);
             var root = doc.RootElement;
 
             var accountId = root.TryGetProperty("accountId", out var a) ? a.GetString() : null;
@@ -51,29 +51,35 @@ public sealed class AccountStatusJobHandler
                 return;
             }
 
-            // Eğer response body farklıysa bile success => ok kabul ediyoruz
+            // Swagger output: { accountId, customerId, currency, status: 1|2|3 }
             var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
 
-            bool accountOk = true;
-
-            if (body.ValueKind == JsonValueKind.Object &&
-                body.TryGetProperty("accountOk", out var okProp) &&
-                (okProp.ValueKind == JsonValueKind.True || okProp.ValueKind == JsonValueKind.False))
+            // status int: 1=Active, 2=Passive, 3=Blocked
+            var statusCode = 1; // default Active
+            if (body.ValueKind == JsonValueKind.Object && body.TryGetProperty("status", out var st))
             {
-                accountOk = okProp.GetBoolean();
+                if (st.ValueKind == JsonValueKind.Number && st.TryGetInt32(out var s))
+                    statusCode = s;
+                else if (st.ValueKind == JsonValueKind.String && int.TryParse(st.GetString(), out var s2))
+                    statusCode = s2;
             }
 
-            string status =
-                body.ValueKind == JsonValueKind.Object && body.TryGetProperty("status", out var st) ? (st.GetString() ?? "Active") : "Active";
+            var accountStatusText = statusCode switch
+            {
+                1 => "Active",
+                2 => "Passive",
+                3 => "Blocked",
+                _ => "Unknown"
+            };
 
-            string statusText =
-                body.ValueKind == JsonValueKind.Object && body.TryGetProperty("accountStatusText", out var tx) ? (tx.GetString() ?? "OK") : "OK";
+            // iş kuralı: sadece Active ise OK
+            var accountOk = statusCode == 1;
 
             var completeVars = new
             {
                 accountOk = accountOk,
-                status = status,                 // BPMN output -> accountStatus
-                accountStatusText = statusText,
+                accountStatus = statusCode,           // ✅ BPMN output ismi ile birebir
+                accountStatusText = accountStatusText, // ✅
                 errorCode = (string?)null,
                 errorMessage = (string?)null,
                 failedAtStep = (string?)null
@@ -97,7 +103,7 @@ public sealed class AccountStatusJobHandler
         var completeVars = new
         {
             accountOk = false,
-            status = "Failed",
+            accountStatus = -1,               // ✅ BPMN output ismi ile birebir
             accountStatusText = "FAILED",
             errorCode = code,
             errorMessage = message,

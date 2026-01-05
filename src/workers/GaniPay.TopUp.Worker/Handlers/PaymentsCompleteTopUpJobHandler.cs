@@ -18,14 +18,15 @@ public sealed class PaymentsCompleteTopUpJobHandler
     {
         try
         {
-            using var doc = JsonDocument.Parse(job.Variables);
+            using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(job.Variables) ? "{}" : job.Variables);
             var root = doc.RootElement;
 
             var correlationId = root.TryGetProperty("correlationId", out var c) ? c.GetString() : null;
 
-            bool creditOk = root.TryGetProperty("creditOk", out var ok) && ok.ValueKind is JsonValueKind.True or JsonValueKind.False
-                ? ok.GetBoolean()
-                : false;
+            bool creditOk =
+                root.TryGetProperty("creditOk", out var ok) && (ok.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                    ? ok.GetBoolean()
+                    : false;
 
             var errorCode = root.TryGetProperty("errorCode", out var ec) ? ec.GetString() : null;
             var errorMessage = root.TryGetProperty("errorMessage", out var em) ? em.GetString() : null;
@@ -39,12 +40,14 @@ public sealed class PaymentsCompleteTopUpJobHandler
                 return;
             }
 
-            var status = creditOk ? "Success" : "Failed";
+            // ✅ Swagger’a birebir: status STRING bekleniyor ("2","3","4")
+            // Complete adımında: creditOk => "3" (Succeeded), değilse "4" (Failed)
+            var status = creditOk ? "3" : "4";
 
             var request = new
             {
                 correlationId,
-                status,
+                status,          // ✅ string
                 errorCode,
                 errorMessage
             };
@@ -53,9 +56,10 @@ public sealed class PaymentsCompleteTopUpJobHandler
 
             if (!resp.IsSuccessStatusCode)
             {
+                var bodyText = await resp.Content.ReadAsStringAsync();
                 await CompleteFail(client, job,
                     "PAYMENTS_COMPLETE_HTTP_ERROR",
-                    $"Payments status HTTP {(int)resp.StatusCode}",
+                    $"Payments status HTTP {(int)resp.StatusCode} | {bodyText}",
                     "Complete TopUp");
                 return;
             }
@@ -63,18 +67,20 @@ public sealed class PaymentsCompleteTopUpJobHandler
             var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
 
             bool okResp =
-                body.ValueKind == JsonValueKind.Object && body.TryGetProperty("ok", out var okp) &&
+                body.ValueKind == JsonValueKind.Object &&
+                body.TryGetProperty("ok", out var okp) &&
                 (okp.ValueKind is JsonValueKind.True or JsonValueKind.False)
                     ? okp.GetBoolean()
                     : true;
 
+            // ✅ BPMN output isimleri paneldekiyle aynı
             var completeVars = new
             {
                 persistOk = okResp,
-                ok = okResp, // BPMN output -> paymentsStatusUpdated
-                errorCode = okResp ? null : "PAYMENTS_STATUS_UPDATE_FAILED",
-                errorMessage = okResp ? null : "Payments status update başarısız.",
-                failedAtStep = okResp ? null : "Complete TopUp"
+                paymentsStatusUpdated = okResp,
+                errorCode = okResp ? (string?)null : "PAYMENTS_STATUS_UPDATE_FAILED",
+                errorMessage = okResp ? (string?)null : "Payments status update başarısız.",
+                failedAtStep = okResp ? (string?)null : "Complete TopUp"
             };
 
             await client.NewCompleteJobCommand(job.Key)
@@ -95,7 +101,7 @@ public sealed class PaymentsCompleteTopUpJobHandler
         var completeVars = new
         {
             persistOk = false,
-            ok = false,
+            paymentsStatusUpdated = false,
             errorCode = code,
             errorMessage = message,
             failedAtStep = step

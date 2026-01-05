@@ -59,7 +59,7 @@
           <zeebe:input source="=accountId" target="accountId" />
           <zeebe:input source="=amount" target="amount" />
           <zeebe:input source="=currency" target="currency" />
-          <zeebe:input source="=1" target="direction" />
+          <zeebe:input source="=2" target="direction" />
           <zeebe:input source="=1" target="operationType" />
           <zeebe:input source="=paymentCorrelationId" target="referenceId" />
           <zeebe:output source="=creditOk" target="creditOk" />
@@ -313,6 +313,7 @@
           <zeebe:input source="=amount" target="amount" />
           <zeebe:input source="=currency" target="currency" />
           <zeebe:input source="=idempotencyKey" target="idempotencyKey" />
+          <zeebe:input source="=accountId" target="accountId" />
           <zeebe:output source="=validateOk" target="validateOk" />
           <zeebe:output source="=errorCode" target="errorCode" />
           <zeebe:output source="=errorMessage" target="errorMessage" />

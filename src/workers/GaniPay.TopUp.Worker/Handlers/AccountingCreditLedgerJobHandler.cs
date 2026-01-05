@@ -18,25 +18,62 @@ public sealed class AccountingCreditLedgerJobHandler
     {
         try
         {
-            using var doc = JsonDocument.Parse(job.Variables);
+            using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(job.Variables) ? "{}" : job.Variables);
             var root = doc.RootElement;
 
-            var accountId = root.TryGetProperty("accountId", out var a) ? a.GetString() : null;
-            var currency = root.TryGetProperty("currency", out var cu) ? cu.GetString() : null;
-            var referenceId = root.TryGetProperty("referenceId", out var r) ? r.GetString() : null;
+            string? GetString(string name)
+                => root.TryGetProperty(name, out var p) ? p.GetString() : null;
 
-            int direction = root.TryGetProperty("direction", out var d) && d.ValueKind == JsonValueKind.Number ? d.GetInt32() : 1;
-            int operationType = root.TryGetProperty("operationType", out var op) && op.ValueKind == JsonValueKind.Number ? op.GetInt32() : 1;
+            int GetInt(string name, int def)
+            {
+                if (!root.TryGetProperty(name, out var p)) return def;
+                try
+                {
+                    return p.ValueKind switch
+                    {
+                        JsonValueKind.Number => p.GetInt32(),
+                        JsonValueKind.String => int.TryParse(p.GetString(), out var v) ? v : def,
+                        _ => def
+                    };
+                }
+                catch { return def; }
+            }
 
-            decimal amount = 0;
-            if (root.TryGetProperty("amount", out var am) && am.ValueKind == JsonValueKind.Number)
-                amount = am.GetDecimal();
+            decimal GetDecimal(string name)
+            {
+                if (!root.TryGetProperty(name, out var p)) return 0m;
+                try
+                {
+                    return p.ValueKind switch
+                    {
+                        JsonValueKind.Number => p.GetDecimal(),
+                        JsonValueKind.String => decimal.TryParse(p.GetString(), out var d) ? d : 0m,
+                        _ => 0m
+                    };
+                }
+                catch { return 0m; }
+            }
 
-            if (string.IsNullOrWhiteSpace(accountId) || amount <= 0 || string.IsNullOrWhiteSpace(currency) || string.IsNullOrWhiteSpace(referenceId))
+            var accountId = GetString("accountId");
+            var currency = GetString("currency");
+            var amount = GetDecimal("amount");
+
+            // ✅ Swagger'a göre defaultlar:
+            // direction: 2 (credit)
+            // operationType: 0 (topup)
+            var direction = 2;
+            var operationType = GetInt("operationType", 0);
+
+            // ✅ referenceId GUID olmalı.
+            // referenceId yoksa veya GUID değilse: yeni GUID üret.
+            var referenceIdRaw = GetString("referenceId") ?? GetString("idempotencyKey");
+            var referenceId = Guid.TryParse(referenceIdRaw, out var gid) ? gid.ToString() : Guid.NewGuid().ToString();
+
+            if (string.IsNullOrWhiteSpace(accountId) || amount <= 0 || string.IsNullOrWhiteSpace(currency))
             {
                 await CompleteFail(client, job,
                     "ACCOUNTING_CREDIT_VALIDATION",
-                    "accountId/amount/currency/referenceId zorunludur.",
+                    "accountId/amount/currency zorunludur.",
                     "Credit Ledger");
                 return;
             }
@@ -55,42 +92,63 @@ public sealed class AccountingCreditLedgerJobHandler
 
             if (!resp.IsSuccessStatusCode)
             {
+                var bodyText = await resp.Content.ReadAsStringAsync();
                 await CompleteFail(client, job,
                     "ACCOUNTING_CREDIT_HTTP_ERROR",
-                    $"Accounting transactions HTTP {(int)resp.StatusCode}",
+                    $"HTTP {(int)resp.StatusCode} | {bodyText}",
                     "Credit Ledger");
                 return;
             }
 
             var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
 
-            // Alanlar yoksa bile akış bozulmasın
-            string? txId = body.ValueKind == JsonValueKind.Object && body.TryGetProperty("id", out var id) ? id.GetString() : null;
+            // tolerant read
+            string? txId =
+                (body.ValueKind == JsonValueKind.Object && body.TryGetProperty("id", out var id) ? id.GetString() : null)
+                ?? (body.ValueKind == JsonValueKind.Object && body.TryGetProperty("transactionId", out var tid) ? tid.GetString() : null)
+                ?? (body.ValueKind == JsonValueKind.Object && body.TryGetProperty("accountingTxId", out var atx) ? atx.GetString() : null);
 
-            decimal? balanceBefore = body.ValueKind == JsonValueKind.Object && body.TryGetProperty("balanceBefore", out var bb) && bb.ValueKind == JsonValueKind.Number
-                ? bb.GetDecimal()
-                : null;
+            decimal? balanceBefore =
+                body.ValueKind == JsonValueKind.Object && body.TryGetProperty("balanceBefore", out var bb) && bb.ValueKind == JsonValueKind.Number
+                    ? bb.GetDecimal()
+                    : null;
 
-            decimal? balanceAfter = body.ValueKind == JsonValueKind.Object && body.TryGetProperty("balanceAfter", out var ba) && ba.ValueKind == JsonValueKind.Number
-                ? ba.GetDecimal()
-                : null;
+            decimal? balanceAfter =
+                body.ValueKind == JsonValueKind.Object && body.TryGetProperty("balanceAfter", out var ba) && ba.ValueKind == JsonValueKind.Number
+                    ? ba.GetDecimal()
+                    : null;
 
-            string? createdAt = body.ValueKind == JsonValueKind.Object && body.TryGetProperty("createdAt", out var ca) ? ca.ToString() : null;
-            string? respRef = body.ValueKind == JsonValueKind.Object && body.TryGetProperty("referenceId", out var rr) ? rr.GetString() : referenceId;
+            string? createdAt =
+                body.ValueKind == JsonValueKind.Object && body.TryGetProperty("createdAt", out var ca) ? ca.ToString()
+                : (body.ValueKind == JsonValueKind.Object && body.TryGetProperty("ledgerCreatedAt", out var lca) ? lca.ToString()
+                : null);
 
-            int? respOp = body.ValueKind == JsonValueKind.Object && body.TryGetProperty("operationType", out var rop) && rop.ValueKind == JsonValueKind.Number
-                ? rop.GetInt32()
-                : operationType;
+            int ledgerOp =
+                body.ValueKind == JsonValueKind.Object && body.TryGetProperty("operationType", out var rop) && rop.ValueKind == JsonValueKind.Number
+                    ? rop.GetInt32()
+                    : operationType;
 
+            string ledgerRef =
+                body.ValueKind == JsonValueKind.Object && body.TryGetProperty("referenceId", out var rr) && rr.ValueKind == JsonValueKind.String
+                    ? rr.GetString()!
+                    : referenceId;
+
+            // ✅ BPMN OUTPUT isimleriyle birebir + referenceId'yi de workflow'a yaz (tutarlılık için)
             var completeVars = new
             {
                 creditOk = true,
-                id = txId,
-                balanceBefore = balanceBefore,
-                balanceAfter = balanceAfter,
-                createdAt = createdAt,
-                referenceId = respRef,
-                operationType = respOp,
+                accountingTxId = txId,
+                balanceBefore,
+                balanceAfter,
+                ledgerCreatedAt = createdAt,
+                ledgerReferenceId = ledgerRef,
+                ledgerOperationType = ledgerOp,
+
+                // bu da çok faydalı: sonraki adımlar ve debug için
+                referenceId = ledgerRef,
+                direction,
+                operationType,
+
                 errorCode = (string?)null,
                 errorMessage = (string?)null,
                 failedAtStep = (string?)null
@@ -114,12 +172,12 @@ public sealed class AccountingCreditLedgerJobHandler
         var completeVars = new
         {
             creditOk = false,
-            id = (string?)null,
+            accountingTxId = (string?)null,
             balanceBefore = (decimal?)null,
             balanceAfter = (decimal?)null,
-            createdAt = (string?)null,
-            referenceId = (string?)null,
-            operationType = (int?)null,
+            ledgerCreatedAt = (string?)null,
+            ledgerReferenceId = (string?)null,
+            ledgerOperationType = (int?)null,
             errorCode = code,
             errorMessage = message,
             failedAtStep = step

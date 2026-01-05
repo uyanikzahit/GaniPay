@@ -78,6 +78,10 @@ var validationWorkerDir = Path.Combine(workersRoot, "GaniPay.Validation.Worker")
 var dataCreationWorkerCsproj = Path.Combine(dataCreationWorkerDir, "GaniPay.DataCreation.Worker.csproj");
 var validationWorkerCsproj = Path.Combine(validationWorkerDir, "GaniPay.Validation.Worker.csproj");
 
+var topupWorkerDir = Path.Combine(workersRoot, "GaniPay.TopUp.Worker");
+var topupWorkerCsproj = Path.Combine(topupWorkerDir, "GaniPay.TopUp.Worker.csproj");
+
+
 // DataCreation Worker
 builder.AddExecutable("data-creation-worker", "dotnet", dataCreationWorkerDir)
     .WithArgs("run", "--project", dataCreationWorkerCsproj, "--no-launch-profile")
@@ -101,6 +105,10 @@ var loginWorkerCsproj = Path.Combine(loginWorkerDir, "GaniPay.Login.Worker.cspro
 
 builder.AddExecutable("login-worker", "dotnet", loginWorkerDir)
     .WithArgs("run", "--project", loginWorkerCsproj, "--no-launch-profile")
+    .WithEnvironment("DOTNET_ENVIRONMENT", "Development");
+
+builder.AddExecutable("topup-worker", "dotnet", topupWorkerDir)
+    .WithArgs("run", "--project", topupWorkerCsproj, "--no-launch-profile")
     .WithEnvironment("DOTNET_ENVIRONMENT", "Development");
 
 builder.Build().Run();

@@ -17,6 +17,7 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 var zeebeGateway = builder.Configuration["Zeebe:GatewayAddress"] ?? "127.0.0.1:26500";
 var registerProcessId = builder.Configuration["Zeebe:RegisterProcessId"] ?? "register";
 var loginProcessId = builder.Configuration["Zeebe:LoginProcessId"] ?? "login";
+var topUpProcessId = builder.Configuration["Zeebe:TopUpProcessId"] ?? "topup";
 
 // Zeebe Client (Singleton)
 builder.Services.AddSingleton<IZeebeClient>(_ =>
@@ -59,6 +60,10 @@ var group = app.MapGroup("/api/v1/onboarding")
 //login
 var authGroup = app.MapGroup("/api/v1/auth")
     .WithTags("Auth");
+
+//topup
+var paymentsGroup = app.MapGroup("/api/v1/payments")
+    .WithTags("Payments");
 
 // POST /api/v1/onboarding/register
 // Görev: Sadece Zeebe’de main flow’u baþlatmak.
@@ -205,6 +210,75 @@ authGroup.MapPost("/login", async (
     }
 });
 
+
+paymentsGroup.MapPost("/topup", async (
+    TopUpRequest req,
+    HttpContext http,
+    IZeebeClient zeebe,
+    CancellationToken ct) =>
+{
+    // Basit validasyon
+    if (string.IsNullOrWhiteSpace(req.CustomerId) ||
+        string.IsNullOrWhiteSpace(req.AccountId) ||
+        string.IsNullOrWhiteSpace(req.Currency) ||
+        string.IsNullOrWhiteSpace(req.IdempotencyKey) ||
+        string.IsNullOrWhiteSpace(req.ReferenceId) ||
+        req.Amount <= 0)
+    {
+        return Results.BadRequest(new
+        {
+            success = false,
+            message = "customerId, accountId, amount(>0), currency, idempotencyKey, referenceId zorunludur."
+        });
+    }
+
+    // CorrelationId: header varsa onu al, yoksa üret
+    var correlationId =
+        http.Request.Headers.TryGetValue("X-Correlation-Id", out var cid) && !string.IsNullOrWhiteSpace(cid)
+            ? cid.ToString()
+            : Guid.NewGuid().ToString();
+
+    // BPMN instance'da verdiðin variable isimleriyle birebir
+    var variables = new
+    {
+        correlationId,
+        customerId = req.CustomerId,
+        accountId = req.AccountId,
+        amount = req.Amount,
+        currency = req.Currency,
+        idempotencyKey = req.IdempotencyKey,
+        referenceId = req.ReferenceId
+    };
+
+    var variablesJson = JsonSerializer.Serialize(variables, zeebeJsonOptions);
+
+    try
+    {
+        var resp = await zeebe.NewCreateProcessInstanceCommand()
+            .BpmnProcessId(topUpProcessId) // appsettings: "topup"
+            .LatestVersion()
+            .Variables(variablesJson)
+            .Send();
+
+        return Results.Accepted(
+            value: new
+            {
+                success = true,
+                correlationId,
+                processId = topUpProcessId,
+                processInstanceKey = resp.ProcessInstanceKey
+            });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Could not start topup workflow",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+});
+
+
 app.Lifetime.ApplicationStopping.Register(() =>
 {
     // Zeebe client dispose
@@ -244,4 +318,13 @@ public sealed record LoginRequest(
     string? DeviceId,
     string? Channel,
     string? ClientVersion
+);
+
+public sealed record TopUpRequest(
+    string CustomerId,
+    string AccountId,
+    decimal Amount,
+    string Currency,
+    string IdempotencyKey,
+    string ReferenceId
 );
