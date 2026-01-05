@@ -1,7 +1,9 @@
-﻿namespace GaniPay.TopUp.Worker.Models;
+﻿using System.Text.Json.Serialization;
+
+namespace GaniPay.TopUp.Worker.Models;
 
 public sealed class PaymentsInitiateTopUpResponse
 {
-    public string CorrelationId { get; set; } = default!;
-    public string Status { get; set; } = default!; // "Running" vs
+    [JsonPropertyName("correlationId")] public string? CorrelationId { get; set; }
+    [JsonPropertyName("status")] public string? Status { get; set; }
 }

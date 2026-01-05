@@ -1,86 +1,112 @@
 ﻿using System.Net.Http.Json;
-using GaniPay.TopUp.Worker.Models;
-using Microsoft.Extensions.Logging;
+using System.Text.Json;
+using Zeebe.Client.Api.Responses;
+using Zeebe.Client.Api.Worker;
 
 namespace GaniPay.TopUp.Worker.Handlers;
 
 public sealed class PaymentsInitiateTopUpJobHandler
 {
-    private readonly IHttpClientFactory _http;
-    private readonly ILogger<PaymentsInitiateTopUpJobHandler> _log;
+    private readonly HttpClient _http;
 
-    public PaymentsInitiateTopUpJobHandler(IHttpClientFactory http, ILogger<PaymentsInitiateTopUpJobHandler> log)
+    public PaymentsInitiateTopUpJobHandler(IHttpClientFactory httpClientFactory)
     {
-        _http = http;
-        _log = log;
+        _http = httpClientFactory.CreateClient("Payments");
     }
 
-    public async Task Handle(dynamic client, dynamic job)
+    public async Task Handle(IJobClient client, IJob job)
     {
-        var vars = ReadVars(job);
-
-        // POST /api/payments/topups
-        // body: { customerId, amount, currency, idempotencyKey }
-        var http = _http.CreateClient("payments");
-
-        var req = new
-        {
-            customerId = vars.CustomerId,
-            amount = vars.Amount,
-            currency = vars.Currency,
-            idempotencyKey = vars.IdempotencyKey ?? $"topup-{DateTime.UtcNow:yyyyMMddHHmmssfff}"
-        };
-
-        PaymentsInitiateTopUpResponse? resp = null;
-
         try
         {
-            var res = await http.PostAsJsonAsync("/api/payments/topups", req);
-            res.EnsureSuccessStatusCode();
-            resp = await res.Content.ReadFromJsonAsync<PaymentsInitiateTopUpResponse>();
+            using var doc = JsonDocument.Parse(job.Variables);
+            var root = doc.RootElement;
+
+            var customerId = root.TryGetProperty("customerId", out var c) ? c.GetString() : null;
+            var currency = root.TryGetProperty("currency", out var cu) ? cu.GetString() : null;
+            var idempotencyKey = root.TryGetProperty("idempotencyKey", out var i) ? i.GetString() : null;
+
+            decimal amount = 0;
+            if (root.TryGetProperty("amount", out var a) && a.ValueKind == JsonValueKind.Number)
+                amount = a.GetDecimal();
+
+            if (string.IsNullOrWhiteSpace(customerId) || amount <= 0 || string.IsNullOrWhiteSpace(currency))
+            {
+                await CompleteFail(client, job,
+                    "PAYMENTS_INITIATE_VALIDATION",
+                    "TopUp initiate için customerId/amount/currency zorunludur.",
+                    "Initiate TopUp");
+                return;
+            }
+
+            var request = new
+            {
+                customerId,
+                amount,
+                currency,
+                idempotencyKey = idempotencyKey ?? Guid.NewGuid().ToString("N")
+            };
+
+            var resp = await _http.PostAsJsonAsync("/api/payments/topups", request);
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                await CompleteFail(client, job,
+                    "PAYMENTS_INITIATE_HTTP_ERROR",
+                    $"Payments topups HTTP {(int)resp.StatusCode}",
+                    "Initiate TopUp");
+                return;
+            }
+
+            // Swagger response değişebilir; yoksa bile correlation üretelim
+            var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+
+            string paymentCorrelationId =
+                body.ValueKind == JsonValueKind.Object && body.TryGetProperty("correlationId", out var corr)
+                    ? (corr.GetString() ?? Guid.NewGuid().ToString())
+                    : Guid.NewGuid().ToString();
+
+            string status =
+                body.ValueKind == JsonValueKind.Object && body.TryGetProperty("status", out var st)
+                    ? (st.GetString() ?? "Initiated")
+                    : "Initiated";
+
+            var completeVars = new
+            {
+                orderOk = true,
+                correlationId = paymentCorrelationId, // BPMN output -> paymentCorrelationId
+                status = status,                      // BPMN output -> paymentStatus
+                errorCode = (string?)null,
+                errorMessage = (string?)null,
+                failedAtStep = (string?)null
+            };
+
+            await client.NewCompleteJobCommand(job.Key)
+                .Variables(JsonSerializer.Serialize(completeVars))
+                .Send();
         }
         catch (Exception ex)
         {
-            _log.LogError(ex, "Payments initiate topup failed.");
+            await CompleteFail(client, job,
+                "PAYMENTS_INITIATE_EXCEPTION",
+                ex.Message,
+                "Initiate TopUp");
         }
-
-        var ok = resp is not null && !string.IsNullOrWhiteSpace(resp.CorrelationId);
-
-        vars.OrderOk = ok;
-        if (!ok)
-        {
-            vars.ErrorCode = "PAYMENTS_INITIATE_FAILED";
-            vars.ErrorMessage = "TopUp initiate edilemedi.";
-        }
-        else
-        {
-            vars.CorrelationId = resp!.CorrelationId;
-            vars.ErrorCode = null;
-            vars.ErrorMessage = null;
-        }
-
-        await Complete(job, client, new
-        {
-            orderOk = vars.OrderOk,
-            correlationId = vars.CorrelationId,
-            errorCode = vars.ErrorCode,
-            errorMessage = vars.ErrorMessage
-        });
     }
 
-    private static TopUpVariables ReadVars(dynamic job)
+    private static async Task CompleteFail(IJobClient client, IJob job, string code, string message, string step)
     {
-        try
+        var completeVars = new
         {
-            var json = (string)job.getVariables();
-            return System.Text.Json.JsonSerializer.Deserialize<TopUpVariables>(json)!;
-        }
-        catch { return new TopUpVariables(); }
-    }
+            orderOk = false,
+            correlationId = (string?)null,
+            status = "Failed",
+            errorCode = code,
+            errorMessage = message,
+            failedAtStep = step
+        };
 
-    private static Task Complete(dynamic job, dynamic client, object variables)
-    {
-        var json = System.Text.Json.JsonSerializer.Serialize(variables);
-        return client.NewCompleteJobCommand(job.getKey()).Variables(json).Send();
+        await client.NewCompleteJobCommand(job.Key)
+            .Variables(JsonSerializer.Serialize(completeVars))
+            .Send();
     }
 }

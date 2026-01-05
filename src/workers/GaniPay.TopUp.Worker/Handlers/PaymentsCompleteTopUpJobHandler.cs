@@ -1,83 +1,108 @@
 ﻿using System.Net.Http.Json;
-using GaniPay.TopUp.Worker.Models;
-using Microsoft.Extensions.Logging;
+using System.Text.Json;
+using Zeebe.Client.Api.Responses;
+using Zeebe.Client.Api.Worker;
 
 namespace GaniPay.TopUp.Worker.Handlers;
 
 public sealed class PaymentsCompleteTopUpJobHandler
 {
-    private readonly IHttpClientFactory _http;
-    private readonly ILogger<PaymentsCompleteTopUpJobHandler> _log;
+    private readonly HttpClient _http;
 
-    public PaymentsCompleteTopUpJobHandler(IHttpClientFactory http, ILogger<PaymentsCompleteTopUpJobHandler> log)
+    public PaymentsCompleteTopUpJobHandler(IHttpClientFactory httpClientFactory)
     {
-        _http = http;
-        _log = log;
+        _http = httpClientFactory.CreateClient("Payments");
     }
 
-    public async Task Handle(dynamic client, dynamic job)
+    public async Task Handle(IJobClient client, IJob job)
     {
-        var vars = ReadVars(job);
-
-        // Bu task Credit OK'tan sonra geldiği için default Success
-        // İstersen process variable’dan finalStatus da okuyabiliriz.
-        short status = 3; // Succeeded
-        if (!string.IsNullOrWhiteSpace(vars.ErrorCode))
-            status = 4; // Failed
-
-        var req = new
-        {
-            correlationId = vars.CorrelationId,
-            status = status,
-            errorCode = vars.ErrorCode,
-            errorMessage = vars.ErrorMessage
-        };
-
-        var http = _http.CreateClient("payments");
-
-        PaymentsStatusUpdateResponse? resp = null;
-
         try
         {
-            var res = await http.PostAsJsonAsync("/api/payments/status", req);
-            res.EnsureSuccessStatusCode();
-            resp = await res.Content.ReadFromJsonAsync<PaymentsStatusUpdateResponse>();
+            using var doc = JsonDocument.Parse(job.Variables);
+            var root = doc.RootElement;
+
+            var correlationId = root.TryGetProperty("correlationId", out var c) ? c.GetString() : null;
+
+            bool creditOk = root.TryGetProperty("creditOk", out var ok) && ok.ValueKind is JsonValueKind.True or JsonValueKind.False
+                ? ok.GetBoolean()
+                : false;
+
+            var errorCode = root.TryGetProperty("errorCode", out var ec) ? ec.GetString() : null;
+            var errorMessage = root.TryGetProperty("errorMessage", out var em) ? em.GetString() : null;
+
+            if (string.IsNullOrWhiteSpace(correlationId))
+            {
+                await CompleteFail(client, job,
+                    "PAYMENTS_COMPLETE_VALIDATION",
+                    "correlationId zorunludur.",
+                    "Complete TopUp");
+                return;
+            }
+
+            var status = creditOk ? "Success" : "Failed";
+
+            var request = new
+            {
+                correlationId,
+                status,
+                errorCode,
+                errorMessage
+            };
+
+            var resp = await _http.PostAsJsonAsync("/api/payments/status", request);
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                await CompleteFail(client, job,
+                    "PAYMENTS_COMPLETE_HTTP_ERROR",
+                    $"Payments status HTTP {(int)resp.StatusCode}",
+                    "Complete TopUp");
+                return;
+            }
+
+            var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+
+            bool okResp =
+                body.ValueKind == JsonValueKind.Object && body.TryGetProperty("ok", out var okp) &&
+                (okp.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                    ? okp.GetBoolean()
+                    : true;
+
+            var completeVars = new
+            {
+                persistOk = okResp,
+                ok = okResp, // BPMN output -> paymentsStatusUpdated
+                errorCode = okResp ? null : "PAYMENTS_STATUS_UPDATE_FAILED",
+                errorMessage = okResp ? null : "Payments status update başarısız.",
+                failedAtStep = okResp ? null : "Complete TopUp"
+            };
+
+            await client.NewCompleteJobCommand(job.Key)
+                .Variables(JsonSerializer.Serialize(completeVars))
+                .Send();
         }
         catch (Exception ex)
         {
-            _log.LogError(ex, "Payments status update failed.");
+            await CompleteFail(client, job,
+                "PAYMENTS_COMPLETE_EXCEPTION",
+                ex.Message,
+                "Complete TopUp");
         }
-
-        var ok = resp is not null && resp.Ok;
-
-        vars.PersistOk = ok;
-        if (!ok)
-        {
-            vars.ErrorCode = "PAYMENTS_STATUS_UPDATE_FAILED";
-            vars.ErrorMessage = "Payment status update başarısız.";
-        }
-
-        await Complete(job, client, new
-        {
-            persistOk = vars.PersistOk,
-            errorCode = vars.ErrorCode,
-            errorMessage = vars.ErrorMessage
-        });
     }
 
-    private static TopUpVariables ReadVars(dynamic job)
+    private static async Task CompleteFail(IJobClient client, IJob job, string code, string message, string step)
     {
-        try
+        var completeVars = new
         {
-            var json = (string)job.getVariables();
-            return System.Text.Json.JsonSerializer.Deserialize<TopUpVariables>(json)!;
-        }
-        catch { return new TopUpVariables(); }
-    }
+            persistOk = false,
+            ok = false,
+            errorCode = code,
+            errorMessage = message,
+            failedAtStep = step
+        };
 
-    private static Task Complete(dynamic job, dynamic client, object variables)
-    {
-        var json = System.Text.Json.JsonSerializer.Serialize(variables);
-        return client.NewCompleteJobCommand(job.getKey()).Variables(json).Send();
+        await client.NewCompleteJobCommand(job.Key)
+            .Variables(JsonSerializer.Serialize(completeVars))
+            .Send();
     }
 }

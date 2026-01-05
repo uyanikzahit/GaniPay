@@ -2,5 +2,6 @@
 
 public sealed class PaymentsApiOptions
 {
-    public string BaseUrl { get; set; } = "https://localhost:7241";
+    public const string SectionName = "Apis:Payments";
+    public string BaseUrl { get; set; } = "http://localhost:7241";
 }

@@ -1,31 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" id="Definitions_GaniPay_TopUp_v1" targetNamespace="http://ganipay.local/bpmn" exporter="Camunda Modeler" exporterVersion="5.40.1">
   <bpmn:process id="topup" name="TopUp" isExecutable="true">
-    <bpmn:startEvent id="StartEvent_TopUp" name="Start">
-      <bpmn:outgoing>Flow_1dl7hhq</bpmn:outgoing>
-    </bpmn:startEvent>
-    <bpmn:serviceTask id="Task_ValidateRequest" name="Validate Request">
-      <bpmn:extensionElements>
-        <zeebe:taskDefinition type="topup.validate" retries="3" />
-        <zeebe:ioMapping>
-          <zeebe:input source="=customerId" target="customerId" />
-          <zeebe:input source="=amount" target="amount" />
-          <zeebe:input source="=currency" target="currency" />
-          <zeebe:input source="=idempotencyKey" target="idempotencyKey" />
-          <zeebe:input source="=correlationId" target="workflowCorrelationId" />
-          <zeebe:output source="=validateOk" target="validateOk" />
-          <zeebe:output source="=errorCode" target="errorCode" />
-          <zeebe:output source="=errorMessage" target="errorMessage" />
-          <zeebe:output source="=failedAtStep" target="failedAtStep" />
-        </zeebe:ioMapping>
-      </bpmn:extensionElements>
-      <bpmn:incoming>Flow_1dl7hhq</bpmn:incoming>
-      <bpmn:outgoing>Flow_0gsl0hg</bpmn:outgoing>
-    </bpmn:serviceTask>
-    <bpmn:exclusiveGateway id="Gw_ValidateOk" name="Validate OK" default="Flow_09935eq">
-      <bpmn:incoming>Flow_0gsl0hg</bpmn:incoming>
-      <bpmn:outgoing>Flow_ValidateOk_To_AccountStatus</bpmn:outgoing>
-      <bpmn:outgoing>Flow_09935eq</bpmn:outgoing>
+    <bpmn:intermediateThrowEvent id="Event_AccountFailed" name="Account Failed">
+      <bpmn:incoming>Flow_0cw67z9</bpmn:incoming>
+      <bpmn:outgoing>Flow_AccountFailed_To_EndJoin</bpmn:outgoing>
+      <bpmn:outgoing>Flow_1x35g4y</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:exclusiveGateway id="Gw_AccountOk" name="Account OK" default="Flow_0cw67z9">
+      <bpmn:incoming>Flow_AccountStatus_To_Gw_Account</bpmn:incoming>
+      <bpmn:outgoing>Flow_AccountOk_To_LimitCheck</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0cw67z9</bpmn:outgoing>
     </bpmn:exclusiveGateway>
     <bpmn:serviceTask id="Task_AccountStatus" name="Account Status Check">
       <bpmn:extensionElements>
@@ -45,85 +29,29 @@
       <bpmn:incoming>Flow_ValidateOk_To_AccountStatus</bpmn:incoming>
       <bpmn:outgoing>Flow_AccountStatus_To_Gw_Account</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:exclusiveGateway id="Gw_AccountOk" name="Account OK" default="Flow_0cw67z9">
-      <bpmn:incoming>Flow_AccountStatus_To_Gw_Account</bpmn:incoming>
-      <bpmn:outgoing>Flow_AccountOk_To_LimitCheck</bpmn:outgoing>
-      <bpmn:outgoing>Flow_0cw67z9</bpmn:outgoing>
-    </bpmn:exclusiveGateway>
-    <bpmn:serviceTask id="Task_LimitCheck" name="Transaction Limit Check">
+    <bpmn:serviceTask id="Task_PersistResult" name="Complete TopUp">
       <bpmn:extensionElements>
-        <zeebe:taskDefinition type="topup.limit.check" retries="3" />
+        <zeebe:taskDefinition type="payments.topup.complete" retries="3" />
         <zeebe:ioMapping>
-          <zeebe:input source="=customerId" target="customerId" />
-          <zeebe:input source="=accountId" target="accountId" />
-          <zeebe:input source="=amount" target="amount" />
-          <zeebe:input source="=currency" target="currency" />
-          <zeebe:output source="=limitOk" target="limitOk" />
-          <zeebe:output source="=limitRemaining" target="limitRemaining" />
-          <zeebe:output source="=limitUsed" target="limitUsed" />
-          <zeebe:output source="=limitTotal" target="limitTotal" />
+          <zeebe:input source="=paymentCorrelationId" target="correlationId" />
+          <zeebe:input source="=creditOk" target="creditOk" />
+          <zeebe:input source="=errorCode" target="errorCode" />
+          <zeebe:input source="=errorMessage" target="errorMessage" />
+          <zeebe:output source="=persistOk" target="persistOk" />
+          <zeebe:output source="=ok" target="paymentsStatusUpdated" />
           <zeebe:output source="=errorCode" target="errorCode" />
           <zeebe:output source="=errorMessage" target="errorMessage" />
           <zeebe:output source="=failedAtStep" target="failedAtStep" />
         </zeebe:ioMapping>
       </bpmn:extensionElements>
-      <bpmn:incoming>Flow_AccountOk_To_LimitCheck</bpmn:incoming>
-      <bpmn:outgoing>Flow_1vfutif</bpmn:outgoing>
+      <bpmn:incoming>Flow_CreditOk_To_Persist</bpmn:incoming>
+      <bpmn:outgoing>Flow_Persist_To_Gw_Persist</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:exclusiveGateway id="Gw_LimitOk" name="Limit OK" default="Flow_0c9zx24">
-      <bpmn:incoming>Flow_1vfutif</bpmn:incoming>
-      <bpmn:outgoing>Flow_LimitOk_To_OrderCreate</bpmn:outgoing>
-      <bpmn:outgoing>Flow_0c9zx24</bpmn:outgoing>
-    </bpmn:exclusiveGateway>
-    <bpmn:serviceTask id="Task_OrderCreate" name="Initiate TopUp">
-      <bpmn:extensionElements>
-        <zeebe:taskDefinition type="payments.topup.initiate" retries="3" />
-        <zeebe:ioMapping>
-          <zeebe:input source="=customerId" target="customerId" />
-          <zeebe:input source="=amount" target="amount" />
-          <zeebe:input source="=currency" target="currency" />
-          <zeebe:input source="=idempotencyKey" target="idempotencyKey" />
-          <zeebe:input source="=correlationId" target="workflowCorrelationId" />
-          <zeebe:output source="=orderOk" target="orderOk" />
-          <zeebe:output source="=correlationId" target="paymentCorrelationId" />
-          <zeebe:output source="=status" target="paymentStatus" />
-          <zeebe:output source="=errorCode" target="errorCode" />
-          <zeebe:output source="=errorMessage" target="errorMessage" />
-          <zeebe:output source="=failedAtStep" target="failedAtStep" />
-        </zeebe:ioMapping>
-      </bpmn:extensionElements>
-      <bpmn:incoming>Flow_LimitOk_To_OrderCreate</bpmn:incoming>
-      <bpmn:outgoing>Flow_15v3udl</bpmn:outgoing>
-    </bpmn:serviceTask>
-    <bpmn:exclusiveGateway id="Gw_OrderOk" name="Order OK" default="Flow_0s90190">
-      <bpmn:incoming>Flow_15v3udl</bpmn:incoming>
-      <bpmn:outgoing>Flow_OrderOk_To_Provider</bpmn:outgoing>
-      <bpmn:outgoing>Flow_0s90190</bpmn:outgoing>
-    </bpmn:exclusiveGateway>
-    <bpmn:serviceTask id="Task_ProviderCharge" name="Provider Charge">
-      <bpmn:extensionElements>
-        <zeebe:taskDefinition type="mock.topup.provider.charge" retries="3" />
-        <zeebe:ioMapping>
-          <zeebe:input source="=paymentCorrelationId" target="paymentCorrelationId" />
-          <zeebe:input source="=customerId" target="customerId" />
-          <zeebe:input source="=amount" target="amount" />
-          <zeebe:input source="=currency" target="currency" />
-          <zeebe:output source="=providerOk" target="providerOk" />
-          <zeebe:output source="=providerStatus" target="providerStatus" />
-          <zeebe:output source="=providerRef" target="providerRef" />
-          <zeebe:output source="=errorCode" target="errorCode" />
-          <zeebe:output source="=errorMessage" target="errorMessage" />
-          <zeebe:output source="=failedAtStep" target="failedAtStep" />
-        </zeebe:ioMapping>
-      </bpmn:extensionElements>
-      <bpmn:incoming>Flow_OrderOk_To_Provider</bpmn:incoming>
-      <bpmn:outgoing>Flow_Provider_To_Gw_Provider</bpmn:outgoing>
-    </bpmn:serviceTask>
-    <bpmn:exclusiveGateway id="Gw_ProviderOk" name="Provider OK" default="Flow_ProviderFail_To_ProviderFailed">
-      <bpmn:incoming>Flow_Provider_To_Gw_Provider</bpmn:incoming>
-      <bpmn:outgoing>Flow_ProviderOk_To_Credit</bpmn:outgoing>
-      <bpmn:outgoing>Flow_ProviderFail_To_ProviderFailed</bpmn:outgoing>
-    </bpmn:exclusiveGateway>
+    <bpmn:intermediateThrowEvent id="Event_CreditFailed" name="Credit Failed">
+      <bpmn:incoming>Flow_0r2ms3z</bpmn:incoming>
+      <bpmn:outgoing>Flow_CreditFailed_To_EndJoin</bpmn:outgoing>
+      <bpmn:outgoing>Flow_18x9sla</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
     <bpmn:serviceTask id="Task_CreditLedger" name="Credit Ledger">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="accounting.topup.credit" retries="3" />
@@ -154,28 +82,176 @@
       <bpmn:outgoing>Flow_CreditOk_To_Persist</bpmn:outgoing>
       <bpmn:outgoing>Flow_0r2ms3z</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:serviceTask id="Task_PersistResult" name="Complete TopUp">
+    <bpmn:endEvent id="EndEvent_TopUp" name="End">
+      <bpmn:incoming>Flow_0fc3unq</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="Gw_EndJoin" name="End Join">
+      <bpmn:incoming>Flow_ValidateFailed_To_EndJoin</bpmn:incoming>
+      <bpmn:incoming>Flow_AccountFailed_To_EndJoin</bpmn:incoming>
+      <bpmn:incoming>Flow_LimitFailed_To_EndJoin</bpmn:incoming>
+      <bpmn:incoming>Flow_OrderFailed_To_EndJoin</bpmn:incoming>
+      <bpmn:incoming>Flow_ProviderFailed_To_EndJoin</bpmn:incoming>
+      <bpmn:incoming>Flow_CreditFailed_To_EndJoin</bpmn:incoming>
+      <bpmn:incoming>Flow_PersistFailed_To_EndJoin</bpmn:incoming>
+      <bpmn:incoming>Flow_NotifyFailed_To_EndJoin</bpmn:incoming>
+      <bpmn:incoming>Flow_0r9564w</bpmn:incoming>
+      <bpmn:incoming>Flow_1jmuvxb</bpmn:incoming>
+      <bpmn:incoming>Flow_1x35g4y</bpmn:incoming>
+      <bpmn:incoming>Flow_16bwcff</bpmn:incoming>
+      <bpmn:incoming>Flow_1xrcphi</bpmn:incoming>
+      <bpmn:incoming>Flow_0ni831r</bpmn:incoming>
+      <bpmn:incoming>Flow_18x9sla</bpmn:incoming>
+      <bpmn:incoming>Flow_0k0fk85</bpmn:incoming>
+      <bpmn:incoming>Flow_0t8nc1l</bpmn:incoming>
+      <bpmn:outgoing>Flow_0fc3unq</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_08fjqvi" sourceRef="Gw_PersistOk" targetRef="Event_PersistFailed" />
+    <bpmn:sequenceFlow id="Flow_09935eq" sourceRef="Gw_ValidateOk" targetRef="Event_ValidateFailed" />
+    <bpmn:sequenceFlow id="Flow_0c9zx24" sourceRef="Gw_LimitOk" targetRef="Event_LimitFailed" />
+    <bpmn:sequenceFlow id="Flow_0cw67z9" sourceRef="Gw_AccountOk" targetRef="Event_AccountFailed" />
+    <bpmn:sequenceFlow id="Flow_0fc3unq" sourceRef="Gw_EndJoin" targetRef="EndEvent_TopUp" />
+    <bpmn:sequenceFlow id="Flow_0gsl0hg" sourceRef="Task_ValidateRequest" targetRef="Gw_ValidateOk" />
+    <bpmn:sequenceFlow id="Flow_0k0fk85" sourceRef="Event_PersistFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_0ni831r" sourceRef="Event_ProviderFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_0r2ms3z" sourceRef="Gw_CreditOk" targetRef="Event_CreditFailed" />
+    <bpmn:sequenceFlow id="Flow_0r9564w" sourceRef="Event_TopUpSuccess" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_0s90190" sourceRef="Gw_OrderOk" targetRef="Event_OrderFailed" />
+    <bpmn:sequenceFlow id="Flow_0t8nc1l" sourceRef="Event_NotifyFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_15v3udl" sourceRef="Task_OrderCreate" targetRef="Gw_OrderOk" />
+    <bpmn:sequenceFlow id="Flow_16bwcff" sourceRef="Event_LimitFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_18x9sla" sourceRef="Event_CreditFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_1dl7hhq" sourceRef="StartEvent_TopUp" targetRef="Task_ValidateRequest" />
+    <bpmn:sequenceFlow id="Flow_1jmuvxb" sourceRef="Event_ValidateFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_1meuv2q" sourceRef="Gw_NotifyOk" targetRef="Event_NotifyFailed" />
+    <bpmn:sequenceFlow id="Flow_1vfutif" sourceRef="Task_LimitCheck" targetRef="Gw_LimitOk" />
+    <bpmn:sequenceFlow id="Flow_1x35g4y" sourceRef="Event_AccountFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_1xrcphi" sourceRef="Event_OrderFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_AccountFailed_To_EndJoin" sourceRef="Event_AccountFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_AccountOk_To_LimitCheck" sourceRef="Gw_AccountOk" targetRef="Task_LimitCheck">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=accountOk=true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_AccountStatus_To_Gw_Account" sourceRef="Task_AccountStatus" targetRef="Gw_AccountOk" />
+    <bpmn:sequenceFlow id="Flow_Credit_To_Gw_Credit" sourceRef="Task_CreditLedger" targetRef="Gw_CreditOk" />
+    <bpmn:sequenceFlow id="Flow_CreditFailed_To_EndJoin" sourceRef="Event_CreditFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_CreditOk_To_Persist" sourceRef="Gw_CreditOk" targetRef="Task_PersistResult">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=creditOk=true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_LimitFailed_To_EndJoin" sourceRef="Event_LimitFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_LimitOk_To_OrderCreate" sourceRef="Gw_LimitOk" targetRef="Task_OrderCreate">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=limitOk=true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Notify_To_Gw_Notify" sourceRef="Task_SendNotification" targetRef="Gw_NotifyOk" />
+    <bpmn:sequenceFlow id="Flow_NotifyFailed_To_EndJoin" sourceRef="Event_NotifyFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_NotifyOk_To_Success" sourceRef="Gw_NotifyOk" targetRef="Event_TopUpSuccess">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=notifyOk=true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_OrderFailed_To_EndJoin" sourceRef="Event_OrderFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_OrderOk_To_Provider" sourceRef="Gw_OrderOk" targetRef="Task_ProviderCharge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=orderOk=true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Persist_To_Gw_Persist" sourceRef="Task_PersistResult" targetRef="Gw_PersistOk" />
+    <bpmn:sequenceFlow id="Flow_PersistFailed_To_EndJoin" sourceRef="Event_PersistFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_PersistOk_To_Notify" sourceRef="Gw_PersistOk" targetRef="Task_SendNotification">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=persistOk=true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Provider_To_Gw_Provider" sourceRef="Task_ProviderCharge" targetRef="Gw_ProviderOk" />
+    <bpmn:sequenceFlow id="Flow_ProviderFail_To_ProviderFailed" sourceRef="Gw_ProviderOk" targetRef="Event_ProviderFailed" />
+    <bpmn:sequenceFlow id="Flow_ProviderFailed_To_EndJoin" sourceRef="Event_ProviderFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_ProviderOk_To_Credit" sourceRef="Gw_ProviderOk" targetRef="Task_CreditLedger">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=providerOk=true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ValidateFailed_To_EndJoin" sourceRef="Event_ValidateFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_ValidateOk_To_AccountStatus" sourceRef="Gw_ValidateOk" targetRef="Task_AccountStatus">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=validateOk=true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:serviceTask id="Task_OrderCreate" name="Initiate TopUp">
       <bpmn:extensionElements>
-        <zeebe:taskDefinition type="payments.topup.complete" retries="3" />
+        <zeebe:taskDefinition type="payments.topup.initiate" retries="3" />
         <zeebe:ioMapping>
-          <zeebe:input source="=paymentCorrelationId" target="correlationId" />
-          <zeebe:input source="=creditOk" target="creditOk" />
-          <zeebe:input source="=errorCode" target="errorCode" />
-          <zeebe:input source="=errorMessage" target="errorMessage" />
-          <zeebe:output source="=persistOk" target="persistOk" />
-          <zeebe:output source="=ok" target="paymentsStatusUpdated" />
+          <zeebe:input source="=customerId" target="customerId" />
+          <zeebe:input source="=amount" target="amount" />
+          <zeebe:input source="=currency" target="currency" />
+          <zeebe:input source="=idempotencyKey" target="idempotencyKey" />
+          <zeebe:input source="=correlationId" target="workflowCorrelationId" />
+          <zeebe:output source="=orderOk" target="orderOk" />
+          <zeebe:output source="=correlationId" target="paymentCorrelationId" />
+          <zeebe:output source="=status" target="paymentStatus" />
           <zeebe:output source="=errorCode" target="errorCode" />
           <zeebe:output source="=errorMessage" target="errorMessage" />
           <zeebe:output source="=failedAtStep" target="failedAtStep" />
         </zeebe:ioMapping>
       </bpmn:extensionElements>
-      <bpmn:incoming>Flow_CreditOk_To_Persist</bpmn:incoming>
-      <bpmn:outgoing>Flow_Persist_To_Gw_Persist</bpmn:outgoing>
+      <bpmn:incoming>Flow_LimitOk_To_OrderCreate</bpmn:incoming>
+      <bpmn:outgoing>Flow_15v3udl</bpmn:outgoing>
     </bpmn:serviceTask>
+    <bpmn:intermediateThrowEvent id="Event_LimitFailed" name="Limit Failed">
+      <bpmn:incoming>Flow_0c9zx24</bpmn:incoming>
+      <bpmn:outgoing>Flow_LimitFailed_To_EndJoin</bpmn:outgoing>
+      <bpmn:outgoing>Flow_16bwcff</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:exclusiveGateway id="Gw_LimitOk" name="Limit OK" default="Flow_0c9zx24">
+      <bpmn:incoming>Flow_1vfutif</bpmn:incoming>
+      <bpmn:outgoing>Flow_LimitOk_To_OrderCreate</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0c9zx24</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateThrowEvent id="Event_NotifyFailed" name="Notify Failed">
+      <bpmn:incoming>Flow_1meuv2q</bpmn:incoming>
+      <bpmn:outgoing>Flow_NotifyFailed_To_EndJoin</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0t8nc1l</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:exclusiveGateway id="Gw_NotifyOk" name="Notify OK" default="Flow_1meuv2q">
+      <bpmn:incoming>Flow_Notify_To_Gw_Notify</bpmn:incoming>
+      <bpmn:outgoing>Flow_NotifyOk_To_Success</bpmn:outgoing>
+      <bpmn:outgoing>Flow_1meuv2q</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateThrowEvent id="Event_OrderFailed" name="Order Failed">
+      <bpmn:incoming>Flow_0s90190</bpmn:incoming>
+      <bpmn:outgoing>Flow_OrderFailed_To_EndJoin</bpmn:outgoing>
+      <bpmn:outgoing>Flow_1xrcphi</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:exclusiveGateway id="Gw_OrderOk" name="Order OK" default="Flow_0s90190">
+      <bpmn:incoming>Flow_15v3udl</bpmn:incoming>
+      <bpmn:outgoing>Flow_OrderOk_To_Provider</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0s90190</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateThrowEvent id="Event_PersistFailed" name="Persist Failed">
+      <bpmn:incoming>Flow_08fjqvi</bpmn:incoming>
+      <bpmn:outgoing>Flow_PersistFailed_To_EndJoin</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0k0fk85</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
     <bpmn:exclusiveGateway id="Gw_PersistOk" name="Persist OK" default="Flow_08fjqvi">
       <bpmn:incoming>Flow_Persist_To_Gw_Persist</bpmn:incoming>
       <bpmn:outgoing>Flow_PersistOk_To_Notify</bpmn:outgoing>
       <bpmn:outgoing>Flow_08fjqvi</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_ProviderCharge" name="Provider Charge">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.topup.provider.charge" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=paymentCorrelationId" target="paymentCorrelationId" />
+          <zeebe:input source="=customerId" target="customerId" />
+          <zeebe:input source="=amount" target="amount" />
+          <zeebe:input source="=currency" target="currency" />
+          <zeebe:output source="=providerOk" target="providerOk" />
+          <zeebe:output source="=providerStatus" target="providerStatus" />
+          <zeebe:output source="=providerRef" target="providerRef" />
+          <zeebe:output source="=errorCode" target="errorCode" />
+          <zeebe:output source="=errorMessage" target="errorMessage" />
+          <zeebe:output source="=failedAtStep" target="failedAtStep" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_OrderOk_To_Provider</bpmn:incoming>
+      <bpmn:outgoing>Flow_Provider_To_Gw_Provider</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:intermediateThrowEvent id="Event_ProviderFailed" name="Provider Failed">
+      <bpmn:incoming>Flow_ProviderFail_To_ProviderFailed</bpmn:incoming>
+      <bpmn:outgoing>Flow_ProviderFailed_To_EndJoin</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0ni831r</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:exclusiveGateway id="Gw_ProviderOk" name="Provider OK" default="Flow_ProviderFail_To_ProviderFailed">
+      <bpmn:incoming>Flow_Provider_To_Gw_Provider</bpmn:incoming>
+      <bpmn:outgoing>Flow_ProviderOk_To_Credit</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ProviderFail_To_ProviderFailed</bpmn:outgoing>
     </bpmn:exclusiveGateway>
     <bpmn:serviceTask id="Task_SendNotification" name="Send Notification">
       <bpmn:extensionElements>
@@ -197,137 +273,60 @@
       <bpmn:incoming>Flow_PersistOk_To_Notify</bpmn:incoming>
       <bpmn:outgoing>Flow_Notify_To_Gw_Notify</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:exclusiveGateway id="Gw_NotifyOk" name="Notify OK" default="Flow_1meuv2q">
-      <bpmn:incoming>Flow_Notify_To_Gw_Notify</bpmn:incoming>
-      <bpmn:outgoing>Flow_NotifyOk_To_Success</bpmn:outgoing>
-      <bpmn:outgoing>Flow_1meuv2q</bpmn:outgoing>
-    </bpmn:exclusiveGateway>
+    <bpmn:startEvent id="StartEvent_TopUp" name="Start">
+      <bpmn:outgoing>Flow_1dl7hhq</bpmn:outgoing>
+    </bpmn:startEvent>
     <bpmn:intermediateThrowEvent id="Event_TopUpSuccess" name="TopUp Success">
       <bpmn:incoming>Flow_NotifyOk_To_Success</bpmn:incoming>
       <bpmn:outgoing>Flow_0r9564w</bpmn:outgoing>
     </bpmn:intermediateThrowEvent>
+    <bpmn:serviceTask id="Task_LimitCheck" name="Transaction Limit Check">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="topup.limit.check" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=customerId" target="customerId" />
+          <zeebe:input source="=accountId" target="accountId" />
+          <zeebe:input source="=amount" target="amount" />
+          <zeebe:input source="=currency" target="currency" />
+          <zeebe:output source="=limitOk" target="limitOk" />
+          <zeebe:output source="=limitRemaining" target="limitRemaining" />
+          <zeebe:output source="=limitUsed" target="limitUsed" />
+          <zeebe:output source="=limitTotal" target="limitTotal" />
+          <zeebe:output source="=errorCode" target="errorCode" />
+          <zeebe:output source="=errorMessage" target="errorMessage" />
+          <zeebe:output source="=failedAtStep" target="failedAtStep" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_AccountOk_To_LimitCheck</bpmn:incoming>
+      <bpmn:outgoing>Flow_1vfutif</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_ValidateOk" name="Validate OK" default="Flow_09935eq">
+      <bpmn:incoming>Flow_0gsl0hg</bpmn:incoming>
+      <bpmn:outgoing>Flow_ValidateOk_To_AccountStatus</bpmn:outgoing>
+      <bpmn:outgoing>Flow_09935eq</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_ValidateRequest" name="Validate Requestee">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="topup.validate" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=customerId" target="customerId" />
+          <zeebe:input source="=amount" target="amount" />
+          <zeebe:input source="=currency" target="currency" />
+          <zeebe:input source="=idempotencyKey" target="idempotencyKey" />
+          <zeebe:output source="=validateOk" target="validateOk" />
+          <zeebe:output source="=errorCode" target="errorCode" />
+          <zeebe:output source="=errorMessage" target="errorMessage" />
+          <zeebe:output source="=failedAtStep" target="failedAtStep" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1dl7hhq</bpmn:incoming>
+      <bpmn:outgoing>Flow_0gsl0hg</bpmn:outgoing>
+    </bpmn:serviceTask>
     <bpmn:intermediateThrowEvent id="Event_ValidateFailed" name="Validation Failed">
       <bpmn:incoming>Flow_09935eq</bpmn:incoming>
       <bpmn:outgoing>Flow_ValidateFailed_To_EndJoin</bpmn:outgoing>
       <bpmn:outgoing>Flow_1jmuvxb</bpmn:outgoing>
     </bpmn:intermediateThrowEvent>
-    <bpmn:intermediateThrowEvent id="Event_AccountFailed" name="Account Failed">
-      <bpmn:incoming>Flow_0cw67z9</bpmn:incoming>
-      <bpmn:outgoing>Flow_AccountFailed_To_EndJoin</bpmn:outgoing>
-      <bpmn:outgoing>Flow_1x35g4y</bpmn:outgoing>
-    </bpmn:intermediateThrowEvent>
-    <bpmn:intermediateThrowEvent id="Event_LimitFailed" name="Limit Failed">
-      <bpmn:incoming>Flow_0c9zx24</bpmn:incoming>
-      <bpmn:outgoing>Flow_LimitFailed_To_EndJoin</bpmn:outgoing>
-      <bpmn:outgoing>Flow_16bwcff</bpmn:outgoing>
-    </bpmn:intermediateThrowEvent>
-    <bpmn:intermediateThrowEvent id="Event_OrderFailed" name="Order Failed">
-      <bpmn:incoming>Flow_0s90190</bpmn:incoming>
-      <bpmn:outgoing>Flow_OrderFailed_To_EndJoin</bpmn:outgoing>
-      <bpmn:outgoing>Flow_1xrcphi</bpmn:outgoing>
-    </bpmn:intermediateThrowEvent>
-    <bpmn:intermediateThrowEvent id="Event_ProviderFailed" name="Provider Failed">
-      <bpmn:incoming>Flow_ProviderFail_To_ProviderFailed</bpmn:incoming>
-      <bpmn:outgoing>Flow_ProviderFailed_To_EndJoin</bpmn:outgoing>
-      <bpmn:outgoing>Flow_0ni831r</bpmn:outgoing>
-    </bpmn:intermediateThrowEvent>
-    <bpmn:intermediateThrowEvent id="Event_CreditFailed" name="Credit Failed">
-      <bpmn:incoming>Flow_0r2ms3z</bpmn:incoming>
-      <bpmn:outgoing>Flow_CreditFailed_To_EndJoin</bpmn:outgoing>
-      <bpmn:outgoing>Flow_18x9sla</bpmn:outgoing>
-    </bpmn:intermediateThrowEvent>
-    <bpmn:intermediateThrowEvent id="Event_PersistFailed" name="Persist Failed">
-      <bpmn:incoming>Flow_08fjqvi</bpmn:incoming>
-      <bpmn:outgoing>Flow_PersistFailed_To_EndJoin</bpmn:outgoing>
-      <bpmn:outgoing>Flow_0k0fk85</bpmn:outgoing>
-    </bpmn:intermediateThrowEvent>
-    <bpmn:intermediateThrowEvent id="Event_NotifyFailed" name="Notify Failed">
-      <bpmn:incoming>Flow_1meuv2q</bpmn:incoming>
-      <bpmn:outgoing>Flow_NotifyFailed_To_EndJoin</bpmn:outgoing>
-      <bpmn:outgoing>Flow_0t8nc1l</bpmn:outgoing>
-    </bpmn:intermediateThrowEvent>
-    <bpmn:exclusiveGateway id="Gw_EndJoin" name="End Join">
-      <bpmn:incoming>Flow_ValidateFailed_To_EndJoin</bpmn:incoming>
-      <bpmn:incoming>Flow_AccountFailed_To_EndJoin</bpmn:incoming>
-      <bpmn:incoming>Flow_LimitFailed_To_EndJoin</bpmn:incoming>
-      <bpmn:incoming>Flow_OrderFailed_To_EndJoin</bpmn:incoming>
-      <bpmn:incoming>Flow_ProviderFailed_To_EndJoin</bpmn:incoming>
-      <bpmn:incoming>Flow_CreditFailed_To_EndJoin</bpmn:incoming>
-      <bpmn:incoming>Flow_PersistFailed_To_EndJoin</bpmn:incoming>
-      <bpmn:incoming>Flow_NotifyFailed_To_EndJoin</bpmn:incoming>
-      <bpmn:incoming>Flow_0r9564w</bpmn:incoming>
-      <bpmn:incoming>Flow_1jmuvxb</bpmn:incoming>
-      <bpmn:incoming>Flow_1x35g4y</bpmn:incoming>
-      <bpmn:incoming>Flow_16bwcff</bpmn:incoming>
-      <bpmn:incoming>Flow_1xrcphi</bpmn:incoming>
-      <bpmn:incoming>Flow_0ni831r</bpmn:incoming>
-      <bpmn:incoming>Flow_18x9sla</bpmn:incoming>
-      <bpmn:incoming>Flow_0k0fk85</bpmn:incoming>
-      <bpmn:incoming>Flow_0t8nc1l</bpmn:incoming>
-      <bpmn:outgoing>Flow_0fc3unq</bpmn:outgoing>
-    </bpmn:exclusiveGateway>
-    <bpmn:endEvent id="EndEvent_TopUp" name="End">
-      <bpmn:incoming>Flow_0fc3unq</bpmn:incoming>
-    </bpmn:endEvent>
-    <bpmn:sequenceFlow id="Flow_ValidateOk_To_AccountStatus" sourceRef="Gw_ValidateOk" targetRef="Task_AccountStatus">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=validateOk=true</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_AccountStatus_To_Gw_Account" sourceRef="Task_AccountStatus" targetRef="Gw_AccountOk" />
-    <bpmn:sequenceFlow id="Flow_AccountOk_To_LimitCheck" sourceRef="Gw_AccountOk" targetRef="Task_LimitCheck">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=accountOk=true</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_LimitOk_To_OrderCreate" sourceRef="Gw_LimitOk" targetRef="Task_OrderCreate">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=limitOk=true</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_OrderOk_To_Provider" sourceRef="Gw_OrderOk" targetRef="Task_ProviderCharge">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=orderOk=true</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_Provider_To_Gw_Provider" sourceRef="Task_ProviderCharge" targetRef="Gw_ProviderOk" />
-    <bpmn:sequenceFlow id="Flow_ProviderOk_To_Credit" sourceRef="Gw_ProviderOk" targetRef="Task_CreditLedger">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=providerOk=true</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_ProviderFail_To_ProviderFailed" sourceRef="Gw_ProviderOk" targetRef="Event_ProviderFailed" />
-    <bpmn:sequenceFlow id="Flow_Credit_To_Gw_Credit" sourceRef="Task_CreditLedger" targetRef="Gw_CreditOk" />
-    <bpmn:sequenceFlow id="Flow_CreditOk_To_Persist" sourceRef="Gw_CreditOk" targetRef="Task_PersistResult">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=creditOk=true</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_Persist_To_Gw_Persist" sourceRef="Task_PersistResult" targetRef="Gw_PersistOk" />
-    <bpmn:sequenceFlow id="Flow_PersistOk_To_Notify" sourceRef="Gw_PersistOk" targetRef="Task_SendNotification">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=persistOk=true</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_Notify_To_Gw_Notify" sourceRef="Task_SendNotification" targetRef="Gw_NotifyOk" />
-    <bpmn:sequenceFlow id="Flow_NotifyOk_To_Success" sourceRef="Gw_NotifyOk" targetRef="Event_TopUpSuccess">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=notifyOk=true</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_ValidateFailed_To_EndJoin" sourceRef="Event_ValidateFailed" targetRef="Gw_EndJoin" />
-    <bpmn:sequenceFlow id="Flow_AccountFailed_To_EndJoin" sourceRef="Event_AccountFailed" targetRef="Gw_EndJoin" />
-    <bpmn:sequenceFlow id="Flow_LimitFailed_To_EndJoin" sourceRef="Event_LimitFailed" targetRef="Gw_EndJoin" />
-    <bpmn:sequenceFlow id="Flow_OrderFailed_To_EndJoin" sourceRef="Event_OrderFailed" targetRef="Gw_EndJoin" />
-    <bpmn:sequenceFlow id="Flow_ProviderFailed_To_EndJoin" sourceRef="Event_ProviderFailed" targetRef="Gw_EndJoin" />
-    <bpmn:sequenceFlow id="Flow_CreditFailed_To_EndJoin" sourceRef="Event_CreditFailed" targetRef="Gw_EndJoin" />
-    <bpmn:sequenceFlow id="Flow_PersistFailed_To_EndJoin" sourceRef="Event_PersistFailed" targetRef="Gw_EndJoin" />
-    <bpmn:sequenceFlow id="Flow_NotifyFailed_To_EndJoin" sourceRef="Event_NotifyFailed" targetRef="Gw_EndJoin" />
-    <bpmn:sequenceFlow id="Flow_0gsl0hg" sourceRef="Task_ValidateRequest" targetRef="Gw_ValidateOk" />
-    <bpmn:sequenceFlow id="Flow_09935eq" sourceRef="Gw_ValidateOk" targetRef="Event_ValidateFailed" />
-    <bpmn:sequenceFlow id="Flow_0cw67z9" sourceRef="Gw_AccountOk" targetRef="Event_AccountFailed" />
-    <bpmn:sequenceFlow id="Flow_1vfutif" sourceRef="Task_LimitCheck" targetRef="Gw_LimitOk" />
-    <bpmn:sequenceFlow id="Flow_0s90190" sourceRef="Gw_OrderOk" targetRef="Event_OrderFailed" />
-    <bpmn:sequenceFlow id="Flow_15v3udl" sourceRef="Task_OrderCreate" targetRef="Gw_OrderOk" />
-    <bpmn:sequenceFlow id="Flow_0r2ms3z" sourceRef="Gw_CreditOk" targetRef="Event_CreditFailed" />
-    <bpmn:sequenceFlow id="Flow_08fjqvi" sourceRef="Gw_PersistOk" targetRef="Event_PersistFailed" />
-    <bpmn:sequenceFlow id="Flow_1meuv2q" sourceRef="Gw_NotifyOk" targetRef="Event_NotifyFailed" />
-    <bpmn:sequenceFlow id="Flow_0r9564w" sourceRef="Event_TopUpSuccess" targetRef="Gw_EndJoin" />
-    <bpmn:sequenceFlow id="Flow_0fc3unq" sourceRef="Gw_EndJoin" targetRef="EndEvent_TopUp" />
-    <bpmn:sequenceFlow id="Flow_1jmuvxb" sourceRef="Event_ValidateFailed" targetRef="Gw_EndJoin" />
-    <bpmn:sequenceFlow id="Flow_1x35g4y" sourceRef="Event_AccountFailed" targetRef="Gw_EndJoin" />
-    <bpmn:sequenceFlow id="Flow_0c9zx24" sourceRef="Gw_LimitOk" targetRef="Event_LimitFailed" />
-    <bpmn:sequenceFlow id="Flow_16bwcff" sourceRef="Event_LimitFailed" targetRef="Gw_EndJoin" />
-    <bpmn:sequenceFlow id="Flow_1xrcphi" sourceRef="Event_OrderFailed" targetRef="Gw_EndJoin" />
-    <bpmn:sequenceFlow id="Flow_0ni831r" sourceRef="Event_ProviderFailed" targetRef="Gw_EndJoin" />
-    <bpmn:sequenceFlow id="Flow_18x9sla" sourceRef="Event_CreditFailed" targetRef="Gw_EndJoin" />
-    <bpmn:sequenceFlow id="Flow_0k0fk85" sourceRef="Event_PersistFailed" targetRef="Gw_EndJoin" />
-    <bpmn:sequenceFlow id="Flow_0t8nc1l" sourceRef="Event_NotifyFailed" targetRef="Gw_EndJoin" />
-    <bpmn:sequenceFlow id="Flow_1dl7hhq" sourceRef="StartEvent_TopUp" targetRef="Task_ValidateRequest" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_TopUp">
     <bpmndi:BPMNPlane id="BPMNPlane_TopUp" bpmnElement="topup">
@@ -339,6 +338,7 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Task_ValidateRequest" bpmnElement="Task_ValidateRequest">
         <dc:Bounds x="260" y="88" width="160" height="80" />
+        <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Gw_ValidateOk" bpmnElement="Gw_ValidateOk" isMarkerVisible="true">
         <dc:Bounds x="445" y="235" width="50" height="50" />

@@ -1,78 +1,111 @@
 ﻿using System.Net.Http.Json;
-using GaniPay.TopUp.Worker.Models;
-using Microsoft.Extensions.Logging;
+using System.Text.Json;
+using Zeebe.Client.Api.Responses;
+using Zeebe.Client.Api.Worker;
 
 namespace GaniPay.TopUp.Worker.Handlers;
 
 public sealed class AccountStatusJobHandler
 {
-    private readonly IHttpClientFactory _http;
-    private readonly ILogger<AccountStatusJobHandler> _log;
+    private readonly HttpClient _http;
 
-    public AccountStatusJobHandler(IHttpClientFactory http, ILogger<AccountStatusJobHandler> log)
+    public AccountStatusJobHandler(IHttpClientFactory httpClientFactory)
     {
-        _http = http;
-        _log = log;
+        _http = httpClientFactory.CreateClient("Accounting");
     }
 
-    public async Task Handle(dynamic client, dynamic job)
+    public async Task Handle(IJobClient client, IJob job)
     {
-        var vars = ReadVars(job);
-
-        // Accounting endpoint:
-        // GET /api/accounting/accounts/status?accountId=...&customerId=...&currency=TRY
-        var http = _http.CreateClient("accounting");
-        var url =
-            $"/api/accounting/accounts/status?accountId={vars.AccountId}&customerId={vars.CustomerId}&currency={vars.Currency}";
-
-        AccountingAccountStatusResponse? resp = null;
-
         try
         {
-            resp = await http.GetFromJsonAsync<AccountingAccountStatusResponse>(url);
+            using var doc = JsonDocument.Parse(job.Variables);
+            var root = doc.RootElement;
+
+            var accountId = root.TryGetProperty("accountId", out var a) ? a.GetString() : null;
+            var customerId = root.TryGetProperty("customerId", out var c) ? c.GetString() : null;
+            var currency = root.TryGetProperty("currency", out var cu) ? cu.GetString() : null;
+
+            if (string.IsNullOrWhiteSpace(accountId))
+            {
+                await CompleteFail(client, job,
+                    "ACCOUNT_ID_REQUIRED",
+                    "accountId zorunludur.",
+                    "Account Status Check");
+                return;
+            }
+
+            // GET /api/accounting/accounts/status?accountId=...&customerId=...&currency=...
+            var url =
+                $"/api/accounting/accounts/status?accountId={Uri.EscapeDataString(accountId)}" +
+                $"&customerId={Uri.EscapeDataString(customerId ?? string.Empty)}" +
+                $"&currency={Uri.EscapeDataString(currency ?? string.Empty)}";
+
+            var resp = await _http.GetAsync(url);
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                await CompleteFail(client, job,
+                    "ACCOUNT_STATUS_HTTP_ERROR",
+                    $"Accounting accounts/status HTTP {(int)resp.StatusCode}",
+                    "Account Status Check");
+                return;
+            }
+
+            // Eğer response body farklıysa bile success => ok kabul ediyoruz
+            var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+
+            bool accountOk = true;
+
+            if (body.ValueKind == JsonValueKind.Object &&
+                body.TryGetProperty("accountOk", out var okProp) &&
+                (okProp.ValueKind == JsonValueKind.True || okProp.ValueKind == JsonValueKind.False))
+            {
+                accountOk = okProp.GetBoolean();
+            }
+
+            string status =
+                body.ValueKind == JsonValueKind.Object && body.TryGetProperty("status", out var st) ? (st.GetString() ?? "Active") : "Active";
+
+            string statusText =
+                body.ValueKind == JsonValueKind.Object && body.TryGetProperty("accountStatusText", out var tx) ? (tx.GetString() ?? "OK") : "OK";
+
+            var completeVars = new
+            {
+                accountOk = accountOk,
+                status = status,                 // BPMN output -> accountStatus
+                accountStatusText = statusText,
+                errorCode = (string?)null,
+                errorMessage = (string?)null,
+                failedAtStep = (string?)null
+            };
+
+            await client.NewCompleteJobCommand(job.Key)
+                .Variables(JsonSerializer.Serialize(completeVars))
+                .Send();
         }
         catch (Exception ex)
         {
-            _log.LogError(ex, "Account status check failed (http).");
+            await CompleteFail(client, job,
+                "ACCOUNT_STATUS_EXCEPTION",
+                ex.Message,
+                "Account Status Check");
         }
-
-        var isActive = resp is not null && resp.Status == 1;
-
-        vars.AccountOk = isActive;
-        if (!isActive)
-        {
-            vars.ErrorCode = "ACCOUNT_NOT_ACTIVE";
-            vars.ErrorMessage = resp is null
-                ? "Accounting account status alınamadı."
-                : $"Account status aktif değil. Status={resp.Status}";
-        }
-        else
-        {
-            vars.ErrorCode = null;
-            vars.ErrorMessage = null;
-        }
-
-        await Complete(job, client, new
-        {
-            accountOk = vars.AccountOk,
-            errorCode = vars.ErrorCode,
-            errorMessage = vars.ErrorMessage
-        });
     }
 
-    private static TopUpVariables ReadVars(dynamic job)
+    private static async Task CompleteFail(IJobClient client, IJob job, string code, string message, string step)
     {
-        try
+        var completeVars = new
         {
-            var json = (string)job.getVariables();
-            return System.Text.Json.JsonSerializer.Deserialize<TopUpVariables>(json)!;
-        }
-        catch { return new TopUpVariables(); }
-    }
+            accountOk = false,
+            status = "Failed",
+            accountStatusText = "FAILED",
+            errorCode = code,
+            errorMessage = message,
+            failedAtStep = step
+        };
 
-    private static Task Complete(dynamic job, dynamic client, object variables)
-    {
-        var json = System.Text.Json.JsonSerializer.Serialize(variables);
-        return client.NewCompleteJobCommand(job.getKey()).Variables(json).Send();
+        await client.NewCompleteJobCommand(job.Key)
+            .Variables(JsonSerializer.Serialize(completeVars))
+            .Send();
     }
 }

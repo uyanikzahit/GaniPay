@@ -2,5 +2,12 @@
 
 public sealed class ZeebeOptions
 {
-    public string GatewayAddress { get; set; } = "127.0.0.1:26500";
+    public const string SectionName = "Zeebe";
+
+    public string GatewayAddress { get; set; } = "localhost:26500";
+
+    // Local dev için genelde plaintext kullanılır.
+    public bool UsePlainText { get; set; } = true;
+
+    // İstersen ileride Camunda Cloud için ek alanlar koyarsın (ClientId/Secret vb.)
 }

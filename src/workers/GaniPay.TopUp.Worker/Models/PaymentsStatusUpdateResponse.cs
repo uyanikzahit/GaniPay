@@ -1,6 +1,8 @@
-﻿namespace GaniPay.TopUp.Worker.Models;
+﻿using System.Text.Json.Serialization;
+
+namespace GaniPay.TopUp.Worker.Models;
 
 public sealed class PaymentsStatusUpdateResponse
 {
-    public bool Ok { get; set; }
+    [JsonPropertyName("ok")] public bool Ok { get; set; }
 }

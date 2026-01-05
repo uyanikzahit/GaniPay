@@ -1,64 +1,58 @@
-﻿using GaniPay.TopUp.Worker.Models;
+﻿using System.Text.Json;
+using Zeebe.Client.Api.Responses;
+using Zeebe.Client.Api.Worker;
 
 namespace GaniPay.TopUp.Worker.Handlers;
 
 public sealed class TopUpMockJobHandler
 {
-    // Aynı handler’ı 3 farklı jobType’a bağlarken “hangi step” olduğunu jobType’tan okuyoruz.
-    public async Task Handle(dynamic client, dynamic job)
+    public async Task Handle(IJobClient client, IJob job)
     {
-        var vars = ReadVars(job);
-        var jobType = (string)job.getType();
+        // job.Type üzerinden hangi mock olduğunu anlıyoruz
+        var type = job.Type;
 
-        // default: true
-        var ok = true;
-
-        // İstersen burada küçük bir profesyonel dokunuş:
-        // amount çok büyükse provider fail simüle et vb.
-        if (jobType == "mock.topup.provider.charge" && vars.Amount > 1_000_000)
-            ok = false;
-
-        if (jobType == "topup.limit.check")
+        object vars = type switch
         {
-            vars.LimitOk = ok;
-            if (!ok) { vars.ErrorCode = "LIMIT_EXCEEDED"; vars.ErrorMessage = "Mock limit fail."; }
-            await Complete(job, client, new { limitOk = vars.LimitOk, errorCode = vars.ErrorCode, errorMessage = vars.ErrorMessage });
-            return;
-        }
+            "topup.limit.check" => new
+            {
+                limitOk = true,
+                limitRemaining = 10_000m,
+                limitUsed = 0m,
+                limitTotal = 10_000m,
+                errorCode = (string?)null,
+                errorMessage = (string?)null,
+                failedAtStep = (string?)null
+            },
 
-        if (jobType == "mock.topup.provider.charge")
-        {
-            vars.ProviderOk = ok;
-            if (!ok) { vars.ErrorCode = "PROVIDER_DECLINED"; vars.ErrorMessage = "Mock provider declined."; }
-            await Complete(job, client, new { providerOk = vars.ProviderOk, errorCode = vars.ErrorCode, errorMessage = vars.ErrorMessage });
-            return;
-        }
+            "mock.topup.provider.charge" => new
+            {
+                providerOk = true,
+                providerStatus = "Charged",
+                providerRef = $"prov_{Guid.NewGuid():N}",
+                errorCode = (string?)null,
+                errorMessage = (string?)null,
+                failedAtStep = (string?)null
+            },
 
-        if (jobType == "mock.topup.notify.send")
-        {
-            vars.NotifyOk = ok;
-            if (!ok) { vars.ErrorCode = "NOTIFY_FAILED"; vars.ErrorMessage = "Mock notify failed."; }
-            await Complete(job, client, new { notifyOk = vars.NotifyOk, errorCode = vars.ErrorCode, errorMessage = vars.ErrorMessage });
-            return;
-        }
+            "mock.topup.notify.send" => new
+            {
+                notifyOk = true,
+                notificationId = $"ntf_{Guid.NewGuid():N}",
+                errorCode = (string?)null,
+                errorMessage = (string?)null,
+                failedAtStep = (string?)null
+            },
 
-        // fallback: just complete
-        await Complete(job, client, new { ok = true });
-    }
+            _ => new
+            {
+                errorCode = "MOCK_UNKNOWN_JOBTYPE",
+                errorMessage = $"Unknown mock jobType: {type}",
+                failedAtStep = "Mock Handler"
+            }
+        };
 
-    private static TopUpVariables ReadVars(dynamic job)
-    {
-        try
-        {
-            var json = (string)job.getVariables();
-            return System.Text.Json.JsonSerializer.Deserialize<TopUpVariables>(json)!;
-        }
-        catch { return new TopUpVariables(); }
-    }
-
-    private static Task Complete(dynamic job, dynamic client, object variables)
-    {
-        var json = System.Text.Json.JsonSerializer.Serialize(variables);
-        return client.NewCompleteJobCommand(job.getKey()).Variables(json).Send();
+        await client.NewCompleteJobCommand(job.Key)
+            .Variables(JsonSerializer.Serialize(vars))
+            .Send();
     }
 }

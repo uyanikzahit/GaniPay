@@ -1,33 +1,31 @@
-﻿namespace GaniPay.TopUp.Worker.Models;
+﻿using System.Text.Json.Serialization;
+
+namespace GaniPay.TopUp.Worker.Models;
 
 public sealed class TopUpVariables
 {
-    public Guid CustomerId { get; set; }
-    public Guid AccountId { get; set; }
+    // Inputs (BPMN)
+    [JsonPropertyName("customerId")] public string? CustomerId { get; set; }
+    [JsonPropertyName("accountId")] public string? AccountId { get; set; }
+    [JsonPropertyName("amount")] public decimal? Amount { get; set; }
+    [JsonPropertyName("currency")] public string? Currency { get; set; }
+    [JsonPropertyName("idempotencyKey")] public string? IdempotencyKey { get; set; }
 
-    public decimal Amount { get; set; }
-    public string Currency { get; set; } = "TRY";
+    // Akış başlangıcında varsa
+    [JsonPropertyName("correlationId")] public string? CorrelationId { get; set; }
 
-    public string? IdempotencyKey { get; set; }
+    // Validate / Initiate input mapping’inde kullandığın isim
+    [JsonPropertyName("workflowCorrelationId")] public string? WorkflowCorrelationId { get; set; }
 
-    // Payments servisinden gelecek
-    public string? CorrelationId { get; set; }
+    // Initiate output ile set edeceğiz
+    [JsonPropertyName("paymentCorrelationId")] public string? PaymentCorrelationId { get; set; }
 
-    // ortak hata alanları
-    public string? ErrorCode { get; set; }
-    public string? ErrorMessage { get; set; }
+    // Akış boyunca durumlar
+    [JsonPropertyName("paymentStatus")] public string? PaymentStatus { get; set; }
+    [JsonPropertyName("accountStatus")] public string? AccountStatus { get; set; }
 
-    // step sonuçları (gateway’leri sürecek)
-    public bool IsValid { get; set; }
-    public bool AccountOk { get; set; }
-    public bool LimitOk { get; set; }
-    public bool OrderOk { get; set; }
-    public bool ProviderOk { get; set; }
-    public bool CreditOk { get; set; }
-    public bool PersistOk { get; set; }
-    public bool NotifyOk { get; set; }
-
-    // Accounting çıktılarını saklamak istersen
-    public string? AccountingTxId { get; set; }
-    public decimal? BalanceAfter { get; set; }
+    // Common error fields
+    [JsonPropertyName("errorCode")] public string? ErrorCode { get; set; }
+    [JsonPropertyName("errorMessage")] public string? ErrorMessage { get; set; }
+    [JsonPropertyName("failedAtStep")] public string? FailedAtStep { get; set; }
 }
