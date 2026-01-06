@@ -1,0 +1,704 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" id="Definitions_Transfer" targetNamespace="http://ganipay.io/bpmn/transfer" exporter="Camunda Modeler" exporterVersion="5.40.1">
+  <bpmn:process id="wallet_to_wallet_transfer" name="Wallet to Wallet Transfer (MVP)" isExecutable="true">
+    <bpmn:startEvent id="StartEvent_Transfer" name="Start (UI/Workflow API)">
+      <bpmn:outgoing>Flow_Start_To_Validate</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="Task_Validate" name="Validate Request">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="transfer.validate" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Start_To_Validate</bpmn:incoming>
+      <bpmn:outgoing>Flow_Validate_To_Gw</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_ValidateOk" name="isValid?">
+      <bpmn:incoming>Flow_Validate_To_Gw</bpmn:incoming>
+      <bpmn:outgoing>Flow_ValidateOk_To_ResolveReceiver</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ValidateFail_To_Ev</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateThrowEvent id="Ev_ValidationFailed" name="Validation Failed">
+      <bpmn:incoming>Flow_ValidateFail_To_Ev</bpmn:incoming>
+      <bpmn:outgoing>Flow_ValidationFailed_To_EndJoin</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:serviceTask id="Task_ResolveReceiver" name="Resolve Receiver (Mock)">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="transfer.receiver.resolve" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ValidateOk_To_ResolveReceiver</bpmn:incoming>
+      <bpmn:outgoing>Flow_ResolveReceiver_To_Gw</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_ReceiverOk" name="receiverResolved?">
+      <bpmn:incoming>Flow_ResolveReceiver_To_Gw</bpmn:incoming>
+      <bpmn:outgoing>Flow_ReceiverOk_To_AccountStatus</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ReceiverFail_To_Ev</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateThrowEvent id="Ev_ReceiverNotFound" name="Receiver Not Found">
+      <bpmn:incoming>Flow_ReceiverFail_To_Ev</bpmn:incoming>
+      <bpmn:outgoing>Flow_ReceiverFailed_To_EndJoin</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:serviceTask id="Task_AccountStatus" name="Account Status Check (Sender+Receiver)">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="accounting.account.status.check" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ReceiverOk_To_AccountStatus</bpmn:incoming>
+      <bpmn:outgoing>Flow_AccountStatus_To_Gw</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_AccountsOk" name="accountsOk?">
+      <bpmn:incoming>Flow_AccountStatus_To_Gw</bpmn:incoming>
+      <bpmn:outgoing>Flow_AccountsOk_To_LimitsSub</bpmn:outgoing>
+      <bpmn:outgoing>Flow_AccountsFail_To_Ev</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateThrowEvent id="Ev_AccountStatusFailed" name="Account Status Failed">
+      <bpmn:incoming>Flow_AccountsFail_To_Ev</bpmn:incoming>
+      <bpmn:outgoing>Flow_AccountsFailed_To_EndJoin</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:subProcess id="Sub_LimitsControl" name="Limits Control (Sender+Receiver)">
+      <bpmn:incoming>Flow_AccountsOk_To_LimitsSub</bpmn:incoming>
+      <bpmn:outgoing>Flow_LimitsSub_To_Gw</bpmn:outgoing>
+      <bpmn:startEvent id="SubStart_Limits" name="Start Limits">
+        <bpmn:outgoing>Flow_SubStart_To_SenderLimit</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:serviceTask id="Task_SenderLimit" name="Sender Limits Check">
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition type="wallet.to.wallet.limits.control" retries="3" />
+        </bpmn:extensionElements>
+        <bpmn:incoming>Flow_SubStart_To_SenderLimit</bpmn:incoming>
+        <bpmn:outgoing>Flow_SenderLimit_To_Gw</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:exclusiveGateway id="Gw_SenderLimitOk" name="senderLimitOk?">
+        <bpmn:incoming>Flow_SenderLimit_To_Gw</bpmn:incoming>
+        <bpmn:outgoing>Flow_SenderLimitOk_To_ReceiverLimit</bpmn:outgoing>
+        <bpmn:outgoing>Flow_SenderLimitFail_To_SubFail</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:serviceTask id="Task_ReceiverLimit" name="Receiver Limits Check">
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition type="wallet.to.wallet.limits.control" retries="3" />
+        </bpmn:extensionElements>
+        <bpmn:incoming>Flow_SenderLimitOk_To_ReceiverLimit</bpmn:incoming>
+        <bpmn:outgoing>Flow_ReceiverLimit_To_Gw</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:exclusiveGateway id="Gw_ReceiverLimitOk" name="receiverLimitOk?">
+        <bpmn:incoming>Flow_ReceiverLimit_To_Gw</bpmn:incoming>
+        <bpmn:outgoing>Flow_ReceiverLimitOk_To_SubOk</bpmn:outgoing>
+        <bpmn:outgoing>Flow_ReceiverLimitFail_To_SubFail</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:endEvent id="SubEnd_LimitsOk" name="Limits OK">
+        <bpmn:incoming>Flow_ReceiverLimitOk_To_SubOk</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:endEvent id="SubEnd_LimitsFail" name="Limits FAIL">
+        <bpmn:incoming>Flow_SenderLimitFail_To_SubFail</bpmn:incoming>
+        <bpmn:incoming>Flow_ReceiverLimitFail_To_SubFail</bpmn:incoming>
+      </bpmn:endEvent>
+    </bpmn:subProcess>
+    <bpmn:exclusiveGateway id="Gw_LimitsOk" name="limitsOk?">
+      <bpmn:incoming>Flow_LimitsSub_To_Gw</bpmn:incoming>
+      <bpmn:outgoing>Flow_LimitsOk_To_Balance</bpmn:outgoing>
+      <bpmn:outgoing>Flow_LimitsFail_To_Ev</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateThrowEvent id="Ev_LimitFailed" name="Limit Failed">
+      <bpmn:incoming>Flow_LimitsFail_To_Ev</bpmn:incoming>
+      <bpmn:outgoing>Flow_LimitFailed_To_EndJoin</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:serviceTask id="Task_BalanceCheck" name="Balance Check (Sender)">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="accounting.balance.check" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_LimitsOk_To_Balance</bpmn:incoming>
+      <bpmn:outgoing>Flow_Balance_To_Gw</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_BalanceOk" name="balanceOk?">
+      <bpmn:incoming>Flow_Balance_To_Gw</bpmn:incoming>
+      <bpmn:outgoing>Flow_BalanceOk_To_Initiate</bpmn:outgoing>
+      <bpmn:outgoing>Flow_BalanceFail_To_Ev</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateThrowEvent id="Ev_InsufficientFunds" name="Insufficient Funds">
+      <bpmn:incoming>Flow_BalanceFail_To_Ev</bpmn:incoming>
+      <bpmn:outgoing>Flow_Insufficient_To_EndJoin</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:serviceTask id="Task_InitiateTransfer" name="Initiate Transfer (Payments)">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="payments.transfer.initiate" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_BalanceOk_To_Initiate</bpmn:incoming>
+      <bpmn:outgoing>Flow_Initiate_To_Gw</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_InitiateOk" name="correlationId set?">
+      <bpmn:incoming>Flow_Initiate_To_Gw</bpmn:incoming>
+      <bpmn:outgoing>Flow_InitiateOk_To_LedgerSub</bpmn:outgoing>
+      <bpmn:outgoing>Flow_InitiateFail_To_Ev</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateThrowEvent id="Ev_InitiateFailed" name="Initiate Failed">
+      <bpmn:incoming>Flow_InitiateFail_To_Ev</bpmn:incoming>
+      <bpmn:outgoing>Flow_InitiateFailed_To_EndJoin</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:subProcess id="Sub_LedgerPosting" name="Ledger Posting (Debit→Credit + Compensation)">
+      <bpmn:incoming>Flow_InitiateOk_To_LedgerSub</bpmn:incoming>
+      <bpmn:outgoing>Flow_LedgerSub_To_Gw</bpmn:outgoing>
+      <bpmn:startEvent id="SubStart_Ledger" name="Start Ledgers">
+        <bpmn:outgoing>Flow_SubLedgerStart_To_Debit</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:serviceTask id="Task_Debit" name="Debit Ledger (Sender)">
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition type="accounting.transfer.debit" retries="3" />
+        </bpmn:extensionElements>
+        <bpmn:incoming>Flow_SubLedgerStart_To_Debit</bpmn:incoming>
+        <bpmn:outgoing>Flow_Debit_To_Gw</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:exclusiveGateway id="Gw_DebitOk" name="debitOk?">
+        <bpmn:incoming>Flow_Debit_To_Gw</bpmn:incoming>
+        <bpmn:outgoing>Flow_DebitOk_To_Credit</bpmn:outgoing>
+        <bpmn:outgoing>Flow_DebitFail_To_SubLedgerFail</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:serviceTask id="Task_Credit" name="Credit Ledger (Receiver)">
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition type="accounting.transfer.credit" retries="3" />
+        </bpmn:extensionElements>
+        <bpmn:incoming>Flow_DebitOk_To_Credit</bpmn:incoming>
+        <bpmn:outgoing>Flow_Credit_To_Gw</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:exclusiveGateway id="Gw_CreditOk" name="creditOk?">
+        <bpmn:incoming>Flow_Credit_To_Gw</bpmn:incoming>
+        <bpmn:outgoing>Flow_CreditOk_To_SubLedgerOk</bpmn:outgoing>
+        <bpmn:outgoing>Flow_CreditFail_To_Compensate</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:endEvent id="SubEnd_LedgerOk" name="Ledger OK">
+        <bpmn:incoming>Flow_CreditOk_To_SubLedgerOk</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:endEvent id="SubEnd_LedgerFail" name="Ledger FAIL">
+        <bpmn:incoming>Flow_DebitFail_To_SubLedgerFail</bpmn:incoming>
+        <bpmn:incoming>Flow_Compensate_To_SubLedgerFail</bpmn:incoming>
+      </bpmn:endEvent>
+    </bpmn:subProcess>
+    <bpmn:exclusiveGateway id="Gw_LedgerOk" name="ledgerOk?">
+      <bpmn:incoming>Flow_LedgerSub_To_Gw</bpmn:incoming>
+      <bpmn:outgoing>Flow_LedgerOk_To_CompleteSuccess</bpmn:outgoing>
+      <bpmn:outgoing>Flow_LedgerFail_To_CompleteFail</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_CompleteSuccess" name="Complete Transfer (Succeeded)">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="payments.transfer.complete" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_LedgerOk_To_CompleteSuccess</bpmn:incoming>
+      <bpmn:outgoing>Flow_CompleteSuccess_To_Notify</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_CompleteFail" name="Complete Transfer (Failed)">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="payments.transfer.complete" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_LedgerFail_To_CompleteFail</bpmn:incoming>
+      <bpmn:outgoing>Flow_CompleteFail_To_Notify</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_Notify" name="Send Notification (Mock)">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.transfer.notify.send" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_CompleteSuccess_To_Notify</bpmn:incoming>
+      <bpmn:incoming>Flow_CompleteFail_To_Notify</bpmn:incoming>
+      <bpmn:outgoing>Flow_Notify_To_Gw</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_NotifyOk" name="notifyOk?">
+      <bpmn:incoming>Flow_Notify_To_Gw</bpmn:incoming>
+      <bpmn:outgoing>Flow_NotifyOk_To_SuccessEv</bpmn:outgoing>
+      <bpmn:outgoing>Flow_NotifyFail_To_Ev</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateThrowEvent id="Ev_NotifyFailed" name="Notify Failed">
+      <bpmn:incoming>Flow_NotifyFail_To_Ev</bpmn:incoming>
+      <bpmn:outgoing>Flow_NotifyFailed_To_EndJoin</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:intermediateThrowEvent id="Ev_TransferSucceeded" name="Transfer Succeeded">
+      <bpmn:incoming>Flow_NotifyOk_To_SuccessEv</bpmn:incoming>
+      <bpmn:outgoing>Flow_SuccessEv_To_EndJoin</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:inclusiveGateway id="Gw_EndJoin" name="End Join">
+      <bpmn:incoming>Flow_ValidationFailed_To_EndJoin</bpmn:incoming>
+      <bpmn:incoming>Flow_ReceiverFailed_To_EndJoin</bpmn:incoming>
+      <bpmn:incoming>Flow_AccountsFailed_To_EndJoin</bpmn:incoming>
+      <bpmn:incoming>Flow_LimitFailed_To_EndJoin</bpmn:incoming>
+      <bpmn:incoming>Flow_Insufficient_To_EndJoin</bpmn:incoming>
+      <bpmn:incoming>Flow_InitiateFailed_To_EndJoin</bpmn:incoming>
+      <bpmn:incoming>Flow_NotifyFailed_To_EndJoin</bpmn:incoming>
+      <bpmn:incoming>Flow_SuccessEv_To_EndJoin</bpmn:incoming>
+      <bpmn:outgoing>Flow_EndJoin_To_End</bpmn:outgoing>
+    </bpmn:inclusiveGateway>
+    <bpmn:endEvent id="EndEvent_Transfer" name="End">
+      <bpmn:incoming>Flow_EndJoin_To_End</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_Start_To_Validate" sourceRef="StartEvent_Transfer" targetRef="Task_Validate" />
+    <bpmn:sequenceFlow id="Flow_Validate_To_Gw" sourceRef="Task_Validate" targetRef="Gw_ValidateOk" />
+    <bpmn:sequenceFlow id="Flow_ValidateOk_To_ResolveReceiver" sourceRef="Gw_ValidateOk" targetRef="Task_ResolveReceiver">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= isValid = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ValidateFail_To_Ev" sourceRef="Gw_ValidateOk" targetRef="Ev_ValidationFailed">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= isValid != true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ValidationFailed_To_EndJoin" sourceRef="Ev_ValidationFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_ResolveReceiver_To_Gw" sourceRef="Task_ResolveReceiver" targetRef="Gw_ReceiverOk" />
+    <bpmn:sequenceFlow id="Flow_ReceiverOk_To_AccountStatus" sourceRef="Gw_ReceiverOk" targetRef="Task_AccountStatus">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= receiverResolved = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ReceiverFail_To_Ev" sourceRef="Gw_ReceiverOk" targetRef="Ev_ReceiverNotFound">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= receiverResolved != true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ReceiverFailed_To_EndJoin" sourceRef="Ev_ReceiverNotFound" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_AccountStatus_To_Gw" sourceRef="Task_AccountStatus" targetRef="Gw_AccountsOk" />
+    <bpmn:sequenceFlow id="Flow_AccountsOk_To_LimitsSub" sourceRef="Gw_AccountsOk" targetRef="Sub_LimitsControl">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= accountsOk = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_AccountsFail_To_Ev" sourceRef="Gw_AccountsOk" targetRef="Ev_AccountStatusFailed">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= accountsOk != true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_AccountsFailed_To_EndJoin" sourceRef="Ev_AccountStatusFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_SubStart_To_SenderLimit" sourceRef="SubStart_Limits" targetRef="Task_SenderLimit" />
+    <bpmn:sequenceFlow id="Flow_SenderLimit_To_Gw" sourceRef="Task_SenderLimit" targetRef="Gw_SenderLimitOk" />
+    <bpmn:sequenceFlow id="Flow_SenderLimitOk_To_ReceiverLimit" sourceRef="Gw_SenderLimitOk" targetRef="Task_ReceiverLimit">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= senderLimitOk = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_SenderLimitFail_To_SubFail" sourceRef="Gw_SenderLimitOk" targetRef="SubEnd_LimitsFail">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= senderLimitOk != true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ReceiverLimit_To_Gw" sourceRef="Task_ReceiverLimit" targetRef="Gw_ReceiverLimitOk" />
+    <bpmn:sequenceFlow id="Flow_ReceiverLimitOk_To_SubOk" sourceRef="Gw_ReceiverLimitOk" targetRef="SubEnd_LimitsOk">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= receiverLimitOk = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ReceiverLimitFail_To_SubFail" sourceRef="Gw_ReceiverLimitOk" targetRef="SubEnd_LimitsFail">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= receiverLimitOk != true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_LimitsSub_To_Gw" sourceRef="Sub_LimitsControl" targetRef="Gw_LimitsOk" />
+    <bpmn:sequenceFlow id="Flow_LimitsOk_To_Balance" sourceRef="Gw_LimitsOk" targetRef="Task_BalanceCheck">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= limitsOk = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_LimitsFail_To_Ev" sourceRef="Gw_LimitsOk" targetRef="Ev_LimitFailed">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= limitsOk != true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_LimitFailed_To_EndJoin" sourceRef="Ev_LimitFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_Balance_To_Gw" sourceRef="Task_BalanceCheck" targetRef="Gw_BalanceOk" />
+    <bpmn:sequenceFlow id="Flow_BalanceOk_To_Initiate" sourceRef="Gw_BalanceOk" targetRef="Task_InitiateTransfer">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= balanceOk = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_BalanceFail_To_Ev" sourceRef="Gw_BalanceOk" targetRef="Ev_InsufficientFunds">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= balanceOk != true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Insufficient_To_EndJoin" sourceRef="Ev_InsufficientFunds" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_Initiate_To_Gw" sourceRef="Task_InitiateTransfer" targetRef="Gw_InitiateOk" />
+    <bpmn:sequenceFlow id="Flow_InitiateOk_To_LedgerSub" sourceRef="Gw_InitiateOk" targetRef="Sub_LedgerPosting">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= correlationId != null and correlationId != ""</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_InitiateFail_To_Ev" sourceRef="Gw_InitiateOk" targetRef="Ev_InitiateFailed">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= correlationId = null or correlationId = ""</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_InitiateFailed_To_EndJoin" sourceRef="Ev_InitiateFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_SubLedgerStart_To_Debit" sourceRef="SubStart_Ledger" targetRef="Task_Debit" />
+    <bpmn:sequenceFlow id="Flow_Debit_To_Gw" sourceRef="Task_Debit" targetRef="Gw_DebitOk" />
+    <bpmn:sequenceFlow id="Flow_DebitOk_To_Credit" sourceRef="Gw_DebitOk" targetRef="Task_Credit">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= debitOk = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_DebitFail_To_SubLedgerFail" sourceRef="Gw_DebitOk" targetRef="SubEnd_LedgerFail">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= debitOk != true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Credit_To_Gw" sourceRef="Task_Credit" targetRef="Gw_CreditOk" />
+    <bpmn:sequenceFlow id="Flow_CreditOk_To_SubLedgerOk" sourceRef="Gw_CreditOk" targetRef="SubEnd_LedgerOk">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= creditOk = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_CreditFail_To_Compensate" sourceRef="Gw_CreditOk" targetRef="Task_Compensate">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= creditOk != true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Compensate_To_SubLedgerFail" sourceRef="Task_Compensate" targetRef="SubEnd_LedgerFail" />
+    <bpmn:sequenceFlow id="Flow_LedgerSub_To_Gw" sourceRef="Sub_LedgerPosting" targetRef="Gw_LedgerOk" />
+    <bpmn:sequenceFlow id="Flow_LedgerOk_To_CompleteSuccess" sourceRef="Gw_LedgerOk" targetRef="Task_CompleteSuccess">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= ledgerOk = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_LedgerFail_To_CompleteFail" sourceRef="Gw_LedgerOk" targetRef="Task_CompleteFail">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= ledgerOk != true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_CompleteSuccess_To_Notify" sourceRef="Task_CompleteSuccess" targetRef="Task_Notify" />
+    <bpmn:sequenceFlow id="Flow_CompleteFail_To_Notify" sourceRef="Task_CompleteFail" targetRef="Task_Notify" />
+    <bpmn:sequenceFlow id="Flow_Notify_To_Gw" sourceRef="Task_Notify" targetRef="Gw_NotifyOk" />
+    <bpmn:sequenceFlow id="Flow_NotifyOk_To_SuccessEv" sourceRef="Gw_NotifyOk" targetRef="Ev_TransferSucceeded">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= notifyOk = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_NotifyFail_To_Ev" sourceRef="Gw_NotifyOk" targetRef="Ev_NotifyFailed">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">= notifyOk != true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_NotifyFailed_To_EndJoin" sourceRef="Ev_NotifyFailed" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_SuccessEv_To_EndJoin" sourceRef="Ev_TransferSucceeded" targetRef="Gw_EndJoin" />
+    <bpmn:sequenceFlow id="Flow_EndJoin_To_End" sourceRef="Gw_EndJoin" targetRef="EndEvent_Transfer" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Transfer">
+    <bpmndi:BPMNPlane id="BPMNPlane_Transfer" bpmnElement="wallet_to_wallet_transfer">
+      <bpmndi:BPMNShape id="Shape_Start" bpmnElement="StartEvent_Transfer">
+        <dc:Bounds x="180" y="180" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="155" y="216" width="87" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Validate" bpmnElement="Task_Validate">
+        <dc:Bounds x="260" y="160" width="140" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_GwValidate" bpmnElement="Gw_ValidateOk" isMarkerVisible="true">
+        <dc:Bounds x="430" y="175" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="436" y="225" width="38" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EvValidationFailed" bpmnElement="Ev_ValidationFailed">
+        <dc:Bounds x="450" y="300" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="428" y="336" width="80" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Resolve" bpmnElement="Task_ResolveReceiver">
+        <dc:Bounds x="510" y="160" width="170" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_GwReceiver" bpmnElement="Gw_ReceiverOk" isMarkerVisible="true">
+        <dc:Bounds x="710" y="175" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="693" y="225" width="85" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EvReceiverFail" bpmnElement="Ev_ReceiverNotFound">
+        <dc:Bounds x="730" y="300" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="716" y="336" width="65" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_AccStatus" bpmnElement="Task_AccountStatus">
+        <dc:Bounds x="790" y="160" width="200" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_GwAccounts" bpmnElement="Gw_AccountsOk" isMarkerVisible="true">
+        <dc:Bounds x="1020" y="175" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1013" y="225" width="65" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EvAccountsFail" bpmnElement="Ev_AccountStatusFailed">
+        <dc:Bounds x="1040" y="300" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1021" y="336" width="74" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EvNotifyFail" bpmnElement="Ev_NotifyFailed">
+        <dc:Bounds x="3627" y="300" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3559" y="311" width="62" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_SubLimits" bpmnElement="Sub_LimitsControl" isExpanded="true">
+        <dc:Bounds x="1100" y="120" width="560" height="170" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_SubStartLimits" bpmnElement="SubStart_Limits">
+        <dc:Bounds x="1125" y="185" width="30" height="30" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1112" y="215" width="56" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_SenderLimit" bpmnElement="Task_SenderLimit">
+        <dc:Bounds x="1170" y="160" width="170" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_GwSenderLimit" bpmnElement="Gw_SenderLimitOk" isMarkerVisible="true">
+        <dc:Bounds x="1355" y="175" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1341" y="225" width="78" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_ReceiverLimit" bpmnElement="Task_ReceiverLimit">
+        <dc:Bounds x="1420" y="160" width="180" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_GwReceiverLimit" bpmnElement="Gw_ReceiverLimitOk" isMarkerVisible="true">
+        <dc:Bounds x="1615" y="175" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1599" y="225" width="83" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_SubEndLimitsOk" bpmnElement="SubEnd_LimitsOk">
+        <dc:Bounds x="1675" y="185" width="30" height="30" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1666" y="215" width="49" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_SubEndLimitsFail" bpmnElement="SubEnd_LimitsFail">
+        <dc:Bounds x="1380" y="245" width="30" height="30" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1367" y="275" width="56" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_GwLimits" bpmnElement="Gw_LimitsOk" isMarkerVisible="true">
+        <dc:Bounds x="1685" y="175" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1687" y="225" width="46" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EvLimitFail" bpmnElement="Ev_LimitFailed">
+        <dc:Bounds x="1710" y="300" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1700" y="336" width="57" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Balance" bpmnElement="Task_BalanceCheck">
+        <dc:Bounds x="1770" y="160" width="180" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_GwBalance" bpmnElement="Gw_BalanceOk" isMarkerVisible="true">
+        <dc:Bounds x="1970" y="175" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1966" y="225" width="59" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EvFundsFail" bpmnElement="Ev_InsufficientFunds">
+        <dc:Bounds x="1990" y="300" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1965" y="336" width="87" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Initiate" bpmnElement="Task_InitiateTransfer">
+        <dc:Bounds x="2050" y="160" width="190" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_GwInitiate" bpmnElement="Gw_InitiateOk" isMarkerVisible="true">
+        <dc:Bounds x="2260" y="175" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2243" y="225" width="85" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EvInitiateFail" bpmnElement="Ev_InitiateFailed">
+        <dc:Bounds x="2280" y="300" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2265" y="336" width="66" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_SubLedger" bpmnElement="Sub_LedgerPosting" isExpanded="true">
+        <dc:Bounds x="2350" y="110" width="700" height="190" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_SubStartLedger" bpmnElement="SubStart_Ledger">
+        <dc:Bounds x="2375" y="195" width="30" height="30" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2357" y="225" width="67" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Debit" bpmnElement="Task_Debit">
+        <dc:Bounds x="2420" y="165" width="160" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_GwDebit" bpmnElement="Gw_DebitOk" isMarkerVisible="true">
+        <dc:Bounds x="2595" y="180" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2598" y="230" width="45" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Credit" bpmnElement="Task_Credit">
+        <dc:Bounds x="2660" y="165" width="170" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_GwCredit" bpmnElement="Gw_CreditOk" isMarkerVisible="true">
+        <dc:Bounds x="2845" y="180" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2846" y="230" width="48" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_SubEndLedgerOk" bpmnElement="SubEnd_LedgerOk">
+        <dc:Bounds x="2910" y="195" width="30" height="30" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2898" y="225" width="54" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_SubEndLedgerFail" bpmnElement="SubEnd_LedgerFail">
+        <dc:Bounds x="2640" y="255" width="30" height="30" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2625" y="285" width="61" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_GwLedger" bpmnElement="Gw_LedgerOk" isMarkerVisible="true">
+        <dc:Bounds x="3070" y="175" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3070" y="225" width="51" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_CompleteSuccess" bpmnElement="Task_CompleteSuccess">
+        <dc:Bounds x="3150" y="135" width="200" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_CompleteFail" bpmnElement="Task_CompleteFail">
+        <dc:Bounds x="3150" y="235" width="200" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Notify" bpmnElement="Task_Notify">
+        <dc:Bounds x="3390" y="175" width="210" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_GwNotify" bpmnElement="Gw_NotifyOk" isMarkerVisible="true">
+        <dc:Bounds x="3620" y="190" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3621" y="166" width="47" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EvSuccess" bpmnElement="Ev_TransferSucceeded">
+        <dc:Bounds x="3720" y="195" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3710" y="231" width="56" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EndJoin" bpmnElement="Gw_EndJoin" isMarkerVisible="true">
+        <dc:Bounds x="3830" y="190" width="60" height="60" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3838" y="163" width="43" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_End" bpmnElement="EndEvent_Transfer">
+        <dc:Bounds x="3950" y="200" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3958" y="236" width="20" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_Flow_Start_To_Validate" bpmnElement="Flow_Start_To_Validate">
+        <di:waypoint x="216" y="198" />
+        <di:waypoint x="260" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Validate_To_Gw" bpmnElement="Flow_Validate_To_Gw">
+        <di:waypoint x="400" y="200" />
+        <di:waypoint x="430" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_ValidateOk_To_ResolveReceiver" bpmnElement="Flow_ValidateOk_To_ResolveReceiver">
+        <di:waypoint x="480" y="200" />
+        <di:waypoint x="510" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_ValidateFail_To_Ev" bpmnElement="Flow_ValidateFail_To_Ev">
+        <di:waypoint x="455" y="225" />
+        <di:waypoint x="455" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_ValidationFailed_To_EndJoin" bpmnElement="Flow_ValidationFailed_To_EndJoin">
+        <di:waypoint x="468" y="318" />
+        <di:waypoint x="468" y="400" />
+        <di:waypoint x="3860" y="400" />
+        <di:waypoint x="3860" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_ResolveReceiver_To_Gw" bpmnElement="Flow_ResolveReceiver_To_Gw">
+        <di:waypoint x="680" y="200" />
+        <di:waypoint x="710" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_ReceiverOk_To_AccountStatus" bpmnElement="Flow_ReceiverOk_To_AccountStatus">
+        <di:waypoint x="760" y="200" />
+        <di:waypoint x="790" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_ReceiverFail_To_Ev" bpmnElement="Flow_ReceiverFail_To_Ev">
+        <di:waypoint x="735" y="225" />
+        <di:waypoint x="735" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_ReceiverFailed_To_EndJoin" bpmnElement="Flow_ReceiverFailed_To_EndJoin">
+        <di:waypoint x="748" y="318" />
+        <di:waypoint x="748" y="420" />
+        <di:waypoint x="3860" y="420" />
+        <di:waypoint x="3860" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_AccountStatus_To_Gw" bpmnElement="Flow_AccountStatus_To_Gw">
+        <di:waypoint x="990" y="200" />
+        <di:waypoint x="1020" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_AccountsOk_To_LimitsSub" bpmnElement="Flow_AccountsOk_To_LimitsSub">
+        <di:waypoint x="1070" y="200" />
+        <di:waypoint x="1100" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_AccountsFail_To_Ev" bpmnElement="Flow_AccountsFail_To_Ev">
+        <di:waypoint x="1045" y="225" />
+        <di:waypoint x="1045" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_AccountsFailed_To_EndJoin" bpmnElement="Flow_AccountsFailed_To_EndJoin">
+        <di:waypoint x="1058" y="318" />
+        <di:waypoint x="1058" y="440" />
+        <di:waypoint x="3860" y="440" />
+        <di:waypoint x="3860" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_LimitsSub_To_Gw" bpmnElement="Flow_LimitsSub_To_Gw">
+        <di:waypoint x="1660" y="205" />
+        <di:waypoint x="1685" y="205" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_LimitsOk_To_Balance" bpmnElement="Flow_LimitsOk_To_Balance">
+        <di:waypoint x="1735" y="205" />
+        <di:waypoint x="1770" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_LimitsFail_To_Ev" bpmnElement="Flow_LimitsFail_To_Ev">
+        <di:waypoint x="1710" y="230" />
+        <di:waypoint x="1710" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_LimitFailed_To_EndJoin" bpmnElement="Flow_LimitFailed_To_EndJoin">
+        <di:waypoint x="1728" y="318" />
+        <di:waypoint x="1728" y="460" />
+        <di:waypoint x="3860" y="460" />
+        <di:waypoint x="3860" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Balance_To_Gw" bpmnElement="Flow_Balance_To_Gw">
+        <di:waypoint x="1950" y="200" />
+        <di:waypoint x="1970" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_BalanceOk_To_Initiate" bpmnElement="Flow_BalanceOk_To_Initiate">
+        <di:waypoint x="2020" y="200" />
+        <di:waypoint x="2050" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_BalanceFail_To_Ev" bpmnElement="Flow_BalanceFail_To_Ev">
+        <di:waypoint x="1995" y="225" />
+        <di:waypoint x="1995" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Insufficient_To_EndJoin" bpmnElement="Flow_Insufficient_To_EndJoin">
+        <di:waypoint x="2008" y="318" />
+        <di:waypoint x="2008" y="480" />
+        <di:waypoint x="3860" y="480" />
+        <di:waypoint x="3860" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Initiate_To_Gw" bpmnElement="Flow_Initiate_To_Gw">
+        <di:waypoint x="2240" y="200" />
+        <di:waypoint x="2260" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_InitiateOk_To_LedgerSub" bpmnElement="Flow_InitiateOk_To_LedgerSub">
+        <di:waypoint x="2310" y="200" />
+        <di:waypoint x="2350" y="205" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_InitiateFail_To_Ev" bpmnElement="Flow_InitiateFail_To_Ev">
+        <di:waypoint x="2285" y="225" />
+        <di:waypoint x="2285" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_InitiateFailed_To_EndJoin" bpmnElement="Flow_InitiateFailed_To_EndJoin">
+        <di:waypoint x="2298" y="318" />
+        <di:waypoint x="2298" y="500" />
+        <di:waypoint x="3860" y="500" />
+        <di:waypoint x="3860" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_LedgerSub_To_Gw" bpmnElement="Flow_LedgerSub_To_Gw">
+        <di:waypoint x="3050" y="205" />
+        <di:waypoint x="3070" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_LedgerOk_To_CompleteSuccess" bpmnElement="Flow_LedgerOk_To_CompleteSuccess">
+        <di:waypoint x="3120" y="195" />
+        <di:waypoint x="3150" y="175" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_LedgerFail_To_CompleteFail" bpmnElement="Flow_LedgerFail_To_CompleteFail">
+        <di:waypoint x="3120" y="210" />
+        <di:waypoint x="3150" y="275" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_CompleteSuccess_To_Notify" bpmnElement="Flow_CompleteSuccess_To_Notify">
+        <di:waypoint x="3350" y="175" />
+        <di:waypoint x="3390" y="215" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_CompleteFail_To_Notify" bpmnElement="Flow_CompleteFail_To_Notify">
+        <di:waypoint x="3350" y="275" />
+        <di:waypoint x="3390" y="215" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_Notify_To_Gw" bpmnElement="Flow_Notify_To_Gw">
+        <di:waypoint x="3600" y="215" />
+        <di:waypoint x="3620" y="215" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_NotifyOk_To_SuccessEv" bpmnElement="Flow_NotifyOk_To_SuccessEv">
+        <di:waypoint x="3670" y="215" />
+        <di:waypoint x="3720" y="213" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_NotifyFail_To_Ev" bpmnElement="Flow_NotifyFail_To_Ev">
+        <di:waypoint x="3645" y="240" />
+        <di:waypoint x="3645" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_NotifyFailed_To_EndJoin" bpmnElement="Flow_NotifyFailed_To_EndJoin">
+        <di:waypoint x="3645" y="336" />
+        <di:waypoint x="3645" y="520" />
+        <di:waypoint x="3860" y="520" />
+        <di:waypoint x="3860" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_SuccessEv_To_EndJoin" bpmnElement="Flow_SuccessEv_To_EndJoin">
+        <di:waypoint x="3756" y="213" />
+        <di:waypoint x="3830" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Flow_EndJoin_To_End" bpmnElement="Flow_EndJoin_To_End">
+        <di:waypoint x="3890" y="220" />
+        <di:waypoint x="3950" y="218" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

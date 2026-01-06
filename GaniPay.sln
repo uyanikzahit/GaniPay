@@ -171,6 +171,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GaniPay.Login.Worker", "src
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GaniPay.TopUp.Worker", "src\workers\GaniPay.TopUp.Worker\GaniPay.TopUp.Worker.csproj", "{0ECFD3FB-863E-3BC5-C539-CE2B21CDC771}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GaniPay.LimitsControl.Worker", "src\workers\GaniPay.LimitsControl.Worker\GaniPay.LimitsControl.Worker.csproj", "{77262ECA-8FF1-8228-F2C6-FD9A015E6487}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -661,6 +663,18 @@ Global
 		{0ECFD3FB-863E-3BC5-C539-CE2B21CDC771}.Release|x64.Build.0 = Release|Any CPU
 		{0ECFD3FB-863E-3BC5-C539-CE2B21CDC771}.Release|x86.ActiveCfg = Release|Any CPU
 		{0ECFD3FB-863E-3BC5-C539-CE2B21CDC771}.Release|x86.Build.0 = Release|Any CPU
+		{77262ECA-8FF1-8228-F2C6-FD9A015E6487}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{77262ECA-8FF1-8228-F2C6-FD9A015E6487}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{77262ECA-8FF1-8228-F2C6-FD9A015E6487}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{77262ECA-8FF1-8228-F2C6-FD9A015E6487}.Debug|x64.Build.0 = Debug|Any CPU
+		{77262ECA-8FF1-8228-F2C6-FD9A015E6487}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{77262ECA-8FF1-8228-F2C6-FD9A015E6487}.Debug|x86.Build.0 = Debug|Any CPU
+		{77262ECA-8FF1-8228-F2C6-FD9A015E6487}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{77262ECA-8FF1-8228-F2C6-FD9A015E6487}.Release|Any CPU.Build.0 = Release|Any CPU
+		{77262ECA-8FF1-8228-F2C6-FD9A015E6487}.Release|x64.ActiveCfg = Release|Any CPU
+		{77262ECA-8FF1-8228-F2C6-FD9A015E6487}.Release|x64.Build.0 = Release|Any CPU
+		{77262ECA-8FF1-8228-F2C6-FD9A015E6487}.Release|x86.ActiveCfg = Release|Any CPU
+		{77262ECA-8FF1-8228-F2C6-FD9A015E6487}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -747,6 +761,7 @@ Global
 		{F36E8944-8BB0-4162-97CB-4B5B00C89A6B} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{961A5194-D1B5-4A98-B31C-1569F8278535} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{0ECFD3FB-863E-3BC5-C539-CE2B21CDC771} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+		{77262ECA-8FF1-8228-F2C6-FD9A015E6487} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {65C888F5-C115-40B8-91C0-BD5F26B2BEAF}
