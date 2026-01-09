@@ -98,11 +98,17 @@
     <bpmn:callActivity id="Activity_1h6lifd" name="Sender Limits Check">
       <bpmn:extensionElements>
         <zeebe:calledElement processId="wallet_system_limits_control" propagateAllChildVariables="false" />
+        <zeebe:ioMapping>
+          <zeebe:output source="=senderLimitsOk" target="limitOk" />
+          <zeebe:output source="=senderLimitReason" target="limitReason" />
+          <zeebe:output source="=errorCode" target="errorCode" />
+          <zeebe:output source="=errorMessage" target="errorMessage" />
+        </zeebe:ioMapping>
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_1vv5mh6</bpmn:incoming>
       <bpmn:outgoing>Flow_1uuphh1</bpmn:outgoing>
     </bpmn:callActivity>
-    <bpmn:exclusiveGateway id="Gateway_0189u5v" name="Sender Limits Ok" default="Flow_1sxy0yb">
+    <bpmn:exclusiveGateway id="Gateway_0189u5v" name="Sender Limits Ok" default="Flow_1yu5hkn">
       <bpmn:incoming>Flow_1uuphh1</bpmn:incoming>
       <bpmn:outgoing>Flow_1sxy0yb</bpmn:outgoing>
       <bpmn:outgoing>Flow_1yu5hkn</bpmn:outgoing>
@@ -228,7 +234,7 @@
     </bpmn:parallelGateway>
     <bpmn:serviceTask id="Task_Notify" name="Receiver Balance Increase">
       <bpmn:extensionElements>
-        <zeebe:taskDefinition type="notification.send.sender" retries="3" />
+        <zeebe:taskDefinition type="receiver.balance.increase" retries="3" />
         <zeebe:ioMapping>
           <zeebe:input source="=paymentsCorrelationId" target="correlationId" />
           <zeebe:output source="=receiverNotifyMessageId" target="receiverNotifyMessageId" />
@@ -239,7 +245,7 @@
     </bpmn:serviceTask>
     <bpmn:serviceTask id="Activity_0p4glwh" name="Sender Balance Decrease">
       <bpmn:extensionElements>
-        <zeebe:taskDefinition type="notification.send.receiver" retries="3" />
+        <zeebe:taskDefinition type="sender.balance.decrease" retries="3" />
         <zeebe:ioMapping>
           <zeebe:input source="=paymentsCorrelationId" target="correlationId" />
           <zeebe:output source="=senderNotifyMessageId" target="senderNotifyMessageId" />
@@ -308,10 +314,10 @@
     <bpmn:sequenceFlow id="Flow_1vv5mh6" sourceRef="Gw_ReceiverOk" targetRef="Activity_1h6lifd" />
     <bpmn:sequenceFlow id="Flow_ReceiverFailed_To_EndJoin" sourceRef="Ev_ReceiverNotFound" targetRef="Gw_EndJoin" />
     <bpmn:sequenceFlow id="Flow_1uuphh1" sourceRef="Activity_1h6lifd" targetRef="Gateway_0189u5v" />
-    <bpmn:sequenceFlow id="Flow_1sxy0yb" sourceRef="Gateway_0189u5v" targetRef="Activity_0bhergz" />
-    <bpmn:sequenceFlow id="Flow_1yu5hkn" sourceRef="Gateway_0189u5v" targetRef="Event_1dohpmf">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=senderLimitOk != true</bpmn:conditionExpression>
+    <bpmn:sequenceFlow id="Flow_1sxy0yb" sourceRef="Gateway_0189u5v" targetRef="Activity_0bhergz">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=senderLimitsOk = true</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_1yu5hkn" sourceRef="Gateway_0189u5v" targetRef="Event_1dohpmf" />
     <bpmn:sequenceFlow id="Flow_1d65j9d" sourceRef="Event_1dohpmf" targetRef="Gw_EndJoin" />
     <bpmn:sequenceFlow id="Flow_1mkroxn" sourceRef="Activity_0bhergz" targetRef="Gw_LimitsOk" />
     <bpmn:sequenceFlow id="Flow_LimitsFail_To_Ev" sourceRef="Gw_LimitsOk" targetRef="Ev_LimitFailed">
@@ -360,6 +366,7 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Activity_0vz11x8_di" bpmnElement="Activity_1nn2gba">
         <dc:Bounds x="260" y="160" width="100" height="80" />
+        <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_1jvrq2n_di" bpmnElement="Gateway_1jvrq2n" isMarkerVisible="true">
         <dc:Bounds x="435" y="175" width="50" height="50" />
@@ -372,6 +379,7 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Activity_0vxo36m_di" bpmnElement="Activity_1g848c7">
         <dc:Bounds x="560" y="160" width="100" height="80" />
+        <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_1be95qb_di" bpmnElement="Gateway_1be95qb" isMarkerVisible="true">
         <dc:Bounds x="755" y="175" width="50" height="50" />
@@ -432,6 +440,7 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Activity_1kdwun2_di" bpmnElement="Activity_0m6rzx5">
         <dc:Bounds x="2000" y="160" width="100" height="80" />
+        <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_0zixx1r_di" bpmnElement="Gateway_0zixx1r" isMarkerVisible="true">
         <dc:Bounds x="2175" y="175" width="50" height="50" />
