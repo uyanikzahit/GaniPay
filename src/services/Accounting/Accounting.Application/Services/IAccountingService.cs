@@ -13,4 +13,6 @@ public interface IAccountingService
     Task<UsageResultDto> GetUsageAsync(UsageQueryRequest request, CancellationToken ct);
     Task<AccountStatusDto> GetAccountStatusAsync(Guid customerId, string currency, CancellationToken ct);
 
+    Task<CustomerWalletsDto> GetCustomerWalletsAsync(Guid customerId, CancellationToken ct);
+
 }

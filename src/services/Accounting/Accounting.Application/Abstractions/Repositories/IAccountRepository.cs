@@ -10,4 +10,6 @@ public interface IAccountRepository
     Task AddAsync(Account account, CancellationToken ct = default);
     Task UpdateAsync(Account account, CancellationToken ct = default);
 
+    Task<List<Account>> ListByCustomerIdAsync(Guid customerId, CancellationToken ct);
+
 }

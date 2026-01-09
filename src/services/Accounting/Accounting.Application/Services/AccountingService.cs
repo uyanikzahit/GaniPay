@@ -4,6 +4,7 @@ using GaniPay.Accounting.Application.Contracts.Dtos;
 using GaniPay.Accounting.Application.Contracts.Requests;
 using GaniPay.Accounting.Domain.Entities;
 using GaniPay.Accounting.Domain.Enums;
+using System.Linq;
 
 namespace GaniPay.Accounting.Application.Services;
 
@@ -283,6 +284,26 @@ public sealed class AccountingService : IAccountingService
             Currency: account.Currency,
             Status: (int)account.Status
         );
+    }
+
+    public async Task<CustomerWalletsDto> GetCustomerWalletsAsync(Guid customerId, CancellationToken ct)
+    {
+        var accounts = await _accountRepository.ListByCustomerIdAsync(customerId, ct);
+
+        // hiç hesabı yoksa boş liste dönelim (istersen 404 de yaparız)
+        var accountDtos = accounts.Select(a =>
+            new AccountDto(
+                a.Id,
+                a.CustomerId,
+                a.AccountNumber,
+                a.Currency,
+                a.Balance,
+                (int)a.Status,
+                a.Iban,
+                a.CreatedAt
+            )).ToList();
+
+        return new CustomerWalletsDto(customerId, accountDtos);
     }
 
 

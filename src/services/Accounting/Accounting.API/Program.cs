@@ -1,6 +1,7 @@
 using GaniPay.Accounting.Application.Contracts.Requests;
 using GaniPay.Accounting.Application.Services;
 using GaniPay.Accounting.Infrastructure.DependencyInjection;
+using Microsoft.AspNetCore.Mvc;
 
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
@@ -62,6 +63,16 @@ group.MapPost("/usage", async (
     var usage = await service.GetUsageAsync(request, ct);
     return Results.Ok(usage);
 });
+
+group.MapGet("/customers/{customerId}/wallets", async (
+    IAccountingService service,
+    Guid customerId,
+    CancellationToken ct) =>
+{
+    var result = await service.GetCustomerWalletsAsync(customerId, ct);
+    return Results.Ok(result);
+})
+.WithName("GetCustomerWallets");
 
 
 

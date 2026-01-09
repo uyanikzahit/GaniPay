@@ -33,4 +33,12 @@ public sealed class AccountRepository : IAccountRepository
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.CustomerId == customerId && x.Currency == ccy, ct);
     }
+
+    public async Task<List<Account>> ListByCustomerIdAsync(Guid customerId, CancellationToken ct)
+    {
+        return await _db.Accounts
+            .Where(x => x.CustomerId == customerId)
+            .OrderBy(x => x.CreatedAt)
+            .ToListAsync(ct);
+    }
 }
