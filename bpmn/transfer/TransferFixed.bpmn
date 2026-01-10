@@ -19,22 +19,6 @@
       <bpmn:incoming>Flow_1d9jqbs</bpmn:incoming>
       <bpmn:outgoing>Flow_0eeofoo</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:exclusiveGateway id="Gateway_1jvrq2n" default="Flow_136vc92">
-      <bpmn:incoming>Flow_0eeofoo</bpmn:incoming>
-      <bpmn:outgoing>Flow_0sve6g4</bpmn:outgoing>
-      <bpmn:outgoing>Flow_136vc92</bpmn:outgoing>
-    </bpmn:exclusiveGateway>
-    <bpmn:intermediateThrowEvent id="Event_1orldit" name="Sender Not Found">
-      <bpmn:extensionElements>
-        <zeebe:ioMapping>
-          <zeebe:output source="=false" target="senderAccountOk" />
-          <zeebe:output source="=&#34;SENDER_ACCOUNT_GET_FAILED&#34;" target="errorCode" />
-          <zeebe:output source="=&#34;Sender account/balance not found or accounting service error&#34;" target="errorMessage" />
-        </zeebe:ioMapping>
-      </bpmn:extensionElements>
-      <bpmn:incoming>Flow_136vc92</bpmn:incoming>
-      <bpmn:outgoing>Flow_08pymhn</bpmn:outgoing>
-    </bpmn:intermediateThrowEvent>
     <bpmn:serviceTask id="Activity_1g848c7" name="Receiver Account Get">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="accounting.receiver.get" retries="3" />
@@ -99,6 +83,8 @@
       <bpmn:extensionElements>
         <zeebe:calledElement processId="wallet_system_limits_control" propagateAllChildVariables="false" />
         <zeebe:ioMapping>
+          <zeebe:input source="=customerId" target="customerId" />
+          <zeebe:input target="amount" />
           <zeebe:output source="=senderLimitsOk" target="limitOk" />
           <zeebe:output source="=senderLimitReason" target="limitReason" />
           <zeebe:output source="=errorCode" target="errorCode" />
@@ -124,7 +110,7 @@
       <bpmn:incoming>Flow_1sxy0yb</bpmn:incoming>
       <bpmn:outgoing>Flow_1mkroxn</bpmn:outgoing>
     </bpmn:callActivity>
-    <bpmn:exclusiveGateway id="Gw_LimitsOk" name="Receiver Limits Ok" default="Flow_0qtszy0">
+    <bpmn:exclusiveGateway id="Gw_LimitsOk" name="Receiver Limits Ok" default="Flow_LimitsFail_To_Ev">
       <bpmn:incoming>Flow_1mkroxn</bpmn:incoming>
       <bpmn:outgoing>Flow_LimitsFail_To_Ev</bpmn:outgoing>
       <bpmn:outgoing>Flow_0qtszy0</bpmn:outgoing>
@@ -197,19 +183,20 @@
         <zeebe:taskDefinition type="accounting.account.ledger" retries="3" />
         <zeebe:ioMapping>
           <zeebe:input source="=senderAccountId" target="senderAccountId" />
-          <zeebe:input source="=receiverAccountId" target="receiverAccountId" />
+          <zeebe:input source="=receiverAccountId" target="referenceId" />
           <zeebe:input source="=amount" target="amount" />
           <zeebe:input source="=&#34;TRY&#34;" target="currency" />
-          <zeebe:input source="=paymentsCorrelationId" target="correlationId" />
-          <zeebe:output source="=true" target="ledgerOk" />
-          <zeebe:output source="=&#34;LEDGER_FAILED&#34;" target="errorCode" />
-          <zeebe:output source="=&#34;Account ledger could not be created&#34;" target="errorMessage" />
+          <zeebe:input source="=2" target="operationType" />
+          <zeebe:input source="=1" target="direction" />
+          <zeebe:output source="=ledgerOk" target="ledgerOk" />
+          <zeebe:output source="=errorCode" target="errorCode" />
+          <zeebe:output source="=errorMessage" target="errorMessage" />
         </zeebe:ioMapping>
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_1ikyhcv</bpmn:incoming>
       <bpmn:outgoing>Flow_1glypp0</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:exclusiveGateway id="Gateway_062as3n" name="Ledger Ok" default="Flow_1qgge4p">
+    <bpmn:exclusiveGateway id="Gateway_062as3n" name="Ledger Ok" default="Flow_1q7xm7m">
       <bpmn:incoming>Flow_1glypp0</bpmn:incoming>
       <bpmn:outgoing>Flow_1qgge4p</bpmn:outgoing>
       <bpmn:outgoing>Flow_1q7xm7m</bpmn:outgoing>
@@ -288,20 +275,15 @@
       <bpmn:incoming>Flow_InitiateFailed_To_EndJoin</bpmn:incoming>
       <bpmn:incoming>Flow_SuccessEv_To_EndJoin</bpmn:incoming>
       <bpmn:incoming>Flow_0gsglet</bpmn:incoming>
-      <bpmn:incoming>Flow_08pymhn</bpmn:incoming>
       <bpmn:incoming>Flow_1ynabbk</bpmn:incoming>
       <bpmn:incoming>Flow_1uw5fx7</bpmn:incoming>
+      <bpmn:incoming>Flow_08pymhn</bpmn:incoming>
       <bpmn:outgoing>Flow_1t5o7gv</bpmn:outgoing>
     </bpmn:inclusiveGateway>
     <bpmn:endEvent id="EndEvent_Transfer" name="End">
       <bpmn:incoming>Flow_1t5o7gv</bpmn:incoming>
     </bpmn:endEvent>
     <bpmn:sequenceFlow id="Flow_1d9jqbs" sourceRef="StartEvent_Transfer" targetRef="Activity_1nn2gba" />
-    <bpmn:sequenceFlow id="Flow_0eeofoo" sourceRef="Activity_1nn2gba" targetRef="Gateway_1jvrq2n" />
-    <bpmn:sequenceFlow id="Flow_136vc92" sourceRef="Gateway_1jvrq2n" targetRef="Event_1orldit" />
-    <bpmn:sequenceFlow id="Flow_0sve6g4" sourceRef="Gateway_1jvrq2n" targetRef="Activity_1g848c7">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=senderAccountOk = true</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_05506x6" sourceRef="Activity_1g848c7" targetRef="Gateway_1be95qb" />
     <bpmn:sequenceFlow id="Flow_0bzgsbz" sourceRef="Gateway_1be95qb" targetRef="Event_1cr7xki" />
     <bpmn:sequenceFlow id="Flow_1sp4ytf" sourceRef="Gateway_1be95qb" targetRef="Task_ResolveReceiver">
@@ -315,15 +297,15 @@
     <bpmn:sequenceFlow id="Flow_ReceiverFailed_To_EndJoin" sourceRef="Ev_ReceiverNotFound" targetRef="Gw_EndJoin" />
     <bpmn:sequenceFlow id="Flow_1uuphh1" sourceRef="Activity_1h6lifd" targetRef="Gateway_0189u5v" />
     <bpmn:sequenceFlow id="Flow_1sxy0yb" sourceRef="Gateway_0189u5v" targetRef="Activity_0bhergz">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=senderLimitsOk = true</bpmn:conditionExpression>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=true</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_1yu5hkn" sourceRef="Gateway_0189u5v" targetRef="Event_1dohpmf" />
     <bpmn:sequenceFlow id="Flow_1d65j9d" sourceRef="Event_1dohpmf" targetRef="Gw_EndJoin" />
     <bpmn:sequenceFlow id="Flow_1mkroxn" sourceRef="Activity_0bhergz" targetRef="Gw_LimitsOk" />
-    <bpmn:sequenceFlow id="Flow_LimitsFail_To_Ev" sourceRef="Gw_LimitsOk" targetRef="Ev_LimitFailed">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=limitsOk != true</bpmn:conditionExpression>
+    <bpmn:sequenceFlow id="Flow_LimitsFail_To_Ev" sourceRef="Gw_LimitsOk" targetRef="Ev_LimitFailed" />
+    <bpmn:sequenceFlow id="Flow_0qtszy0" sourceRef="Gw_LimitsOk" targetRef="Activity_0m6rzx5">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=true</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_0qtszy0" sourceRef="Gw_LimitsOk" targetRef="Activity_0m6rzx5" />
     <bpmn:sequenceFlow id="Flow_LimitFailed_To_EndJoin" sourceRef="Ev_LimitFailed" targetRef="Gw_EndJoin" />
     <bpmn:sequenceFlow id="Flow_0ij3m0g" sourceRef="Activity_0m6rzx5" targetRef="Gateway_0zixx1r" />
     <bpmn:sequenceFlow id="Flow_1w6aecv" sourceRef="Gateway_0zixx1r" targetRef="Event_1tursdg">
@@ -337,10 +319,10 @@
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_InitiateFailed_To_EndJoin" sourceRef="Ev_InitiateFailed" targetRef="Gw_EndJoin" />
     <bpmn:sequenceFlow id="Flow_1glypp0" sourceRef="Task_Credit" targetRef="Gateway_062as3n" />
-    <bpmn:sequenceFlow id="Flow_1qgge4p" sourceRef="Gateway_062as3n" targetRef="Event_0da9fz6" />
-    <bpmn:sequenceFlow id="Flow_1q7xm7m" sourceRef="Gateway_062as3n" targetRef="Event_06ht7vf">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=ledgerOk != true</bpmn:conditionExpression>
+    <bpmn:sequenceFlow id="Flow_1qgge4p" sourceRef="Gateway_062as3n" targetRef="Event_0da9fz6">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=ledgerOk = true</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_1q7xm7m" sourceRef="Gateway_062as3n" targetRef="Event_06ht7vf" />
     <bpmn:sequenceFlow id="Flow_0v4pgl3" sourceRef="Event_0da9fz6" targetRef="Gateway_0k5tc63" />
     <bpmn:sequenceFlow id="Flow_1to875u" sourceRef="Gateway_0k5tc63" targetRef="Task_Notify" />
     <bpmn:sequenceFlow id="Flow_0j6dls3" sourceRef="Gateway_0k5tc63" targetRef="Activity_0p4glwh" />
@@ -351,10 +333,31 @@
     <bpmn:sequenceFlow id="Flow_0kenwne" sourceRef="Activity_11vc1ff" targetRef="Ev_TransferSucceeded" />
     <bpmn:sequenceFlow id="Flow_SuccessEv_To_EndJoin" sourceRef="Ev_TransferSucceeded" targetRef="Gw_EndJoin" />
     <bpmn:sequenceFlow id="Flow_0gsglet" sourceRef="Event_1tursdg" targetRef="Gw_EndJoin" />
-    <bpmn:sequenceFlow id="Flow_08pymhn" sourceRef="Event_1orldit" targetRef="Gw_EndJoin" />
     <bpmn:sequenceFlow id="Flow_1ynabbk" sourceRef="Event_1cr7xki" targetRef="Gw_EndJoin" />
     <bpmn:sequenceFlow id="Flow_1uw5fx7" sourceRef="Event_06ht7vf" targetRef="Gw_EndJoin" />
     <bpmn:sequenceFlow id="Flow_1t5o7gv" sourceRef="Gw_EndJoin" targetRef="EndEvent_Transfer" />
+    <bpmn:intermediateThrowEvent id="Event_1orldit" name="Sender Not Found">
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:output source="=false" target="senderAccountOk" />
+          <zeebe:output source="=&#34;SENDER_ACCOUNT_GET_FAILED&#34;" target="errorCode" />
+          <zeebe:output source="=&#34;Sender account/balance not found or accounting service error&#34;" target="errorMessage" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_136vc92</bpmn:incoming>
+      <bpmn:outgoing>Flow_08pymhn</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:sequenceFlow id="Flow_08pymhn" sourceRef="Event_1orldit" targetRef="Gw_EndJoin" />
+    <bpmn:exclusiveGateway id="Gateway_1jvrq2n" default="Flow_136vc92">
+      <bpmn:incoming>Flow_0eeofoo</bpmn:incoming>
+      <bpmn:outgoing>Flow_0sve6g4</bpmn:outgoing>
+      <bpmn:outgoing>Flow_136vc92</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_0sve6g4" sourceRef="Gateway_1jvrq2n" targetRef="Activity_1g848c7">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=senderAccountOk = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_136vc92" sourceRef="Gateway_1jvrq2n" targetRef="Event_1orldit" />
+    <bpmn:sequenceFlow id="Flow_0eeofoo" sourceRef="Activity_1nn2gba" targetRef="Gateway_1jvrq2n" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Transfer">

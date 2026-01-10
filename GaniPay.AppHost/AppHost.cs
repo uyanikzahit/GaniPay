@@ -81,6 +81,13 @@ var validationWorkerCsproj = Path.Combine(validationWorkerDir, "GaniPay.Validati
 var topupWorkerDir = Path.Combine(workersRoot, "GaniPay.TopUp.Worker");
 var topupWorkerCsproj = Path.Combine(topupWorkerDir, "GaniPay.TopUp.Worker.csproj");
 
+// Limits Control Worker
+var limitsControlWorkerCsproj = Path.Combine(workersRoot, "GaniPay.LimitsControl.Worker", "GaniPay.LimitsControl.Worker.csproj");
+
+builder.AddExecutable("limits-control-worker", "dotnet", Path.GetDirectoryName(limitsControlWorkerCsproj)!)
+    .WithArgs("run", "--project", limitsControlWorkerCsproj, "--no-launch-profile")
+    .WithEnvironment("DOTNET_ENVIRONMENT", "Development");
+
 
 // DataCreation Worker
 builder.AddExecutable("data-creation-worker", "dotnet", dataCreationWorkerDir)

@@ -77,9 +77,9 @@ using var wReceiverGet = zeebe.NewWorker()
     .Timeout(TimeSpan.FromSeconds(30))
     .Open();
 
-// 3) Resolve Receiver (AML) (MOCK)
+// 3) Resolve Receiver (AML)
 using var wResolveAml = zeebe.NewWorker()
-    .JobType("resolve.receiver.aml")
+    .JobType("transfer.receiver.resolve")
     .Handler(mock.Handle)
     .Name("GaniPay.Transfer.Worker.resolveAml")
     .MaxJobsActive(10)

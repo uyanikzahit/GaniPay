@@ -10,9 +10,7 @@ public sealed class AccountingAccountLedgerJobHandler
     private readonly HttpClient _http;
 
     public AccountingAccountLedgerJobHandler(IHttpClientFactory httpClientFactory)
-    {
-        _http = httpClientFactory.CreateClient("Accounting");
-    }
+        => _http = httpClientFactory.CreateClient("Accounting");
 
     public async Task Handle(IJobClient client, IJob job)
     {
@@ -39,129 +37,102 @@ public sealed class AccountingAccountLedgerJobHandler
                 catch { return 0m; }
             }
 
-            var senderAccountId = GetString("senderAccountId");
-            var receiverAccountId = GetString("receiverAccountId");
-            var currency = GetString("currency") ?? "TRY";
+            int GetInt(string name, int @default)
+            {
+                if (!root.TryGetProperty(name, out var p)) return @default;
+                try
+                {
+                    return p.ValueKind switch
+                    {
+                        JsonValueKind.Number => p.GetInt32(),
+                        JsonValueKind.String => int.TryParse(p.GetString(), out var i) ? i : @default,
+                        _ => @default
+                    };
+                }
+                catch { return @default; }
+            }
+
+            // ✅ FALLBACK: Senin process’te sender için accountId var
+            var senderAccountId =
+                GetString("senderAccountId")
+                ?? GetString("accountId"); // Sender Account Get’in bıraktığı
+
+            // ✅ Receiver tarafında çoğu akışta receiverAccountId var; yoksa referenceId’yi de dene
+            var receiverAccountId =
+                GetString("receiverAccountId")
+                ?? GetString("receiverAccountid")
+                ?? GetString("referenceId"); // sen referansı receiver vermek istiyorsun
+
             var amount = GetDecimal("amount");
+            var currency = GetString("currency") ?? "TRY";
 
-            // correlationId workflow’dan gelmeyebilir; gelmezse üretelim
-            var correlationId = GetString("correlationId");
-            if (string.IsNullOrWhiteSpace(correlationId))
-                correlationId = Guid.NewGuid().ToString();
+            // operationType: BPMN’den gelsin; yoksa 3
+            var operationType = GetInt("operationType", 3);
 
-            // Validation
+            // referenceId: sen “receiverAccountId verelim” dedin -> onu kullanıyoruz
+            var referenceId = receiverAccountId;
+
             if (string.IsNullOrWhiteSpace(senderAccountId) ||
                 string.IsNullOrWhiteSpace(receiverAccountId) ||
-                amount <= 0m ||
-                string.IsNullOrWhiteSpace(currency))
+                string.IsNullOrWhiteSpace(referenceId) ||
+                amount <= 0m)
             {
                 await CompleteFail(client, job,
                     code: "ACCOUNT_LEDGER_VALIDATION",
-                    message: "senderAccountId/receiverAccountId/amount/currency zorunludur.",
+                    message: "senderAccountId/receiverAccountId/amount zorunludur.",
                     step: "Account Ledger");
                 return;
             }
 
-            // ✅ Accounting API beklediği request (Swagger örneğine göre)
-            // direction:
-            //   debit  (sender)
-            //   credit (receiver)
-            // operationType: transfer için örnek olarak 3 kullandın (ekrandaki)
-            const int operationTypeTransfer = 3;
-
-            var referenceId = correlationId; // idempotency / korelasyon için aynı id mantıklı
-
-            // 1) Sender debit
+            // ✅ Swagger’a uygun: direction numeric (1=debit, 2=credit)
             var senderReq = new
             {
                 accountId = senderAccountId,
-                direction = "debit",
+                direction = 1,
                 amount,
                 currency,
-                operationType = operationTypeTransfer,
+                operationType,
                 referenceId
             };
 
             var senderResp = await _http.PostAsJsonAsync("/api/accounting/transactions", senderReq);
+            var senderText = await senderResp.Content.ReadAsStringAsync();
             if (!senderResp.IsSuccessStatusCode)
             {
-                var bodyText = await senderResp.Content.ReadAsStringAsync();
                 await CompleteFail(client, job,
                     code: "ACCOUNT_LEDGER_SENDER_HTTP_ERROR",
-                    message: $"Sender debit HTTP {(int)senderResp.StatusCode} | {bodyText}",
+                    message: $"Sender debit HTTP {(int)senderResp.StatusCode} | {senderText}",
                     step: "Account Ledger");
                 return;
             }
 
-            var senderBody = await senderResp.Content.ReadFromJsonAsync<JsonElement>();
-
-            // 2) Receiver credit
             var receiverReq = new
             {
                 accountId = receiverAccountId,
-                direction = "credit",
+                direction = 2,
                 amount,
                 currency,
-                operationType = operationTypeTransfer,
+                operationType,
                 referenceId
             };
 
             var receiverResp = await _http.PostAsJsonAsync("/api/accounting/transactions", receiverReq);
+            var receiverText = await receiverResp.Content.ReadAsStringAsync();
             if (!receiverResp.IsSuccessStatusCode)
             {
-                var bodyText = await receiverResp.Content.ReadAsStringAsync();
                 await CompleteFail(client, job,
                     code: "ACCOUNT_LEDGER_RECEIVER_HTTP_ERROR",
-                    message: $"Receiver credit HTTP {(int)receiverResp.StatusCode} | {bodyText}",
+                    message: $"Receiver credit HTTP {(int)receiverResp.StatusCode} | {receiverText}",
                     step: "Account Ledger");
                 return;
             }
 
-            var receiverBody = await receiverResp.Content.ReadFromJsonAsync<JsonElement>();
-
-            // tolerant parse (debug için)
-            string? senderTxId =
-                senderBody.ValueKind == JsonValueKind.Object && senderBody.TryGetProperty("id", out var sid) ? sid.GetString() : null;
-
-            string? receiverTxId =
-                receiverBody.ValueKind == JsonValueKind.Object && receiverBody.TryGetProperty("id", out var rid) ? rid.GetString() : null;
-
-            decimal? senderBalanceBefore =
-                senderBody.ValueKind == JsonValueKind.Object && senderBody.TryGetProperty("balanceBefore", out var sbb) && sbb.ValueKind == JsonValueKind.Number
-                    ? sbb.GetDecimal()
-                    : null;
-
-            decimal? senderBalanceAfter =
-                senderBody.ValueKind == JsonValueKind.Object && senderBody.TryGetProperty("balanceAfter", out var sba) && sba.ValueKind == JsonValueKind.Number
-                    ? sba.GetDecimal()
-                    : null;
-
-            decimal? receiverBalanceBefore =
-                receiverBody.ValueKind == JsonValueKind.Object && receiverBody.TryGetProperty("balanceBefore", out var rbb) && rbb.ValueKind == JsonValueKind.Number
-                    ? rbb.GetDecimal()
-                    : null;
-
-            decimal? receiverBalanceAfter =
-                receiverBody.ValueKind == JsonValueKind.Object && receiverBody.TryGetProperty("balanceAfter", out var rba) && rba.ValueKind == JsonValueKind.Number
-                    ? rba.GetDecimal()
-                    : null;
-
-            // ✅ BPMN OUTPUT + bonus debug alanları
+            // OK
             var completeVars = new
             {
                 ledgerOk = true,
                 errorCode = (string?)null,
                 errorMessage = (string?)null,
-
-                // bonus
-                correlationId,
-                referenceId,
-                senderLedgerTxId = senderTxId,
-                receiverLedgerTxId = receiverTxId,
-                senderBalanceBefore,
-                senderBalanceAfter,
-                receiverBalanceBefore,
-                receiverBalanceAfter,
                 failedAtStep = (string?)null
             };
 
@@ -185,8 +156,6 @@ public sealed class AccountingAccountLedgerJobHandler
             ledgerOk = false,
             errorCode = code,
             errorMessage = message,
-
-            // bonus
             failedAtStep = step
         };
 
