@@ -82,7 +82,7 @@
     </bpmn:intermediateThrowEvent>
     <bpmn:serviceTask id="T_AccountActive" name="Account Active">
       <bpmn:extensionElements>
-        <zeebe:taskDefinition type="auth.account.status" retries="3" />
+        <zeebe:taskDefinition type="mock.auth.account.status" retries="3" />
         <zeebe:ioMapping>
           <zeebe:input source="=customerId" target="customerId" />
           <zeebe:input source="=correlationId" target="correlationId" />

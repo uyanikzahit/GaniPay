@@ -41,7 +41,7 @@ HookDashboardAutoOpen();
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-// -------------------- APIs (mevcutlarýný BOZMADAN) --------------------
+// -------------------- APIs (mevcutlarÄ±nÄ± BOZMADAN) --------------------
 var accountingApi = builder.AddProject<Projects.GaniPay_Accounting_API>("accounting-api")
     .WithExternalHttpEndpoints();
 
@@ -67,9 +67,9 @@ var transactionLimitApi = builder.AddProject<Projects.GaniPay_TransactionLimit_A
     .WithExternalHttpEndpoints();
 
 // -------------------- WORKERS (Executable) --------------------
-// ÖNEMLÝ: WorkingDirectory worker klasörü olmalý (appsettings.json doðru okunsun).
+// Ã–NEMLÄ°: WorkingDirectory worker klasÃ¶rÃ¼ olmalÄ± (appsettings.json doÄŸru okunsun).
 var appHostDir = builder.AppHostDirectory;
-var repoRoot = Path.GetFullPath(Path.Combine(appHostDir, "..")); // solution root varsayýmý
+var repoRoot = Path.GetFullPath(Path.Combine(appHostDir, "..")); // solution root varsayÄ±mÄ±
 var workersRoot = Path.Combine(repoRoot, "src", "workers");
 
 var dataCreationWorkerDir = Path.Combine(workersRoot, "GaniPay.DataCreation.Worker");
@@ -93,7 +93,7 @@ builder.AddExecutable("limits-control-worker", "dotnet", Path.GetDirectoryName(l
 builder.AddExecutable("data-creation-worker", "dotnet", dataCreationWorkerDir)
     .WithArgs("run", "--project", dataCreationWorkerCsproj, "--no-launch-profile")
     .WithEnvironment("DOTNET_ENVIRONMENT", "Development")
-    // Ýstersen baðýmlýlýk olarak API'ler ayakta olsun diye:
+    // Ä°stersen baÄŸÄ±mlÄ±lÄ±k olarak API'ler ayakta olsun diye:
     .WaitFor(accountingApi)
     .WaitFor(customerApi)
     .WaitFor(identityApi);
@@ -104,6 +104,21 @@ builder.AddExecutable("validation-worker", "dotnet", validationWorkerDir)
     .WithEnvironment("DOTNET_ENVIRONMENT", "Development")
     .WaitFor(customerApi)
     .WaitFor(integrationApi);
+
+
+// -------------------- TRANSFER WORKER --------------------
+// workersRoot zaten senin AppHost.cs'inde var: Path.Combine(repoRoot, "src", "workers")
+
+var transferWorkerDir = Path.Combine(workersRoot, "GaniPay.Transfer.Worker");
+var transferWorkerCsproj = Path.Combine(transferWorkerDir, "GaniPay.Transfer.Worker.csproj");
+
+builder.AddExecutable("transfer-worker", "dotnet", transferWorkerDir)
+    .WithArgs(
+        "run",
+        "--project", transferWorkerCsproj,
+        "--no-launch-profile"
+    )
+    .WithEnvironment("DOTNET_ENVIRONMENT", "Development");
 
 
 
@@ -117,6 +132,8 @@ builder.AddExecutable("login-worker", "dotnet", loginWorkerDir)
 builder.AddExecutable("topup-worker", "dotnet", topupWorkerDir)
     .WithArgs("run", "--project", topupWorkerCsproj, "--no-launch-profile")
     .WithEnvironment("DOTNET_ENVIRONMENT", "Development");
+
+builder.AddProject<Projects.GaniPay_Workflow_API>("ganipay-workflow-api");
 
 builder.Build().Run();
 
