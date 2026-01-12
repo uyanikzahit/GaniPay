@@ -6,11 +6,12 @@ import {
   Pressable,
   Platform,
   ScrollView,
-  KeyboardAvoidingView,
-  Alert,
+  KeyboardAvoidingView
 } from "react-native";
+
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { Alert } from "react-native";
 import { Colors } from "../theme/colors";
 
 import { defaults, REGISTER_STEPS, type StepKey, buildRegisterPayload, validateStep } from "./register.types";
@@ -24,6 +25,8 @@ export default function RegisterScreen() {
   const [form, setForm] = useState(defaults);
   const [stepIndex, setStepIndex] = useState(0);
   const [loading, setLoading] = useState(false);
+
+
 
   const stepKey: StepKey = REGISTER_STEPS[stepIndex].key;
 

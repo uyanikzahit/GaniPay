@@ -1,4 +1,4 @@
-using System.Text.Json;
+ï»¿using System.Text.Json;
 using System.Text.Json.Serialization;
 using Zeebe.Client;
 
@@ -9,7 +9,24 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 
-// JSON options (enumlarý string olarak gönderiyoruz)
+// âœ… CORS (builder.Build() Ã¶ncesi)
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Frontend", policy =>
+    {
+        policy
+            .WithOrigins(
+                "http://localhost:8082", // Expo web
+                "https://localhost:8082" // bazen https'e dÃ¼ÅŸebilir
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+        // .AllowCredentials(); // sadece cookie/auth gerekiyorsa aÃ§
+    });
+});
+
+
+// JSON options (enumlarÄ± string olarak gÃ¶nderiyoruz)
 builder.Services.ConfigureHttpJsonOptions(o =>
 {
     o.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
@@ -31,11 +48,15 @@ builder.Services.AddSingleton<IZeebeClient>(_ =>
         .Build();
 });
 
-// Variables serializer (Zeebe’ye JSON string basacaðýz)
+// Variables serializer (Zeebeâ€™ye JSON string basacaÄŸÄ±z)
 var zeebeJsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
 zeebeJsonOptions.Converters.Add(new JsonStringEnumConverter());
 
 var app = builder.Build();
+
+
+// âœ… CORS (Map*â€™lerden Ã¶nce)
+app.UseCors("Frontend");
 
 if (app.Environment.IsDevelopment())
 {
@@ -66,7 +87,7 @@ onboardingGroup.MapPost("/register", async (
     IZeebeClient zeebe,
     CancellationToken ct) =>
 {
-    // Basit validasyon (istersen arttýr)
+    // Basit validasyon (istersen arttÄ±r)
     if (string.IsNullOrWhiteSpace(req.PhoneNumber) || string.IsNullOrWhiteSpace(req.Password))
     {
         return Results.BadRequest(new { success = false, message = "phoneNumber ve password zorunludur." });
@@ -77,7 +98,7 @@ onboardingGroup.MapPost("/register", async (
             ? cid.ToString()
             : Guid.NewGuid().ToString();
 
-    // Zeebe variables (register worker’larýnýn beklediði alanlar)
+    // Zeebe variables (register workerâ€™larÄ±nÄ±n beklediÄŸi alanlar)
     var variables = new
     {
         correlationId,
@@ -273,7 +294,7 @@ transfersGroup.MapPost("/transfer", async (
             ? cid.ToString()
             : Guid.NewGuid().ToString();
 
-    // Modeler’da verdiðin JSON isimleriyle birebir
+    // Modelerâ€™da verdiÄŸin JSON isimleriyle birebir
     var variables = new
     {
         correlationId,

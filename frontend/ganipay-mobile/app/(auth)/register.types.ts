@@ -51,7 +51,7 @@ export const REGISTER_STEPS: Array<{ key: StepKey; label: string; desc: string; 
   { key: "account", label: "Account", desc: "Create your wallet profile.", icon: "👤" },
   { key: "contact", label: "Contact", desc: "Enter your contact details.", icon: "📞" },
   { key: "address", label: "Address", desc: "Add your address information.", icon: "📍" },
-  { key: "review", label: "Review", desc: "Confirm details before creating.", icon: "✅" },
+  { key: "review", label: "Review", desc: "Confirm details before creating.", icon: "🛡️" },
 ];
 
 export const defaults: RegisterForm = {

@@ -67,7 +67,7 @@ export function StepAccount({ form, setForm }: Props) {
       <View style={s.segmentRow}>
         <SegmentPill
           active={form.segment === "STANDARD"}
-          text="Standard"
+          text="Individual"
           onPress={() => set("segment", "STANDARD")}
         />
         <SegmentPill
