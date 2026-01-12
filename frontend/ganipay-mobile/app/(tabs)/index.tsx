@@ -1,104 +1,161 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function HomeScreen() {
-  const userName = "İlyas";
-  const balance = "0,00 ₺";
+  const userName = "Ilyas";
+  const balance = "₺0.00";
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.container}>
-      {/* Üst Kart */}
+      {/* Header Card */}
       <View style={styles.headerCard}>
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.welcome}>Hoş Geldin,</Text>
+            <Text style={styles.welcome}>Welcome,</Text>
             <Text style={styles.name}>{userName}</Text>
           </View>
 
           <View style={{ alignItems: "flex-end" }}>
-            <Text style={styles.balanceLabel}>Bakiye</Text>
+            <Text style={styles.balanceLabel}>Balance</Text>
             <Text style={styles.balance}>{balance}</Text>
           </View>
         </View>
 
-        <View style={styles.quickRow}>
-          <QuickButton title="Para Transferi" />
-          <QuickButton title="Para Yükle" />
-          <QuickButton title="Fatura Öde" />
-          <QuickButton title="İşlemler" />
-        </View>
+        <Text style={styles.subHint}>Your wallet is ready for quick actions.</Text>
       </View>
 
-      {/* Grid Kartlar */}
-      <View style={styles.grid}>
-        <GridCard title="Para Transferi" />
-        <GridCard title="Fatura Öde" />
-        <GridCard title="Para Yükle" />
-        <GridCard title="Hesap Detayları" />
+      {/* 4 Action Tiles */}
+      <View style={styles.actionGrid}>
+        <ActionTile title="Top Up" icon="wallet-outline" variant="teal" onPress={() => {}} />
+        <ActionTile title="Transfer" icon="swap-horizontal-outline" variant="blue" onPress={() => {}} />
+        <ActionTile title="Pay Bills" icon="receipt-outline" variant="purple" disabled />
+        <ActionTile title="Partner Stores" icon="storefront-outline" variant="orange" disabled />
       </View>
 
-      {/* Son İşlemler */}
+      {/* Last 3 Transactions */}
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Son İşlemler</Text>
-        <Text style={styles.sectionLink}>Tümünü Gör</Text>
+        <Text style={styles.sectionTitle}>Last Transactions</Text>
+        <Text style={styles.sectionLink}>View all</Text>
       </View>
 
-      <View style={styles.txItem}>
-        <Text style={styles.txTitle}>Para Yükleme</Text>
-        <Text style={styles.txAmount}>+200,00 ₺</Text>
-      </View>
-
-      <View style={styles.txItem}>
-        <Text style={styles.txTitle}>Transfer</Text>
-        <Text style={styles.txAmount}>-120,00 ₺</Text>
-      </View>
+      <TxItem title="Top Up" amount="+ ₺200.00" meta="Today • Pending" />
+      <TxItem title="Transfer" amount="- ₺120.00" meta="Today • Completed" />
+      <TxItem title="Top Up" amount="+ ₺50.00" meta="Yesterday • Completed" />
     </ScrollView>
   );
 }
 
-function QuickButton({ title }: { title: string }) {
+function ActionTile({
+  title,
+  icon,
+  onPress,
+  disabled,
+  variant,
+}: {
+  title: string;
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  onPress?: () => void;
+  disabled?: boolean;
+  variant: "teal" | "blue" | "purple" | "orange";
+}) {
+  const v = variantStyles[variant];
+
   return (
-    <TouchableOpacity style={styles.quickBtn} onPress={() => {}}>
-      <Text style={styles.quickText}>{title}</Text>
+    <TouchableOpacity
+      style={styles.actionTile}
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.85}
+    >
+      <View style={[styles.iconBubble, { backgroundColor: v.bubbleBg }]}>
+        <Ionicons name={icon} size={24} color={v.icon} />
+      </View>
+
+      <Text style={styles.actionText}>{title}</Text>
+
     </TouchableOpacity>
   );
 }
 
-function GridCard({ title }: { title: string }) {
+const variantStyles = {
+  teal: { bubbleBg: "#E9FBF7", icon: "#2DB7A3" },
+  blue: { bubbleBg: "#EEF4FF", icon: "#2563EB" },
+  purple: { bubbleBg: "#F4F1FF", icon: "#6D28D9" },
+  orange: { bubbleBg: "#FFF3E8", icon: "#EA580C" },
+} as const;
+
+function TxItem({ title, amount, meta }: { title: string; amount: string; meta: string }) {
+  const isPositive = amount.trim().startsWith("+");
   return (
-    <TouchableOpacity style={styles.gridCard} onPress={() => {}}>
-      <Text style={styles.gridTitle}>{title}</Text>
-    </TouchableOpacity>
+    <View style={styles.txItem}>
+      <View style={{ gap: 4 }}>
+        <Text style={styles.txTitle}>{title}</Text>
+        <Text style={styles.txMeta}>{meta}</Text>
+      </View>
+      <Text style={[styles.txAmount, isPositive ? styles.positive : styles.negative]}>{amount}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: "#f6f7f9" },
+  page: { flex: 1, backgroundColor: "#F6F7F9" },
   container: { padding: 16, paddingBottom: 28 },
 
   headerCard: {
-    backgroundColor: "#2db7a3",
+    backgroundColor: "#297967",
     borderRadius: 16,
     padding: 16,
     marginBottom: 14,
   },
   headerRow: { flexDirection: "row", justifyContent: "space-between" },
-  welcome: { color: "white", opacity: 0.9 },
+  welcome: { color: "white", opacity: 0.92 },
   name: { color: "white", fontSize: 20, fontWeight: "800", marginTop: 2 },
-  balanceLabel: { color: "white", opacity: 0.9 },
+  balanceLabel: { color: "white", opacity: 0.92 },
   balance: { color: "white", fontSize: 18, fontWeight: "800", marginTop: 2 },
+  subHint: { marginTop: 10, color: "white", opacity: 0.75, fontSize: 12 },
 
-  quickRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 14, gap: 8 },
-  quickBtn: { backgroundColor: "rgba(255,255,255,0.2)", padding: 10, borderRadius: 12, flex: 1 },
-  quickText: { color: "white", fontSize: 12, fontWeight: "700", textAlign: "center" },
+  actionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 6, marginBottom: 6 },
 
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 10 },
-  gridCard: { backgroundColor: "white", borderRadius: 14, padding: 16, width: "48%" },
-  gridTitle: { fontWeight: "800" },
+  actionTile: {
+    backgroundColor: "white",
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    width: "48%",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#EEF0F3",
+    position: "relative",
+  },
+  iconBubble: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+  actionText: { fontWeight: "800", fontSize: 13 },
 
-  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8 },
+  badge: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#98A2B3",
+  },
+
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 14,
+  },
   sectionTitle: { fontSize: 16, fontWeight: "900" },
-  sectionLink: { color: "#2db7a3", fontWeight: "800" },
+  sectionLink: { color: "#2DB7A3", fontWeight: "800" },
 
   txItem: {
     backgroundColor: "white",
@@ -107,7 +164,14 @@ const styles = StyleSheet.create({
     marginTop: 10,
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#EEF0F3",
   },
-  txTitle: { fontWeight: "800" },
+  txTitle: { fontWeight: "900" },
+  txMeta: { color: "#667085", fontSize: 12, fontWeight: "600" },
+
   txAmount: { fontWeight: "900" },
+  positive: { color: "#12B76A" },
+  negative: { color: "#F04438" },
 });
