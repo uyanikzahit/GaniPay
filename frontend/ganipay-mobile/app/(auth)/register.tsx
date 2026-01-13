@@ -55,7 +55,7 @@ export default function RegisterScreen() {
 
       Alert.alert("Success", "Account created. Continue to onboarding.");
       // ✅ Approach 1: Register biter → onboarding başlar
-      router.replace("/(auth)/onboarding");
+      router.replace("/(auth)/onboarding/agreements");
     } catch (e: any) {
       Alert.alert("Register failed", e?.message ?? "Unknown error");
     } finally {

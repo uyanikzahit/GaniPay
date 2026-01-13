@@ -1,48 +1,66 @@
+// app/(tabs)/index.tsx
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { Colors } from "../theme/colors";
 
 export default function HomeScreen() {
-  const userName = "Ilyas";
-  const balance = "₺0.00";
+  const userName = "Gani";
+  const balance = "₺11.110.00";
 
   return (
-    <ScrollView style={styles.page} contentContainerStyle={styles.container}>
-      {/* Header Card */}
-      <View style={styles.headerCard}>
-        <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.welcome}>Welcome,</Text>
-            <Text style={styles.name}>{userName}</Text>
+    <View style={styles.container}>
+      <LinearGradient
+        colors={[Colors.bg, "#0B1220", "#12223E"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.hero}
+      >
+        <LinearGradient
+          colors={["rgba(246,195,64,0.55)", "rgba(246,195,64,0)"]}
+          start={{ x: 0.15, y: 0 }}
+          end={{ x: 0.85, y: 1 }}
+          style={styles.goldGlow}
+        />
+
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.headerCard}>
+            <View style={styles.headerRow}>
+              <View>
+                <Text style={styles.welcome}>Welcome,</Text>
+                <Text style={styles.name}>{userName}</Text>
+              </View>
+
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={styles.balanceLabel}>Balance</Text>
+                <Text style={styles.balance}>{balance}</Text>
+              </View>
+            </View>
+
+            <Text style={styles.subHint}>Your wallet is ready for quick actions.</Text>
           </View>
 
-          <View style={{ alignItems: "flex-end" }}>
-            <Text style={styles.balanceLabel}>Balance</Text>
-            <Text style={styles.balance}>{balance}</Text>
+          <View style={styles.actionGrid}>
+            <ActionTile title="Top Up" icon="wallet-outline" variant="teal" onPress={() => {}} />
+            <ActionTile title="Transfer" icon="swap-horizontal-outline" variant="blue" onPress={() => {}} />
+            <ActionTile title="Pay Bills" icon="receipt-outline" variant="purple" disabled />
+            <ActionTile title="Partner Stores" icon="storefront-outline" variant="orange" disabled />
           </View>
-        </View>
 
-        <Text style={styles.subHint}>Your wallet is ready for quick actions.</Text>
-      </View>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Last Transactions</Text>
+            <Text style={styles.sectionLink}>View all</Text>
+          </View>
 
-      {/* 4 Action Tiles */}
-      <View style={styles.actionGrid}>
-        <ActionTile title="Top Up" icon="wallet-outline" variant="teal" onPress={() => {}} />
-        <ActionTile title="Transfer" icon="swap-horizontal-outline" variant="blue" onPress={() => {}} />
-        <ActionTile title="Pay Bills" icon="receipt-outline" variant="purple" disabled />
-        <ActionTile title="Partner Stores" icon="storefront-outline" variant="orange" disabled />
-      </View>
+          <TxItem title="Top Up" amount="+ ₺200.00" meta="Today • Pending" />
+          <TxItem title="Transfer" amount="- ₺120.00" meta="Today • Completed" />
+          <TxItem title="Top Up" amount="+ ₺50.00" meta="Yesterday • Completed" />
 
-      {/* Last 3 Transactions */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Last Transactions</Text>
-        <Text style={styles.sectionLink}>View all</Text>
-      </View>
-
-      <TxItem title="Top Up" amount="+ ₺200.00" meta="Today • Pending" />
-      <TxItem title="Transfer" amount="- ₺120.00" meta="Today • Completed" />
-      <TxItem title="Top Up" amount="+ ₺50.00" meta="Yesterday • Completed" />
-    </ScrollView>
+          <View style={{ height: 28 }} />
+        </ScrollView>
+      </LinearGradient>
+    </View>
   );
 }
 
@@ -63,26 +81,26 @@ function ActionTile({
 
   return (
     <TouchableOpacity
-      style={styles.actionTile}
+      style={[styles.actionTile, disabled && styles.actionTileDisabled]}
       onPress={onPress}
       disabled={disabled}
       activeOpacity={0.85}
     >
-      <View style={[styles.iconBubble, { backgroundColor: v.bubbleBg }]}>
+      <View style={[styles.iconBubble, { backgroundColor: v.bubbleBg, borderColor: v.bubbleBorder }]}>
         <Ionicons name={icon} size={24} color={v.icon} />
       </View>
 
-      <Text style={styles.actionText}>{title}</Text>
-
+      <Text style={[styles.actionText, disabled && styles.disabledText]}>{title}</Text>
+      {/* ✅ Soon kaldırıldı */}
     </TouchableOpacity>
   );
 }
 
 const variantStyles = {
-  teal: { bubbleBg: "#E9FBF7", icon: "#2DB7A3" },
-  blue: { bubbleBg: "#EEF4FF", icon: "#2563EB" },
-  purple: { bubbleBg: "#F4F1FF", icon: "#6D28D9" },
-  orange: { bubbleBg: "#FFF3E8", icon: "#EA580C" },
+  teal: { bubbleBg: "rgba(45,183,163,0.14)", bubbleBorder: "rgba(45,183,163,0.22)", icon: "rgba(45,183,163,1)" },
+  blue: { bubbleBg: "rgba(37,99,235,0.14)", bubbleBorder: "rgba(37,99,235,0.22)", icon: "rgba(37,99,235,1)" },
+  purple: { bubbleBg: "rgba(109,40,217,0.14)", bubbleBorder: "rgba(109,40,217,0.22)", icon: "rgba(109,40,217,1)" },
+  orange: { bubbleBg: "rgba(234,88,12,0.14)", bubbleBorder: "rgba(234,88,12,0.22)", icon: "rgba(234,88,12,1)" },
 } as const;
 
 function TxItem({ title, amount, meta }: { title: string; amount: string; meta: string }) {
@@ -98,55 +116,85 @@ function TxItem({ title, amount, meta }: { title: string; amount: string; meta: 
   );
 }
 
+const shadow = Platform.select({
+  ios: {
+    shadowColor: "#000",
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
+  },
+  android: { elevation: 10 },
+  web: { boxShadow: "0px 14px 40px rgba(0,0,0,0.28)" } as any,
+});
+
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: "#F6F7F9" },
-  container: { padding: 16, paddingBottom: 28 },
+  container: { flex: 1, backgroundColor: Colors.bg },
+
+  hero: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    overflow: "hidden",
+  },
+
+  goldGlow: {
+    position: "absolute",
+    top: -50,
+    left: 0,
+    right: 0,
+    height: 280,
+    borderBottomLeftRadius: 240,
+    borderBottomRightRadius: 240,
+    opacity: 0.9,
+    transform: [{ scaleX: 1.2 }],
+  },
+
+  content: { paddingBottom: 28 },
 
   headerCard: {
-    backgroundColor: "#297967",
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 14,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    ...shadow,
   },
   headerRow: { flexDirection: "row", justifyContent: "space-between" },
-  welcome: { color: "white", opacity: 0.92 },
-  name: { color: "white", fontSize: 20, fontWeight: "800", marginTop: 2 },
-  balanceLabel: { color: "white", opacity: 0.92 },
-  balance: { color: "white", fontSize: 18, fontWeight: "800", marginTop: 2 },
-  subHint: { marginTop: 10, color: "white", opacity: 0.75, fontSize: 12 },
+  welcome: { color: "rgba(255,255,255,0.80)", fontWeight: "800" },
+  name: { color: "rgba(255,255,255,0.96)", fontSize: 20, fontWeight: "900", marginTop: 2 },
+  balanceLabel: { color: "rgba(255,255,255,0.72)", fontWeight: "800" },
+  balance: { color: "rgba(255,255,255,0.96)", fontSize: 18, fontWeight: "900", marginTop: 2 },
+  subHint: { marginTop: 10, color: "rgba(255,255,255,0.62)", fontSize: 12, fontWeight: "700" },
 
   actionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 6, marginBottom: 6 },
 
   actionTile: {
-    backgroundColor: "white",
-    borderRadius: 14,
+    borderRadius: 16,
     paddingVertical: 16,
     paddingHorizontal: 14,
     width: "48%",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#EEF0F3",
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.06)",
     position: "relative",
+    ...shadow,
   },
+  actionTileDisabled: { opacity: 0.6 },
+
   iconBubble: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 10,
+    borderWidth: 1,
   },
-  actionText: { fontWeight: "800", fontSize: 13 },
-
-  badge: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    fontSize: 10,
-    fontWeight: "900",
-    color: "#98A2B3",
-  },
+  actionText: { fontWeight: "900", fontSize: 13, color: "rgba(255,255,255,0.92)" },
+  disabledText: { color: "rgba(255,255,255,0.75)" },
 
   sectionHeader: {
     flexDirection: "row",
@@ -154,24 +202,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 14,
   },
-  sectionTitle: { fontSize: 16, fontWeight: "900" },
-  sectionLink: { color: "#2DB7A3", fontWeight: "800" },
+  sectionTitle: { fontSize: 16, fontWeight: "900", color: "rgba(255,255,255,0.92)" },
+  sectionLink: { color: "rgba(246,195,64,0.95)", fontWeight: "900" },
 
   txItem: {
-    backgroundColor: "white",
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 14,
     marginTop: 10,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#EEF0F3",
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    ...shadow,
   },
-  txTitle: { fontWeight: "900" },
-  txMeta: { color: "#667085", fontSize: 12, fontWeight: "600" },
+  txTitle: { fontWeight: "900", color: "rgba(255,255,255,0.92)" },
+  txMeta: { color: "rgba(255,255,255,0.60)", fontSize: 12, fontWeight: "700" },
 
-  txAmount: { fontWeight: "900" },
-  positive: { color: "#12B76A" },
-  negative: { color: "#F04438" },
+  txAmount: { fontWeight: "900", color: "rgba(255,255,255,0.92)" },
+  positive: { color: "rgba(134, 239, 172, 0.95)" },
+  negative: { color: "rgba(252, 165, 165, 0.95)" },
 });

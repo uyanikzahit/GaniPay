@@ -1,4 +1,6 @@
-﻿using System.Text.Json;
+﻿using Microsoft.Extensions.Configuration;
+using System.Net.Http.Json;
+using System.Text.Json;
 using Zeebe.Client.Api.Responses;
 using Zeebe.Client.Api.Worker;
 
@@ -7,6 +9,15 @@ namespace GaniPay.Login.Worker.Handlers;
 public sealed class AuthFlowJobHandler
 {
     private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
+
+    private readonly HttpClient _http;
+    private readonly string _workflowBaseUrl;
+
+    public AuthFlowJobHandler(HttpClient http, IConfiguration cfg)
+    {
+        _http = http;
+        _workflowBaseUrl = (cfg["WorkflowApi:BaseUrl"] ?? "http://localhost:5160").TrimEnd('/');
+    }
 
     public async Task Handle(IJobClient client, IJob job)
     {
@@ -17,18 +28,39 @@ public sealed class AuthFlowJobHandler
         var jobType = job.Type;
 
         // Çıkış değişkenleri
-        object output = jobType switch
+        object output;
+
+        switch (jobType)
         {
-            "mock.auth.context.prepare" => PrepareContext(vars),
-            "mock.auth.bruteforce.guard" => BruteForceGuard(vars),
-            "mock.auth.account.status" => AccountStatus(vars),
-            "mock.auth.device.trust" => DeviceTrust(vars),
-            "mock.auth.session.create" => CreateSession(vars),
-            "mock.auth.audit.log" => AuditLog(vars),
+            case "mock.auth.context.prepare":
+                output = PrepareContext(vars);
+                break;
+
+            case "mock.auth.bruteforce.guard":
+                output = BruteForceGuard(vars);
+                break;
+
+            case "mock.auth.account.status":
+                output = AccountStatus(vars);
+                break;
+
+            case "mock.auth.device.trust":
+                output = DeviceTrust(vars);
+                break;
+
+            case "mock.auth.session.create":
+                output = CreateSession(vars);
+                break;
+
+            case "mock.auth.audit.log":
+                output = await AuditLogAsync(vars);
+                break;
 
             // yanlış job type gelirse kırma, fail’e düşür (ok=false)
-            _ => new { ok = false, errorCode = "UNSUPPORTED_JOB_TYPE" }
-        };
+            default:
+                output = new { ok = false, errorCode = "UNSUPPORTED_JOB_TYPE" };
+                break;
+        }
 
         var json = JsonSerializer.Serialize(output, JsonOpts);
 
@@ -44,7 +76,11 @@ public sealed class AuthFlowJobHandler
         var phone = GetString(v, "phoneNumber") ?? "";
         var normalized = NormalizePhone(phone);
 
-        var correlationId = Guid.NewGuid().ToString("N");
+        // ✅ KRİTİK: correlationId'yi EZME!
+        // API'den gelen correlationId'yi taşı, yoksa üret.
+        var correlationId =
+            GetString(v, "correlationId")
+            ?? Guid.NewGuid().ToString();
 
         return new
         {
@@ -116,17 +152,44 @@ public sealed class AuthFlowJobHandler
         };
     }
 
-    private static object AuditLog(Dictionary<string, object?> v)
+    private async Task<object> AuditLogAsync(Dictionary<string, object?> v)
     {
-        // Mock audit log (db yoksa bile "ok=true" dön)
-        // success değişkeni gelmişse aynen geçir, yoksa true
-        var success = GetBool(v, "success") ?? true;
+        // ✅ Workflow sonucunu çıkar
+        var correlationId = GetString(v, "correlationId") ?? "";
+        var token = GetString(v, "accessToken"); // CreateSession sonrasında varsa gelir
 
+        var success = !string.IsNullOrWhiteSpace(token);
+        var status = success ? "Succeeded" : "Failed";
+        var message = success ? "Login successful" : "The password or phone number is incorrect.";
+
+        // ✅ Workflow API callback payload
+        var payload = new
+        {
+            correlationId,
+            success,
+            status,
+            message,
+            token
+        };
+
+        // ✅ Callback at (MVP: callback patlarsa akışı kırmıyoruz)
+        try
+        {
+            var url = $"{_workflowBaseUrl}/api/v1/auth/login/result";
+            var resp = await _http.PostAsJsonAsync(url, payload);
+            resp.EnsureSuccessStatusCode();
+        }
+        catch
+        {
+            // intentionally ignore (MVP)
+        }
+
+        // Mock audit log (db yoksa bile "ok=true" dön)
         return new
         {
             ok = true,
             success,
-            errorCode = GetString(v, "errorCode")
+            errorCode = success ? (string?)null : "LOGIN_FAILED"
         };
     }
 

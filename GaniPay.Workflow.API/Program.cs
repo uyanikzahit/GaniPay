@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using Zeebe.Client;
+using GaniPay.Workflow.API.ResultStore;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -159,7 +160,12 @@ authGroup.MapPost("/login", async (
 {
     if (string.IsNullOrWhiteSpace(req.PhoneNumber) || string.IsNullOrWhiteSpace(req.Password))
     {
-        return Results.BadRequest(new { success = false, message = "phoneNumber ve password zorunludur." });
+        return Results.BadRequest(new
+        {
+            success = false,
+            status = "Failed",
+            message = "phoneNumber ve password zorunludur."
+        });
     }
 
     var correlationId =
@@ -167,35 +173,58 @@ authGroup.MapPost("/login", async (
             ? cid.ToString()
             : Guid.NewGuid().ToString();
 
+    // ✅ Aynı correlationId ile daha önce store’a yazılmış eski bir sonuç varsa temizle
+    LoginResultStore.Remove(correlationId);
+
     var variables = new
     {
         correlationId,
         phoneNumber = req.PhoneNumber,
-        password = req.Password,
-        ipAddress = req.IpAddress,
-        deviceId = req.DeviceId,
-        channel = req.Channel,
-        clientVersion = req.ClientVersion
+        password = req.Password
+
     };
 
     var variablesJson = JsonSerializer.Serialize(variables, zeebeJsonOptions);
 
     try
     {
-        var resp = await zeebe.NewCreateProcessInstanceCommand()
+        // 1) Workflow başlat
+        await zeebe.NewCreateProcessInstanceCommand()
             .BpmnProcessId(loginProcessId)
             .LatestVersion()
             .Variables(variablesJson)
             .Send();
 
-        return Results.Accepted(
-            value: new
+        // 2) Kısa süre bekle (max 2 sn) -> store’a sonuç düştüyse dön
+        for (int i = 0; i < 20; i++)
+        {
+            if (LoginResultStore.TryGet(correlationId, out var result))
             {
-                success = true,
-                correlationId,
-                processId = loginProcessId,
-                processInstanceKey = resp.ProcessInstanceKey
-            });
+                // ✅ Okunduktan sonra sil (aynı correlationId tekrar kullanılırsa karışmasın)
+                LoginResultStore.Remove(correlationId);
+
+                return Results.Ok(new
+                {
+                    success = result.Success,
+                    status = result.Status,   // "Succeeded" | "Failed"
+                    message = result.Message,
+                    token = result.Token,
+                    correlationId
+                });
+            }
+
+            await Task.Delay(100, ct);
+        }
+
+        // 3) Hâlâ yoksa -> workflow çalışıyor (başarılı DEME!)
+        // ✅ 202 Accepted dön: UI bunu "bekle/poll et" diye anlayacak
+        return Results.Accepted(value: new
+        {
+            success = false,
+            status = "Running",
+            correlationId,
+            message = "The password or phone number is incorrect."
+        });
     }
     catch (Exception ex)
     {
@@ -205,6 +234,26 @@ authGroup.MapPost("/login", async (
             statusCode: StatusCodes.Status503ServiceUnavailable);
     }
 });
+
+
+authGroup.MapPost("/login/result", (LoginResultCallback body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.CorrelationId))
+        return Results.BadRequest(new { success = false, message = "correlationId zorunlu" });
+
+    LoginResultStore.Set(
+        body.CorrelationId,
+        new LoginResult(body.Success, body.Status, body.Message, body.Token)
+    );
+
+    return Results.Ok(new { success = true });
+});
+
+
+
+
+
+
 
 // -------------------- TOPUP --------------------
 paymentsGroup.MapPost("/topup", async (
@@ -354,6 +403,15 @@ public sealed record RegisterRequest(
     string? Currency
 );
 
+public sealed record LoginResultCallback(
+    string CorrelationId,
+    bool Success,
+    string Status,
+    string Message,
+    string? Token
+);
+
+
 public sealed record RegisterAddress(
     string AddressType,
     string City,
@@ -364,11 +422,7 @@ public sealed record RegisterAddress(
 
 public sealed record LoginRequest(
     string PhoneNumber,
-    string Password,
-    string? IpAddress,
-    string? DeviceId,
-    string? Channel,
-    string? ClientVersion
+    string Password
 );
 
 public sealed record TopUpRequest(

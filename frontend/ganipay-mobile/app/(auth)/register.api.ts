@@ -15,7 +15,7 @@ import type { RegisterPayload } from "./register.types";
 const WEB_BASE_URL = "https://localhost:7253";
 
 // Android emulator için özel localhost
-const ANDROID_EMULATOR_BASE_URL = "http://10.0.2.2:7253";
+const ANDROID_EMULATOR_BASE_URL = "https://10.0.2.2:7253";
 
 // Fiziksel cihaz için PC IP yaz (wifi aynı olmalı)
 const DEVICE_BASE_URL = "http://YOUR_PC_IP:7253";

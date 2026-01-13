@@ -61,6 +61,7 @@
           <zeebe:output source="=ok" target="loginOk" />
           <zeebe:output source="=customerId" target="customerId" />
           <zeebe:output source="=errorCode" target="errorCode" />
+          <zeebe:output source="=accessToken" target="accessToken" />
         </zeebe:ioMapping>
       </bpmn:extensionElements>
       <bpmn:incoming>F3_OK</bpmn:incoming>

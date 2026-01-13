@@ -9,13 +9,19 @@ var builder = Host.CreateApplicationBuilder(args);
 // Options
 builder.Services.Configure<ZeebeOptions>(builder.Configuration.GetSection("Zeebe"));
 builder.Services.Configure<IdentityApiOptions>(builder.Configuration.GetSection("IdentityApi"));
+builder.Services.Configure<WorkflowApiOptions>(builder.Configuration.GetSection("WorkflowApi"));
 
-// HttpClient
-builder.Services.AddHttpClient();
+// HttpClient (DEV: https local sertifika için ignore)
+builder.Services.AddHttpClient<AuthFlowJobHandler>()
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        ServerCertificateCustomValidationCallback =
+            HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+    });
 
 // Handlers
 builder.Services.AddSingleton<IdentityLoginJobHandler>(); // REAL
-builder.Services.AddSingleton<AuthFlowJobHandler>();      // MOCK’ların hepsi tek class
+// ❗ AuthFlowJobHandler burada AddSingleton OLMAYACAK (HttpClient ile geliyor)
 
 // Zeebe Client
 builder.Services.AddSingleton<IZeebeClient>(sp =>
@@ -104,4 +110,9 @@ public sealed class ZeebeOptions
 public sealed class IdentityApiOptions
 {
     public string BaseUrl { get; set; } = "http://localhost:5102";
+}
+
+public sealed class WorkflowApiOptions
+{
+    public string BaseUrl { get; set; } = "https://localhost:7253";
 }

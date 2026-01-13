@@ -1,4 +1,4 @@
-using GaniPay.Identity.Application.Services;
+﻿using GaniPay.Identity.Application.Services;
 using GaniPay.Identity.Domain.Enums;
 using GaniPay.Identity.Infrastructure.DependencyInjection;
 
@@ -44,49 +44,59 @@ group.MapPost("/registrations/start", async (StartRegistrationBody body, Identit
 // POST /api/v1/identity/login
 group.MapPost("/login", async (LoginBody body, IdentityService service, IConfiguration config, CancellationToken ct) =>
 {
-    var cred = await service.LoginAsync(body.PhoneNumber, body.Password, ct);
-
-    var jwtSection = config.GetSection("Jwt");
-    var issuer = jwtSection["Issuer"]!;
-    var audience = jwtSection["Audience"]!;
-    var secret = jwtSection["Secret"]!;
-    var expiresMinutes = int.TryParse(jwtSection["ExpiresMinutes"], out var m) ? m : 60;
-
-    if (string.IsNullOrWhiteSpace(secret) || secret.Length < 32)
-        return Results.Problem("Jwt:Secret must be at least 32 chars.");
-
-    var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
-    var signingCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-    var now = DateTime.UtcNow;
-
-    var claims = new List<Claim>
+    try
     {
-        new(JwtRegisteredClaimNames.Sub, cred.Id.ToString()),
-        new("customerId", cred.CustomerId.ToString()),
-        new("loginType", cred.LoginType.ToString()),
-        new("phoneNumber", cred.LoginValue),
-        new(ClaimTypes.Role, "Customer")
-    };
+        var cred = await service.LoginAsync(body.PhoneNumber, body.Password, ct);
 
-    var token = new JwtSecurityToken(
-        issuer: issuer,
-        audience: audience,
-        claims: claims,
-        notBefore: now,
-        expires: now.AddMinutes(expiresMinutes),
-        signingCredentials: signingCredentials
-    );
+        var jwtSection = config.GetSection("Jwt");
+        var issuer = jwtSection["Issuer"]!;
+        var audience = jwtSection["Audience"]!;
+        var secret = jwtSection["Secret"]!;
+        var expiresMinutes = int.TryParse(jwtSection["ExpiresMinutes"], out var m) ? m : 60;
 
-    var accessToken = new JwtSecurityTokenHandler().WriteToken(token);
+        if (string.IsNullOrWhiteSpace(secret) || secret.Length < 32)
+            return Results.Problem("Jwt:Secret must be at least 32 chars.");
 
-    return Results.Ok(new
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
+        var signingCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var now = DateTime.UtcNow;
+
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, cred.Id.ToString()),
+            new("customerId", cred.CustomerId.ToString()),
+            new("loginType", cred.LoginType.ToString()),
+            new("phoneNumber", cred.LoginValue),
+            new(ClaimTypes.Role, "Customer")
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: issuer,
+            audience: audience,
+            claims: claims,
+            notBefore: now,
+            expires: now.AddMinutes(expiresMinutes),
+            signingCredentials: signingCredentials
+        );
+
+        var accessToken = new JwtSecurityTokenHandler().WriteToken(token);
+
+        return Results.Ok(new
+        {
+            success = true,
+            customerId = cred.CustomerId,
+            accessToken,
+            expiresIn = expiresMinutes * 60
+        });
+    }
+    catch (UnauthorizedAccessException)
     {
-        success = true,
-        customerId = cred.CustomerId,
-        accessToken,
-        expiresIn = expiresMinutes * 60
-    });
+        // ✅ yanlış telefon/şifre -> 401 dön (500 değil)
+        return Results.Unauthorized();
+        // İstersen daha açıklayıcı payload:
+        // return Results.Unauthorized(new { success = false, errorCode = "INVALID_CREDENTIALS", message = "Invalid phone or password." });
+    }
 });
 
 // POST /api/v1/identity/recovery/start
@@ -95,7 +105,7 @@ group.MapPost("/recovery/start", async (StartRecoveryBody body, IdentityService 
     var channel = Enum.TryParse<RecoveryChannel>(body.Channel, true, out var ch) ? ch : RecoveryChannel.Sms;
     var (recovery, plainToken) = await service.StartRecoveryAsync(body.PhoneNumber, channel, ct);
 
-    // MVP: token response�a d�nebilir (prod�da SMS/E-mail ile g�nderilir)
+    // MVP: token response’a dönebilir (prod’da SMS/E-mail ile gönderilir)
     return Results.Ok(new
     {
         recoveryId = recovery.Id,
