@@ -27,7 +27,7 @@ public sealed class CustomerGetJobHandler
         var root = doc.RootElement;
 
         var customerId = TryGetString(root, "customerId");
-        var accessToken = TryGetString(root, "accessToken"); // varsa auth ekleriz
+        var accessToken = TryGetString(root, "accessToken");
 
         if (string.IsNullOrWhiteSpace(customerId))
         {
@@ -47,11 +47,10 @@ public sealed class CustomerGetJobHandler
             http.BaseAddress = new Uri(baseUrl);
             http.Timeout = TimeSpan.FromSeconds(15);
 
-            // Eğer Customer API authorize isterse diye:
             if (!string.IsNullOrWhiteSpace(accessToken))
                 http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-            // ✅ HTTP/1.1 zorla (ResponseEnded problemini çok kez çözer)
+            // ✅ HTTP/1.1 zorla (ResponseEnded problemini engeller)
             var req = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/customers/{customerId}")
             {
                 Version = HttpVersion.Version11,
@@ -71,9 +70,10 @@ public sealed class CustomerGetJobHandler
                 return;
             }
 
+            var raw = await resp.Content.ReadAsStringAsync();
+
             if (!resp.IsSuccessStatusCode)
             {
-                var raw = await resp.Content.ReadAsStringAsync();
                 await CompleteAsync(client, job, new
                 {
                     customerOk = false,
@@ -84,20 +84,69 @@ public sealed class CustomerGetJobHandler
                 return;
             }
 
-            // DTO parçalamıyoruz: response’u “customer” olarak aynen taşı
-            using var bodyDoc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
-            var customer = bodyDoc.RootElement.Clone();
+            // ✅ DTO yok: raw json güvenli parse
+            using var body = JsonDocument.Parse(raw);
+            var b = body.RootElement;
+
+            // Üst seviye alanlar (varsa)
+            var id = GetString(b, "id") ?? customerId;
+            var customerNumber = GetString(b, "customerNumber");
+            var status = GetString(b, "status");
+            var segment = GetString(b, "segment");
+            var type = GetString(b, "type");
+
+            // nested: customer
+            var cust = GetObject(b, "customer");
+            var firstName = cust is null ? null : GetString(cust.Value, "firstName");
+            var lastName = cust is null ? null : GetString(cust.Value, "lastName");
+            var birthDate = cust is null ? null : GetString(cust.Value, "birthDate");
+            var nationality = cust is null ? null : GetString(cust.Value, "nationality");
+
+            // emails[0].emailAddress
+            var email = GetFirstArrayObjectString(b, "emails", "emailAddress");
+
+            // phones[0].phoneNumber
+            var phoneNumber = GetFirstArrayObjectString(b, "phones", "phoneNumber");
+
+            // addresses[0] basic
+            var addrObj = GetFirstArrayObject(b, "addresses");
+            var address = addrObj is null
+                ? null
+                : new
+                {
+                    addressType = GetString(addrObj.Value, "addressType"),
+                    city = GetString(addrObj.Value, "city"),
+                    district = GetString(addrObj.Value, "district"),
+                    postalCode = GetString(addrObj.Value, "postalCode"),
+                    addressLine1 = GetString(addrObj.Value, "addressLine1")
+                };
+
+            // ✅ Camunda’da kullanacağımız customer objesi (küçük ve sabit)
+            var customerOut = new
+            {
+                customerId = id,
+                customerNumber,
+                status,
+                segment,
+                type,
+                firstName,
+                lastName,
+                birthDate,
+                nationality,
+                email,
+                phoneNumber,
+                address
+            };
 
             await CompleteAsync(client, job, new
             {
                 customerOk = true,
                 errorCode = (string?)null,
-                customer
+                customer = customerOut
             });
         }
         catch (Exception ex)
         {
-            // burada Complete yerine Fail de yapabilirsin ama MVP’de “customerOk=false” daha iyi
             await CompleteAsync(client, job, new
             {
                 customerOk = false,
@@ -118,5 +167,36 @@ public sealed class CustomerGetJobHandler
     {
         if (!root.TryGetProperty(name, out var p)) return null;
         return p.ValueKind == JsonValueKind.String ? p.GetString() : p.GetRawText();
+    }
+
+    private static JsonElement? GetObject(JsonElement root, string name)
+    {
+        if (!root.TryGetProperty(name, out var p)) return null;
+        return p.ValueKind == JsonValueKind.Object ? p : null;
+    }
+
+    private static string? GetString(JsonElement root, string name)
+    {
+        if (!root.TryGetProperty(name, out var p)) return null;
+        if (p.ValueKind == JsonValueKind.String) return p.GetString();
+        if (p.ValueKind == JsonValueKind.Number) return p.GetRawText();
+        if (p.ValueKind == JsonValueKind.True) return "true";
+        if (p.ValueKind == JsonValueKind.False) return "false";
+        return null;
+    }
+
+    private static JsonElement? GetFirstArrayObject(JsonElement root, string arrayName)
+    {
+        if (!root.TryGetProperty(arrayName, out var arr)) return null;
+        if (arr.ValueKind != JsonValueKind.Array) return null;
+        using var e = arr.EnumerateArray();
+        if (!e.MoveNext()) return null;
+        return e.Current.ValueKind == JsonValueKind.Object ? e.Current : null;
+    }
+
+    private static string? GetFirstArrayObjectString(JsonElement root, string arrayName, string fieldName)
+    {
+        var obj = GetFirstArrayObject(root, arrayName);
+        return obj is null ? null : GetString(obj.Value, fieldName);
     }
 }

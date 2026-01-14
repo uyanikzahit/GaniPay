@@ -69,9 +69,10 @@ public sealed class AccountGetJobHandler
                 return;
             }
 
+            var raw = await resp.Content.ReadAsStringAsync();
+
             if (!resp.IsSuccessStatusCode)
             {
-                var raw = await resp.Content.ReadAsStringAsync();
                 await CompleteAsync(client, job, new
                 {
                     accountOk = false,
@@ -82,14 +83,28 @@ public sealed class AccountGetJobHandler
                 return;
             }
 
-            using var bodyDoc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
-            var wallets = bodyDoc.RootElement.Clone();
+            using var body = JsonDocument.Parse(raw);
+            var b = body.RootElement;
+
+            var respCustomerId = GetString(b, "customerId") ?? customerId;
+
+            // accounts array -> minimal liste
+            var accounts = GetAccountsMinimal(b);
+
+            // ✅ accountOk: accounts var ve en az 1 tane var ise true
+            var ok = accounts is not null && accounts.Count > 0;
+
+            var walletsOut = new
+            {
+                customerId = respCustomerId,
+                accounts // [{accountId,currency,balance,status}]
+            };
 
             await CompleteAsync(client, job, new
             {
-                accountOk = true,
-                errorCode = (string?)null,
-                wallets
+                accountOk = ok,
+                errorCode = ok ? null : "NO_WALLET_ACCOUNT",
+                wallets = walletsOut
             });
         }
         catch (Exception ex)
@@ -104,6 +119,27 @@ public sealed class AccountGetJobHandler
         }
     }
 
+    private static List<object>? GetAccountsMinimal(JsonElement root)
+    {
+        if (!root.TryGetProperty("accounts", out var arr)) return null;
+        if (arr.ValueKind != JsonValueKind.Array) return null;
+
+        var list = new List<object>();
+        foreach (var a in arr.EnumerateArray())
+        {
+            if (a.ValueKind != JsonValueKind.Object) continue;
+
+            list.Add(new
+            {
+                accountId = GetString(a, "id"),
+                currency = GetString(a, "currency"),
+                balance = GetDecimal(a, "balance"),
+                status = GetInt(a, "status")
+            });
+        }
+        return list;
+    }
+
     private static async Task CompleteAsync(IJobClient client, IJob job, object variables)
     {
         var json = JsonSerializer.Serialize(variables, JsonOpts);
@@ -114,5 +150,29 @@ public sealed class AccountGetJobHandler
     {
         if (!root.TryGetProperty(name, out var p)) return null;
         return p.ValueKind == JsonValueKind.String ? p.GetString() : p.GetRawText();
+    }
+
+    private static string? GetString(JsonElement root, string name)
+    {
+        if (!root.TryGetProperty(name, out var p)) return null;
+        if (p.ValueKind == JsonValueKind.String) return p.GetString();
+        if (p.ValueKind == JsonValueKind.Number) return p.GetRawText();
+        return null;
+    }
+
+    private static decimal GetDecimal(JsonElement root, string name)
+    {
+        if (!root.TryGetProperty(name, out var p)) return 0m;
+        if (p.ValueKind == JsonValueKind.Number && p.TryGetDecimal(out var d)) return d;
+        if (p.ValueKind == JsonValueKind.String && decimal.TryParse(p.GetString(), out var ds)) return ds;
+        return 0m;
+    }
+
+    private static int GetInt(JsonElement root, string name)
+    {
+        if (!root.TryGetProperty(name, out var p)) return 0;
+        if (p.ValueKind == JsonValueKind.Number && p.TryGetInt32(out var i)) return i;
+        if (p.ValueKind == JsonValueKind.String && int.TryParse(p.GetString(), out var isx)) return isx;
+        return 0;
     }
 }

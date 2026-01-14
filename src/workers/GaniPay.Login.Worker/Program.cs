@@ -13,52 +13,34 @@ builder.Services.Configure<IdentityApiOptions>(builder.Configuration.GetSection(
 builder.Services.Configure<CustomerApiOptions>(builder.Configuration.GetSection("CustomerApi"));
 builder.Services.Configure<AccountingApiOptions>(builder.Configuration.GetSection("AccountingApi"));
 
-// -------------------- HttpClient (DEV: https local sertifika için ignore) --------------------
-// Typed clients: handler'lar HttpClient alacak şekilde yazılırsa en temiz yol bu.
+// -------------------- HttpClient (DEV: sertifika ignore) --------------------
+// Identity (http ise sorun yok ama aynı standartta kalsın)
+builder.Services.AddHttpClient();
+
+// Customer API (https olduğun için sertifika ignore şart)
+builder.Services.AddHttpClient("customer")
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        ServerCertificateCustomValidationCallback =
+            HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+    });
+
+// Accounting API (http)
+builder.Services.AddHttpClient("accounting");
+
+// AuthFlowJobHandler (mock tasklar için) -> https ignore lazım olabilir diye aynı handler veriyoruz
 builder.Services.AddHttpClient<AuthFlowJobHandler>()
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
     {
         ServerCertificateCustomValidationCallback =
             HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-    })
-    .SetHandlerLifetime(TimeSpan.FromMinutes(5))
-    .ConfigureHttpClient(c => c.Timeout = TimeSpan.FromSeconds(15));
-
-builder.Services.AddHttpClient<IdentityLoginJobHandler>()
-    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-    {
-        ServerCertificateCustomValidationCallback =
-            HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-    })
-    .SetHandlerLifetime(TimeSpan.FromMinutes(5))
-    .ConfigureHttpClient(c => c.Timeout = TimeSpan.FromSeconds(15));
-
-builder.Services.AddHttpClient<CustomerGetJobHandler>()
-    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-    {
-        ServerCertificateCustomValidationCallback =
-            HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-    })
-    .SetHandlerLifetime(TimeSpan.FromMinutes(5))
-    .ConfigureHttpClient(c => c.Timeout = TimeSpan.FromSeconds(15));
-
-builder.Services.AddHttpClient<AccountGetJobHandler>()
-    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-    {
-        ServerCertificateCustomValidationCallback =
-            HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-    })
-    .SetHandlerLifetime(TimeSpan.FromMinutes(5))
-    .ConfigureHttpClient(c => c.Timeout = TimeSpan.FromSeconds(15));
+    });
 
 // -------------------- Handlers --------------------
-// REAL
-builder.Services.AddSingleton<IdentityLoginJobHandler>();
-builder.Services.AddSingleton<CustomerGetJobHandler>();
-builder.Services.AddSingleton<AccountGetJobHandler>();
-
-// MOCK (Typed HttpClient ile gelir -> AddSingleton verme)
-// AuthFlowJobHandler typed client ile otomatik çözülür
+builder.Services.AddSingleton<IdentityLoginJobHandler>();     // REAL
+builder.Services.AddSingleton<CustomerGetJobHandler>();       // REAL
+builder.Services.AddSingleton<AccountGetJobHandler>();        // REAL
+// AuthFlowJobHandler AddSingleton OLMAYACAK (typed HttpClient ile geliyor)
 
 // -------------------- Zeebe Client --------------------
 builder.Services.AddSingleton<IZeebeClient>(sp =>
@@ -74,16 +56,14 @@ builder.Services.AddSingleton<IZeebeClient>(sp =>
 var host = builder.Build();
 
 var zeebe = host.Services.GetRequiredService<IZeebeClient>();
-
 var identityHandler = host.Services.GetRequiredService<IdentityLoginJobHandler>();
 var customerHandler = host.Services.GetRequiredService<CustomerGetJobHandler>();
 var accountHandler = host.Services.GetRequiredService<AccountGetJobHandler>();
-
 var flowHandler = host.Services.GetRequiredService<AuthFlowJobHandler>();
 
 // -------------------- WORKERS --------------------
 
-// 1) REAL: identity.login
+// 1) REAL - Identity Login
 using var identityWorker = zeebe.NewWorker()
     .JobType("identity.login")
     .Handler(identityHandler.Handle)
@@ -92,7 +72,7 @@ using var identityWorker = zeebe.NewWorker()
     .Timeout(TimeSpan.FromSeconds(30))
     .Open();
 
-// 2) REAL: login.customer.get
+// 2) REAL - Customer Get
 using var customerWorker = zeebe.NewWorker()
     .JobType("login.customer.get")
     .Handler(customerHandler.Handle)
@@ -101,7 +81,7 @@ using var customerWorker = zeebe.NewWorker()
     .Timeout(TimeSpan.FromSeconds(30))
     .Open();
 
-// 3) REAL: login.account.get
+// 3) REAL - Account Get (account.active yerine geçti)
 using var accountWorker = zeebe.NewWorker()
     .JobType("login.account.get")
     .Handler(accountHandler.Handle)
@@ -110,7 +90,7 @@ using var accountWorker = zeebe.NewWorker()
     .Timeout(TimeSpan.FromSeconds(30))
     .Open();
 
-// 4) MOCK job types (tek handler class)
+// 4) MOCK - Prepare Context
 using var prepareWorker = zeebe.NewWorker()
     .JobType("mock.auth.context.prepare")
     .Handler(flowHandler.Handle)
@@ -119,6 +99,7 @@ using var prepareWorker = zeebe.NewWorker()
     .Timeout(TimeSpan.FromSeconds(30))
     .Open();
 
+// 5) MOCK - Bruteforce Guard
 using var guardWorker = zeebe.NewWorker()
     .JobType("mock.auth.bruteforce.guard")
     .Handler(flowHandler.Handle)
@@ -127,6 +108,7 @@ using var guardWorker = zeebe.NewWorker()
     .Timeout(TimeSpan.FromSeconds(30))
     .Open();
 
+// 6) MOCK - Device Trust
 using var deviceWorker = zeebe.NewWorker()
     .JobType("mock.auth.device.trust")
     .Handler(flowHandler.Handle)
@@ -135,6 +117,7 @@ using var deviceWorker = zeebe.NewWorker()
     .Timeout(TimeSpan.FromSeconds(30))
     .Open();
 
+// 7) MOCK - Session Create
 using var sessionWorker = zeebe.NewWorker()
     .JobType("mock.auth.session.create")
     .Handler(flowHandler.Handle)
@@ -143,6 +126,7 @@ using var sessionWorker = zeebe.NewWorker()
     .Timeout(TimeSpan.FromSeconds(30))
     .Open();
 
+// 8) MOCK - Audit Log
 using var auditWorker = zeebe.NewWorker()
     .JobType("mock.auth.audit.log")
     .Handler(flowHandler.Handle)

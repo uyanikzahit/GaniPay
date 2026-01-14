@@ -223,7 +223,7 @@ authGroup.MapPost("/login", async (
             success = false,
             status = "Running",
             correlationId,
-            message = "The password or phone number is incorrect."
+            message = "Login is being processed."
         });
     }
     catch (Exception ex)

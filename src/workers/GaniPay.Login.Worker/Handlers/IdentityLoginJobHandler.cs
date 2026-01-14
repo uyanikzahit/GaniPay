@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Zeebe.Client.Api.Responses;
 using Zeebe.Client.Api.Worker;
+using GaniPay.Login.Worker.Options;
 
 namespace GaniPay.Login.Worker.Handlers;
 

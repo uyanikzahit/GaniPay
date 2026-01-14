@@ -54,12 +54,9 @@ export default function TabLayout() {
         icon: "wallet-outline",
         onPress: () => {
           setMenuOpen(false);
-          // mock (şimdilik)
+          router.push("/(tabs)/wallet");
         },
       },
-
-      // ✅ Wallet altına Top up + Transfer alt menü (aynı grup gibi)
-      // (render sırasında hemen wallet'ın altında gösteriyoruz)
 
       {
         key: "limits",
@@ -68,6 +65,7 @@ export default function TabLayout() {
         icon: "speedometer-outline",
         onPress: () => {
           setMenuOpen(false);
+          router.push("/(tabs)/limits");
         },
       },
       {
@@ -77,6 +75,7 @@ export default function TabLayout() {
         icon: "shield-checkmark-outline",
         onPress: () => {
           setMenuOpen(false);
+          router.push("/(tabs)/security");
         },
       },
       {
@@ -149,7 +148,7 @@ export default function TabLayout() {
 
           // ✅ Logo kesin sol + 2x büyütme
           headerTitle: "",
-          headerLeftContainerStyle: { paddingLeft: 0, marginLeft: 0 }, // ✅ en sola
+          headerLeftContainerStyle: { paddingLeft: 0, marginLeft: 0 },
           headerLeft: () => (
             <View style={styles.headerLeftWrap}>
               <Image
@@ -228,10 +227,20 @@ export default function TabLayout() {
             ),
           }}
         />
+
+        {/* ✅ SABİT KALMASI İÇİN: tab bar’da görünmeyen screens (HATASIZ) */}
+        <Tabs.Screen name="wallet" options={{ href: null }} />
+        <Tabs.Screen name="limits" options={{ href: null }} />
+        <Tabs.Screen name="security" options={{ href: null }} />
       </Tabs>
 
       {/* ✅ Premium menu modal */}
-      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+      <Modal
+        visible={menuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuOpen(false)}
+      >
         <Pressable style={styles.backdrop} onPress={() => setMenuOpen(false)} />
 
         <View style={styles.sheetWrap} pointerEvents="box-none">
@@ -254,7 +263,10 @@ export default function TabLayout() {
                   value={darkMode}
                   onValueChange={setDarkMode}
                   thumbColor={darkMode ? GOLD : undefined}
-                  trackColor={{ false: "rgba(255,255,255,0.18)", true: "rgba(246,195,64,0.25)" }}
+                  trackColor={{
+                    false: "rgba(255,255,255,0.18)",
+                    true: "rgba(246,195,64,0.25)",
+                  }}
                 />
               </View>
 
@@ -276,7 +288,12 @@ export default function TabLayout() {
                   onPress={it.onPress}
                   style={({ pressed }) => [styles.item, pressed && { opacity: 0.9 }]}
                 >
-                  <View style={[styles.itemIconWrap, it.tone === "danger" && styles.itemIconWrapDanger]}>
+                  <View
+                    style={[
+                      styles.itemIconWrap,
+                      it.tone === "danger" && styles.itemIconWrapDanger,
+                    ]}
+                  >
                     <Ionicons
                       name={it.icon}
                       size={18}
@@ -285,7 +302,12 @@ export default function TabLayout() {
                   </View>
 
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.itemTitle, it.tone === "danger" && styles.itemTitleDanger]}>
+                    <Text
+                      style={[
+                        styles.itemTitle,
+                        it.tone === "danger" && styles.itemTitleDanger,
+                      ]}
+                    >
                       {it.title}
                     </Text>
                     {!!it.subtitle && <Text style={styles.itemSub}>{it.subtitle}</Text>}
@@ -297,60 +319,51 @@ export default function TabLayout() {
 
               if (it.key !== "wallet") return row;
 
-              // ✅ Wallet'tan hemen sonra 2 alt item (Top up + Transfer)
               return (
-              <View key="wallet-group">
-                {row}
+                <View key="wallet-group">
+                  {row}
 
-                {/* ✅ Top up - aynı item tasarımı, sadece içerden */}
-                <Pressable
-                  onPress={() => {
-                    setMenuOpen(false);
-                    router.push("/(tabs)/topup");
-                  }}
-                  style={({ pressed }) => [
-                    styles.item,
-                    styles.itemIndented, // ✅ sadece indent
-                    pressed && { opacity: 0.9 },
-                  ]}
-                >
-                  <View style={styles.itemIconWrap}>
-                    <Ionicons name="wallet-outline" size={18} color={GOLD} />
-                  </View>
+                  {/* ✅ Top up (Wallet altında, aynı format) */}
+                  <Pressable
+                    onPress={() => {
+                      setMenuOpen(false);
+                      router.push("/(tabs)/topup");
+                    }}
+                    style={({ pressed }) => [styles.item, pressed && { opacity: 0.9 }]}
+                  >
+                    <View style={styles.itemIconWrap}>
+                      <Ionicons name="wallet-outline" size={18} color={GOLD} />
+                    </View>
 
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.itemTitle}>Top up</Text>
-                    <Text style={styles.itemSub}>Add money to your wallet</Text>
-                  </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.itemTitle}>Top up</Text>
+                      <Text style={styles.itemSub}>Add money to your wallet</Text>
+                    </View>
 
-                  <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.35)" />
-                </Pressable>
+                    <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.35)" />
+                  </Pressable>
 
-                {/* ✅ Transfer - aynı item tasarımı, sadece içerden */}
-                <Pressable
-                  onPress={() => {
-                    setMenuOpen(false);
-                    router.push("/(tabs)/transfer");
-                  }}
-                  style={({ pressed }) => [
-                    styles.item,
-                    styles.itemIndented, // ✅ sadece indent
-                    pressed && { opacity: 0.9 },
-                  ]}
-                >
-                  <View style={styles.itemIconWrap}>
-                    <Ionicons name="swap-horizontal-outline" size={18} color={GOLD} />
-                  </View>
+                  {/* ✅ Transfer (Wallet altında, aynı format) */}
+                  <Pressable
+                    onPress={() => {
+                      setMenuOpen(false);
+                      router.push("/(tabs)/transfer");
+                    }}
+                    style={({ pressed }) => [styles.item, pressed && { opacity: 0.9 }]}
+                  >
+                    <View style={styles.itemIconWrap}>
+                      <Ionicons name="swap-horizontal-outline" size={18} color={GOLD} />
+                    </View>
 
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.itemTitle}>Transfer</Text>
-                    <Text style={styles.itemSub}>Send money instantly</Text>
-                  </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.itemTitle}>Transfer</Text>
+                      <Text style={styles.itemSub}>Send money instantly</Text>
+                    </View>
 
-                  <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.35)" />
-                </Pressable>
-              </View>
-            );
+                    <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.35)" />
+                  </Pressable>
+                </View>
+              );
             })}
           </View>
         </View>
@@ -365,16 +378,12 @@ const styles = StyleSheet.create({
     height: 56,
     justifyContent: "center",
     paddingLeft: 0,
-    marginLeft: -90, // ✅ en sola yasla (gerekirse -18)
+    marginLeft: -90,
   },
   logo: {
-    height: 62,  // ✅ büyütüldü (2x hissi)
-    width: 260,  // ✅ büyütüldü
+    height: 62,
+    width: 260,
   },
-
-    itemIndented: {
-      marginLeft: 44, // wallet altına içerden dursun
-    },
 
   menuBtn: {
     width: 44,
@@ -488,9 +497,9 @@ const styles = StyleSheet.create({
   itemTitleDanger: { color: "rgba(252,165,165,0.95)" },
   itemSub: { marginTop: 3, color: "rgba(255,255,255,0.55)", fontSize: 11.5, fontWeight: "700" },
 
-  // ✅ Wallet alt item stili (indent)
+  // (Dosyanda vardı, dokunmadım)
   subItem: {
-    marginLeft: 44, // ✅ wallet ikon + boşluk kadar içerden başla
+    marginLeft: 44,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
