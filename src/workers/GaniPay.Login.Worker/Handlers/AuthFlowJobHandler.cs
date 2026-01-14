@@ -40,9 +40,7 @@ public sealed class AuthFlowJobHandler
                 output = BruteForceGuard(vars);
                 break;
 
-            case "mock.auth.account.status":
-                output = AccountStatus(vars);
-                break;
+
 
             case "mock.auth.device.trust":
                 output = DeviceTrust(vars);

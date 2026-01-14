@@ -1,4 +1,5 @@
 ﻿using GaniPay.Login.Worker.Handlers;
+using GaniPay.Login.Worker.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -6,41 +7,83 @@ using Zeebe.Client;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-// Options
+// -------------------- Options --------------------
 builder.Services.Configure<ZeebeOptions>(builder.Configuration.GetSection("Zeebe"));
 builder.Services.Configure<IdentityApiOptions>(builder.Configuration.GetSection("IdentityApi"));
-builder.Services.Configure<WorkflowApiOptions>(builder.Configuration.GetSection("WorkflowApi"));
+builder.Services.Configure<CustomerApiOptions>(builder.Configuration.GetSection("CustomerApi"));
+builder.Services.Configure<AccountingApiOptions>(builder.Configuration.GetSection("AccountingApi"));
 
-// HttpClient (DEV: https local sertifika için ignore)
+// -------------------- HttpClient (DEV: https local sertifika için ignore) --------------------
+// Typed clients: handler'lar HttpClient alacak şekilde yazılırsa en temiz yol bu.
 builder.Services.AddHttpClient<AuthFlowJobHandler>()
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
     {
         ServerCertificateCustomValidationCallback =
             HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-    });
+    })
+    .SetHandlerLifetime(TimeSpan.FromMinutes(5))
+    .ConfigureHttpClient(c => c.Timeout = TimeSpan.FromSeconds(15));
 
-// Handlers
-builder.Services.AddSingleton<IdentityLoginJobHandler>(); // REAL
-// ❗ AuthFlowJobHandler burada AddSingleton OLMAYACAK (HttpClient ile geliyor)
+builder.Services.AddHttpClient<IdentityLoginJobHandler>()
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        ServerCertificateCustomValidationCallback =
+            HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+    })
+    .SetHandlerLifetime(TimeSpan.FromMinutes(5))
+    .ConfigureHttpClient(c => c.Timeout = TimeSpan.FromSeconds(15));
 
-// Zeebe Client
+builder.Services.AddHttpClient<CustomerGetJobHandler>()
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        ServerCertificateCustomValidationCallback =
+            HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+    })
+    .SetHandlerLifetime(TimeSpan.FromMinutes(5))
+    .ConfigureHttpClient(c => c.Timeout = TimeSpan.FromSeconds(15));
+
+builder.Services.AddHttpClient<AccountGetJobHandler>()
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        ServerCertificateCustomValidationCallback =
+            HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+    })
+    .SetHandlerLifetime(TimeSpan.FromMinutes(5))
+    .ConfigureHttpClient(c => c.Timeout = TimeSpan.FromSeconds(15));
+
+// -------------------- Handlers --------------------
+// REAL
+builder.Services.AddSingleton<IdentityLoginJobHandler>();
+builder.Services.AddSingleton<CustomerGetJobHandler>();
+builder.Services.AddSingleton<AccountGetJobHandler>();
+
+// MOCK (Typed HttpClient ile gelir -> AddSingleton verme)
+// AuthFlowJobHandler typed client ile otomatik çözülür
+
+// -------------------- Zeebe Client --------------------
 builder.Services.AddSingleton<IZeebeClient>(sp =>
 {
     var opt = sp.GetRequiredService<IOptions<ZeebeOptions>>().Value;
 
     return ZeebeClient.Builder()
         .UseGatewayAddress(opt.GatewayAddress)
-        .UsePlainText() // local dev
+        .UsePlainText()
         .Build();
 });
 
 var host = builder.Build();
 
 var zeebe = host.Services.GetRequiredService<IZeebeClient>();
+
 var identityHandler = host.Services.GetRequiredService<IdentityLoginJobHandler>();
+var customerHandler = host.Services.GetRequiredService<CustomerGetJobHandler>();
+var accountHandler = host.Services.GetRequiredService<AccountGetJobHandler>();
+
 var flowHandler = host.Services.GetRequiredService<AuthFlowJobHandler>();
 
-// 1) REAL
+// -------------------- WORKERS --------------------
+
+// 1) REAL: identity.login
 using var identityWorker = zeebe.NewWorker()
     .JobType("identity.login")
     .Handler(identityHandler.Handle)
@@ -49,7 +92,25 @@ using var identityWorker = zeebe.NewWorker()
     .Timeout(TimeSpan.FromSeconds(30))
     .Open();
 
-// 2) MOCK job types (tek handler class)
+// 2) REAL: login.customer.get
+using var customerWorker = zeebe.NewWorker()
+    .JobType("login.customer.get")
+    .Handler(customerHandler.Handle)
+    .Name("GaniPay.Login.Worker.customer")
+    .MaxJobsActive(10)
+    .Timeout(TimeSpan.FromSeconds(30))
+    .Open();
+
+// 3) REAL: login.account.get
+using var accountWorker = zeebe.NewWorker()
+    .JobType("login.account.get")
+    .Handler(accountHandler.Handle)
+    .Name("GaniPay.Login.Worker.account")
+    .MaxJobsActive(10)
+    .Timeout(TimeSpan.FromSeconds(30))
+    .Open();
+
+// 4) MOCK job types (tek handler class)
 using var prepareWorker = zeebe.NewWorker()
     .JobType("mock.auth.context.prepare")
     .Handler(flowHandler.Handle)
@@ -62,14 +123,6 @@ using var guardWorker = zeebe.NewWorker()
     .JobType("mock.auth.bruteforce.guard")
     .Handler(flowHandler.Handle)
     .Name("GaniPay.Login.Worker.guard")
-    .MaxJobsActive(10)
-    .Timeout(TimeSpan.FromSeconds(30))
-    .Open();
-
-using var accountWorker = zeebe.NewWorker()
-    .JobType("mock.auth.account.status")
-    .Handler(flowHandler.Handle)
-    .Name("GaniPay.Login.Worker.account")
     .MaxJobsActive(10)
     .Timeout(TimeSpan.FromSeconds(30))
     .Open();
@@ -99,20 +152,3 @@ using var auditWorker = zeebe.NewWorker()
     .Open();
 
 await host.RunAsync();
-
-
-// ---- Options Classes (aynı dosyada kalsın) ----
-public sealed class ZeebeOptions
-{
-    public string GatewayAddress { get; set; } = "127.0.0.1:26500";
-}
-
-public sealed class IdentityApiOptions
-{
-    public string BaseUrl { get; set; } = "http://localhost:5102";
-}
-
-public sealed class WorkflowApiOptions
-{
-    public string BaseUrl { get; set; } = "https://localhost:7253";
-}

@@ -24,7 +24,6 @@ type MenuItem = {
   subtitle?: string;
   icon: React.ComponentProps<typeof Ionicons>["name"];
   tone?: "default" | "danger";
-  kind?: "link";
   onPress?: () => void;
 };
 
@@ -32,10 +31,8 @@ export default function TabLayout() {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // ✅ Local-only toggles (sonra global settings’e bağlarız)
+  // ✅ Local-only settings
   const [darkMode, setDarkMode] = useState(true);
-  const [nightShift, setNightShift] = useState(true);
-  const [pushNotifs, setPushNotifs] = useState(true);
   const [language, setLanguage] = useState<"EN" | "TR">("EN");
 
   const items: MenuItem[] = useMemo(
@@ -52,73 +49,80 @@ export default function TabLayout() {
       },
       {
         key: "wallet",
-        title: "Wallet & cards",
-        subtitle: "Linked cards, funding sources",
-        icon: "card-outline",
-        onPress: () => setMenuOpen(false),
+        title: "Wallet",
+        subtitle: "Funding sources & balances",
+        icon: "wallet-outline",
+        onPress: () => {
+          setMenuOpen(false);
+          // mock (şimdilik)
+        },
       },
+
+      // ✅ Wallet altına Top up + Transfer alt menü (aynı grup gibi)
+      // (render sırasında hemen wallet'ın altında gösteriyoruz)
+
       {
         key: "limits",
         title: "Spending limits",
         subtitle: "Daily/Monthly limits, rules",
         icon: "speedometer-outline",
-        onPress: () => setMenuOpen(false),
+        onPress: () => {
+          setMenuOpen(false);
+        },
       },
       {
         key: "security",
         title: "Security",
-        subtitle: "PIN, biometrics, trusted devices",
+        subtitle: "PIN, biometrics, sign-in options",
         icon: "shield-checkmark-outline",
-        onPress: () => setMenuOpen(false),
-      },
-      {
-        key: "devices",
-        title: "Trusted devices",
-        subtitle: "Manage active sessions",
-        icon: "phone-portrait-outline",
-        onPress: () => setMenuOpen(false),
+        onPress: () => {
+          setMenuOpen(false);
+        },
       },
       {
         key: "notifications",
         title: "Notifications",
-        subtitle: "Push alerts, email preferences",
+        subtitle: "Alerts & preferences",
         icon: "notifications-outline",
-        onPress: () => setMenuOpen(false),
+        onPress: () => {
+          setMenuOpen(false);
+        },
       },
       {
-        key: "appearance",
-        title: "Appearance",
-        subtitle: "Theme & readability",
-        icon: "color-palette-outline",
-        onPress: () => setMenuOpen(false),
+        key: "paybills",
+        title: "Pay bills",
+        subtitle: "Utilities & subscriptions",
+        icon: "receipt-outline",
+        onPress: () => {
+          setMenuOpen(false);
+        },
       },
       {
-        key: "support",
-        title: "Help center",
-        subtitle: "FAQ, contact support",
-        icon: "help-circle-outline",
-        onPress: () => setMenuOpen(false),
-      },
-      {
-        key: "report",
-        title: "Report a problem",
-        subtitle: "Send feedback & logs",
-        icon: "bug-outline",
-        onPress: () => setMenuOpen(false),
+        key: "partners",
+        title: "Partner stores",
+        subtitle: "Deals & supported merchants",
+        icon: "storefront-outline",
+        onPress: () => {
+          setMenuOpen(false);
+        },
       },
       {
         key: "legal",
         title: "Legal",
         subtitle: "Terms, privacy policy",
         icon: "document-text-outline",
-        onPress: () => setMenuOpen(false),
+        onPress: () => {
+          setMenuOpen(false);
+        },
       },
       {
         key: "about",
         title: "About GaniPay",
         subtitle: "Version, build info",
         icon: "information-circle-outline",
-        onPress: () => setMenuOpen(false),
+        onPress: () => {
+          setMenuOpen(false);
+        },
       },
       {
         key: "logout",
@@ -128,7 +132,6 @@ export default function TabLayout() {
         tone: "danger",
         onPress: () => {
           setMenuOpen(false);
-          // sonra token temizleyip login’e döneceğiz
           // router.replace("/(auth)/login");
         },
       },
@@ -144,8 +147,9 @@ export default function TabLayout() {
           headerStyle: { backgroundColor: NAV_BG },
           headerShadowVisible: false,
 
-          // ✅ Logo kesin sola: headerLeft içine aldık
+          // ✅ Logo kesin sol + 2x büyütme
           headerTitle: "",
+          headerLeftContainerStyle: { paddingLeft: 0, marginLeft: 0 }, // ✅ en sola
           headerLeft: () => (
             <View style={styles.headerLeftWrap}>
               <Image
@@ -156,7 +160,6 @@ export default function TabLayout() {
             </View>
           ),
 
-          // ✅ Sağ menü butonu
           headerRight: () => (
             <Pressable
               onPress={() => setMenuOpen(true)}
@@ -195,9 +198,7 @@ export default function TabLayout() {
           name="index"
           options={{
             title: "Home",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="home" size={size} color={color} />
-            ),
+            tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
           }}
         />
         <Tabs.Screen
@@ -231,7 +232,6 @@ export default function TabLayout() {
 
       {/* ✅ Premium menu modal */}
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
-        {/* ✅ Arka plan karartma artırıldı (yazı karışmasını önler) */}
         <Pressable style={styles.backdrop} onPress={() => setMenuOpen(false)} />
 
         <View style={styles.sheetWrap} pointerEvents="box-none">
@@ -246,7 +246,7 @@ export default function TabLayout() {
               </Pressable>
             </View>
 
-            {/* ✅ Quick toggles (premium cüzdan tarzı) */}
+            {/* ✅ Sadece Dark mode + Language yan yana */}
             <View style={styles.quickRow}>
               <View style={styles.quickItem}>
                 <Text style={styles.quickLabel}>Dark mode</Text>
@@ -254,28 +254,6 @@ export default function TabLayout() {
                   value={darkMode}
                   onValueChange={setDarkMode}
                   thumbColor={darkMode ? GOLD : undefined}
-                  trackColor={{ false: "rgba(255,255,255,0.18)", true: "rgba(246,195,64,0.25)" }}
-                />
-              </View>
-
-              <View style={styles.quickItem}>
-                <Text style={styles.quickLabel}>Night shift</Text>
-                <Switch
-                  value={nightShift}
-                  onValueChange={setNightShift}
-                  thumbColor={nightShift ? GOLD : undefined}
-                  trackColor={{ false: "rgba(255,255,255,0.18)", true: "rgba(246,195,64,0.25)" }}
-                />
-              </View>
-            </View>
-
-            <View style={styles.quickRow}>
-              <View style={styles.quickItem}>
-                <Text style={styles.quickLabel}>Push alerts</Text>
-                <Switch
-                  value={pushNotifs}
-                  onValueChange={setPushNotifs}
-                  thumbColor={pushNotifs ? GOLD : undefined}
                   trackColor={{ false: "rgba(255,255,255,0.18)", true: "rgba(246,195,64,0.25)" }}
                 />
               </View>
@@ -290,8 +268,9 @@ export default function TabLayout() {
 
             <View style={styles.sheetDivider} />
 
-            <ScrollArea>
-              {items.map((it) => (
+            {/* ✅ Menü listesi: wallet'ın altına Top up + Transfer ekliyoruz */}
+            {items.map((it) => {
+              const row = (
                 <Pressable
                   key={it.key}
                   onPress={it.onPress}
@@ -314,8 +293,65 @@ export default function TabLayout() {
 
                   <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.35)" />
                 </Pressable>
-              ))}
-            </ScrollArea>
+              );
+
+              if (it.key !== "wallet") return row;
+
+              // ✅ Wallet'tan hemen sonra 2 alt item (Top up + Transfer)
+              return (
+              <View key="wallet-group">
+                {row}
+
+                {/* ✅ Top up - aynı item tasarımı, sadece içerden */}
+                <Pressable
+                  onPress={() => {
+                    setMenuOpen(false);
+                    router.push("/(tabs)/topup");
+                  }}
+                  style={({ pressed }) => [
+                    styles.item,
+                    styles.itemIndented, // ✅ sadece indent
+                    pressed && { opacity: 0.9 },
+                  ]}
+                >
+                  <View style={styles.itemIconWrap}>
+                    <Ionicons name="wallet-outline" size={18} color={GOLD} />
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.itemTitle}>Top up</Text>
+                    <Text style={styles.itemSub}>Add money to your wallet</Text>
+                  </View>
+
+                  <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.35)" />
+                </Pressable>
+
+                {/* ✅ Transfer - aynı item tasarımı, sadece içerden */}
+                <Pressable
+                  onPress={() => {
+                    setMenuOpen(false);
+                    router.push("/(tabs)/transfer");
+                  }}
+                  style={({ pressed }) => [
+                    styles.item,
+                    styles.itemIndented, // ✅ sadece indent
+                    pressed && { opacity: 0.9 },
+                  ]}
+                >
+                  <View style={styles.itemIconWrap}>
+                    <Ionicons name="swap-horizontal-outline" size={18} color={GOLD} />
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.itemTitle}>Transfer</Text>
+                    <Text style={styles.itemSub}>Send money instantly</Text>
+                  </View>
+
+                  <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.35)" />
+                </Pressable>
+              </View>
+            );
+            })}
           </View>
         </View>
       </Modal>
@@ -323,23 +359,22 @@ export default function TabLayout() {
   );
 }
 
-// ✅ Modal içeriği uzarsa scroll olsun (web/android/ios)
-function ScrollArea({ children }: { children: React.ReactNode }) {
-  // Switch’ler var, çok karmaşaya girmeden basit View bırakıyorum.
-  // Menü uzarsa zaten sheet yüksekliği yeterli; istersek sonra ScrollView ekleriz.
-  return <View>{children}</View>;
-}
-
 const styles = StyleSheet.create({
+  // ✅ Logo tamamen sola + 2x hissi
   headerLeftWrap: {
     height: 56,
     justifyContent: "center",
-    paddingLeft: 10, // ✅ sol köşeye yakın
+    paddingLeft: 0,
+    marginLeft: -90, // ✅ en sola yasla (gerekirse -18)
   },
   logo: {
-    height: 48,
-    width: 190,
+    height: 62,  // ✅ büyütüldü (2x hissi)
+    width: 260,  // ✅ büyütüldü
   },
+
+    itemIndented: {
+      marginLeft: 44, // wallet altına içerden dursun
+    },
 
   menuBtn: {
     width: 44,
@@ -353,11 +388,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
 
-  // ✅ Arkayı daha net kararttık (yazı karışmasın)
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.70)",
-  },
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.70)" },
 
   sheetWrap: {
     position: "absolute",
@@ -367,7 +398,6 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
 
-  // ✅ Sheet daha opak (arkadaki yazılar gözükmesin)
   sheet: {
     width: "86%",
     borderRadius: 18,
@@ -386,11 +416,7 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     paddingBottom: 10,
   },
-  sheetTitle: {
-    color: "rgba(255,255,255,0.92)",
-    fontSize: 14,
-    fontWeight: "900",
-  },
+  sheetTitle: { color: "rgba(255,255,255,0.92)", fontSize: 14, fontWeight: "900" },
   closeBtn: {
     width: 34,
     height: 34,
@@ -402,12 +428,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.10)",
   },
 
-  quickRow: {
-    flexDirection: "row",
-    gap: 10,
-    paddingHorizontal: 6,
-    paddingBottom: 10,
-  },
+  quickRow: { flexDirection: "row", gap: 10, paddingHorizontal: 6, paddingBottom: 10 },
   quickItem: {
     flex: 1,
     borderRadius: 14,
@@ -419,11 +440,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  quickLabel: {
-    color: "rgba(255,255,255,0.80)",
-    fontSize: 12,
-    fontWeight: "900",
-  },
+  quickLabel: { color: "rgba(255,255,255,0.80)", fontSize: 12, fontWeight: "900" },
 
   langPill: {
     flex: 1,
@@ -435,11 +452,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  langText: {
-    color: "rgba(246,195,64,0.95)",
-    fontSize: 12,
-    fontWeight: "900",
-  },
+  langText: { color: "rgba(246,195,64,0.95)", fontSize: 12, fontWeight: "900" },
 
   sheetDivider: {
     height: 1,
@@ -471,18 +484,33 @@ const styles = StyleSheet.create({
     borderColor: "rgba(252,165,165,0.22)",
   },
 
-  itemTitle: {
-    color: "rgba(255,255,255,0.92)",
-    fontSize: 13,
-    fontWeight: "900",
+  itemTitle: { color: "rgba(255,255,255,0.92)", fontSize: 13, fontWeight: "900" },
+  itemTitleDanger: { color: "rgba(252,165,165,0.95)" },
+  itemSub: { marginTop: 3, color: "rgba(255,255,255,0.55)", fontSize: 11.5, fontWeight: "700" },
+
+  // ✅ Wallet alt item stili (indent)
+  subItem: {
+    marginLeft: 44, // ✅ wallet ikon + boşluk kadar içerden başla
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    marginBottom: 8,
   },
-  itemTitleDanger: {
-    color: "rgba(252,165,165,0.95)",
+  subIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(246,195,64,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(246,195,64,0.22)",
   },
-  itemSub: {
-    marginTop: 3,
-    color: "rgba(255,255,255,0.55)",
-    fontSize: 11.5,
-    fontWeight: "700",
-  },
+  subTitle: { flex: 1, color: "rgba(255,255,255,0.90)", fontSize: 12.5, fontWeight: "900" },
 });
