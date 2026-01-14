@@ -40,8 +40,6 @@ public sealed class AuthFlowJobHandler
                 output = BruteForceGuard(vars);
                 break;
 
-
-
             case "mock.auth.device.trust":
                 output = DeviceTrust(vars);
                 break;
@@ -75,7 +73,6 @@ public sealed class AuthFlowJobHandler
         var normalized = NormalizePhone(phone);
 
         // ✅ KRİTİK: correlationId'yi EZME!
-        // API'den gelen correlationId'yi taşı, yoksa üret.
         var correlationId =
             GetString(v, "correlationId")
             ?? Guid.NewGuid().ToString();
@@ -89,8 +86,6 @@ public sealed class AuthFlowJobHandler
 
     private static object BruteForceGuard(Dictionary<string, object?> v)
     {
-        // Basit mock:
-        // password = "wrong" içeriyorsa guard fail gibi davran, yoksa ok
         var password = GetString(v, "password") ?? "";
         var ok = !password.Contains("wrong", StringComparison.OrdinalIgnoreCase);
 
@@ -105,8 +100,6 @@ public sealed class AuthFlowJobHandler
 
     private static object AccountStatus(Dictionary<string, object?> v)
     {
-        // Mock account status
-        // customerId boşsa fail
         var customerId = GetString(v, "customerId");
         var ok = !string.IsNullOrWhiteSpace(customerId);
 
@@ -120,14 +113,13 @@ public sealed class AuthFlowJobHandler
 
     private static object DeviceTrust(Dictionary<string, object?> v)
     {
-        // Mock device trust
         var deviceId = GetString(v, "deviceId") ?? "";
-        var trusted = deviceId.EndsWith("T", StringComparison.OrdinalIgnoreCase); // örnek kural
+        var trusted = deviceId.EndsWith("T", StringComparison.OrdinalIgnoreCase);
         var risk = trusted ? "LOW" : "HIGH";
 
         return new
         {
-            ok = true, // mock'ta cihaz kontrolü çoğu zaman ok
+            ok = true,
             riskLevel = risk,
             trustedDevice = trusted,
             errorCode = (string?)null
@@ -141,8 +133,8 @@ public sealed class AuthFlowJobHandler
 
         return new
         {
-            ok = true,                 // <-- EN ÖNEMLİSİ
-            errorCode = (string?)null,  // (opsiyonel ama temiz)
+            ok = true,
+            errorCode = (string?)null,
             accessToken,
             refreshToken,
             expiresIn = 3600,
@@ -154,13 +146,12 @@ public sealed class AuthFlowJobHandler
     {
         // ✅ Workflow sonucunu çıkar
         var correlationId = GetString(v, "correlationId") ?? "";
-        var token = GetString(v, "accessToken"); // CreateSession sonrasında varsa gelir
+        var token = GetString(v, "accessToken");
 
         var success = !string.IsNullOrWhiteSpace(token);
         var status = success ? "Succeeded" : "Failed";
         var message = success ? "Login successful" : "The password or phone number is incorrect.";
 
-        // ✅ Workflow API callback payload
         var payload = new
         {
             correlationId,
@@ -170,19 +161,33 @@ public sealed class AuthFlowJobHandler
             token
         };
 
-        // ✅ Callback at (MVP: callback patlarsa akışı kırmıyoruz)
+        // ✅ Callback at
+        var url = $"{_workflowBaseUrl}/api/v1/auth/login/result";
+
         try
         {
-            var url = $"{_workflowBaseUrl}/api/v1/auth/login/result";
+            Console.WriteLine($"[AuthFlow] login/result callback -> {url} | correlationId={correlationId}");
+
             var resp = await _http.PostAsJsonAsync(url, payload);
+            var raw = await resp.Content.ReadAsStringAsync();
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"[AuthFlow] CALLBACK HTTP {(int)resp.StatusCode} {resp.ReasonPhrase} | body={raw}");
+            }
+            else
+            {
+                Console.WriteLine($"[AuthFlow] CALLBACK OK | body={raw}");
+            }
+
             resp.EnsureSuccessStatusCode();
         }
-        catch
+        catch (Exception ex)
         {
-            // intentionally ignore (MVP)
+            // ❗ önceki sürüm bunu yutuyordu, şimdi görelim
+            Console.WriteLine($"[AuthFlow] CALLBACK FAILED: {ex.GetType().Name} - {ex.Message}");
         }
 
-        // Mock audit log (db yoksa bile "ok=true" dön)
         return new
         {
             ok = true,
@@ -213,7 +218,6 @@ public sealed class AuthFlowJobHandler
     {
         if (!v.TryGetValue(key, out var val) || val is null) return null;
 
-        // System.Text.Json bazen JsonElement getirir
         if (val is JsonElement je)
         {
             return je.ValueKind switch
@@ -248,10 +252,8 @@ public sealed class AuthFlowJobHandler
 
     private static string NormalizePhone(string phone)
     {
-        // sadece rakamları al
         var digits = new string(phone.Where(char.IsDigit).ToArray());
 
-        // 90 ekle (çok basit)
         if (digits.Length == 10) digits = "90" + digits;
         if (digits.StartsWith("0") && digits.Length == 11) digits = "9" + digits;
 
