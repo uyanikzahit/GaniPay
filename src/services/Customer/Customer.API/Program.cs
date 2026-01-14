@@ -45,7 +45,7 @@ app.MapGet("/api/v1/customers/{customerId:guid}", async (
     Guid customerId,
     CancellationToken ct) =>
 {
-    var result = await service.GetByIdAsync(customerId, ct);
+    var result = await service.GetDetailByIdAsync(customerId, ct);
     return result is null ? Results.NotFound() : Results.Ok(result);
 });
 

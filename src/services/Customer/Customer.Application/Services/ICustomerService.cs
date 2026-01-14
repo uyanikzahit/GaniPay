@@ -13,4 +13,7 @@ public interface ICustomerService
     Task AddAddressAsync(Guid customerId, AddAddressRequest request, CancellationToken ct);
 
     Task CloseAsync(Guid customerId, CloseCustomerRequest request, CancellationToken ct);
+
+
+    Task<CustomerDetailDto?> GetDetailByIdAsync(Guid customerId, CancellationToken ct);
 }

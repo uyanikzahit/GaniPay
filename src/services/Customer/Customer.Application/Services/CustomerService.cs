@@ -1,4 +1,4 @@
-using GaniPay.Customer.Application.Abstractions;
+ï»¿using GaniPay.Customer.Application.Abstractions;
 using GaniPay.Customer.Application.Contracts.Dtos;
 using GaniPay.Customer.Application.Contracts.Requests;
 using GaniPay.Customer.Domain.Entities;
@@ -37,7 +37,7 @@ public sealed class CustomerService : ICustomerService
 
         var identity = request.IdentityNumber.Trim();
         if (await _customers.ExistsByIdentityNumberAsync(identity, ct))
-            throw new InvalidOperationException("Bu identityNumber ile müþteri zaten mevcut.");
+            throw new InvalidOperationException("Bu identityNumber ile mÃ¼ÅŸteri zaten mevcut.");
 
         var customerId = Guid.NewGuid();
 
@@ -77,10 +77,10 @@ public sealed class CustomerService : ICustomerService
     public async Task AddEmailAsync(Guid customerId, AddEmailRequest request, CancellationToken ct)
     {
         _ = await _customers.GetByIdAsync(customerId, ct)
-            ?? throw new KeyNotFoundException("Customer bulunamadý.");
+            ?? throw new KeyNotFoundException("Customer bulunamadÄ±.");
 
         if (string.IsNullOrWhiteSpace(request.EmailAddress) || !request.EmailAddress.Contains('@'))
-            throw new ArgumentException("Email formatý geçersiz.");
+            throw new ArgumentException("Email formatÄ± geÃ§ersiz.");
 
         var entity = new Email
         {
@@ -98,10 +98,10 @@ public sealed class CustomerService : ICustomerService
     public async Task AddPhoneAsync(Guid customerId, AddPhoneRequest request, CancellationToken ct)
     {
         _ = await _customers.GetByIdAsync(customerId, ct)
-            ?? throw new KeyNotFoundException("Customer bulunamadý.");
+            ?? throw new KeyNotFoundException("Customer bulunamadÄ±.");
 
         if (string.IsNullOrWhiteSpace(request.CountryCode) || string.IsNullOrWhiteSpace(request.PhoneNumber))
-            throw new ArgumentException("Telefon alanlarý zorunludur.");
+            throw new ArgumentException("Telefon alanlarÄ± zorunludur.");
 
         var entity = new Phone
         {
@@ -119,10 +119,10 @@ public sealed class CustomerService : ICustomerService
     public async Task AddAddressAsync(Guid customerId, AddAddressRequest request, CancellationToken ct)
     {
         _ = await _customers.GetByIdAsync(customerId, ct)
-            ?? throw new KeyNotFoundException("Customer bulunamadý.");
+            ?? throw new KeyNotFoundException("Customer bulunamadÄ±.");
 
         if (string.IsNullOrWhiteSpace(request.City) || string.IsNullOrWhiteSpace(request.District))
-            throw new ArgumentException("Þehir/Ýlçe zorunludur.");
+            throw new ArgumentException("Åžehir/Ä°lÃ§e zorunludur.");
 
         if (string.IsNullOrWhiteSpace(request.AddressLine1))
             throw new ArgumentException("AddressLine1 zorunludur.");
@@ -145,7 +145,7 @@ public sealed class CustomerService : ICustomerService
     public async Task CloseAsync(Guid customerId, CloseCustomerRequest request, CancellationToken ct)
     {
         var customer = await _customers.GetByIdAsync(customerId, ct)
-            ?? throw new KeyNotFoundException("Customer bulunamadý.");
+            ?? throw new KeyNotFoundException("Customer bulunamadÄ±.");
 
         if (customer.Status == DomainEnums.CustomerStatus.Closed)
             return;
@@ -155,6 +155,13 @@ public sealed class CustomerService : ICustomerService
         customer.CloseReason = string.IsNullOrWhiteSpace(request.Reason) ? "N/A" : request.Reason.Trim();
 
         await _customers.SaveChangesAsync(ct);
+    }
+
+    // âœ… UI iÃ§in detaylÄ± endpoint response'u
+    public async Task<CustomerDetailDto?> GetDetailByIdAsync(Guid customerId, CancellationToken ct)
+    {
+        var customer = await _customers.GetByIdAsync(customerId, ct);
+        return customer is null ? null : ToCustomerDetailDto(customer);
     }
 
     // --------------------------
@@ -170,6 +177,56 @@ public sealed class CustomerService : ICustomerService
             c.OpenDate,
             c.CloseDate,
             c.CloseReason
+        );
+
+    // âœ… NEW: Detail DTO map (Individual + Emails + Phones + Addresses)
+    private static CustomerDetailDto ToCustomerDetailDto(Domain.Entities.Customer c)
+        => new(
+            c.Id,
+            c.CustomerNumber,
+            MapCustomerType(c.Type),
+            MapCustomerSegment(c.Segment),
+            MapCustomerStatus(c.Status),
+            c.OpenDate,
+            c.CloseDate,
+            c.CloseReason,
+
+            c.Individual is null
+                ? null
+                : new CustomerIndividualDto(
+                    c.Id,
+                    c.Individual.FirstName,
+                    c.Individual.LastName,
+                    c.Individual.BirthDate,
+                    c.Individual.Nationality,
+                    c.Individual.IdentityNumber
+                ),
+
+            c.Emails.Select(e => new EmailDto(
+                e.Id,
+                e.CustomerId,
+                e.EmailAddress,
+                MapEmailTypeToContract(e.Type),
+                e.IsVerified
+            )).ToList(),
+
+            c.Phones.Select(p => new PhoneDto(
+                p.Id,
+                p.CustomerId,
+                p.CountryCode,
+                p.PhoneNumber,
+                MapPhoneTypeToContract(p.Type)
+            )).ToList(),
+
+            c.Addresses.Select(a => new AddressDto(
+                a.Id,
+                a.CustomerId,
+                MapAddressTypeToContract(a.AddressType),
+                a.City,
+                a.District,
+                a.PostalCode,
+                a.AddressLine1
+            )).ToList()
         );
 
     private static string GenerateCustomerNumber()
@@ -237,5 +294,32 @@ public sealed class CustomerService : ICustomerService
             DomainEnums.CustomerStatus.Suspended => ContractEnums.CustomerStatus.Suspended,
             DomainEnums.CustomerStatus.Closed => ContractEnums.CustomerStatus.Closed,
             _ => ContractEnums.CustomerStatus.Active
+        };
+
+    // âœ… NEW: Domain -> Contract Enum dÃ¶nÃ¼ÅŸÃ¼mleri (Detail response iÃ§in)
+    private static ContractEnums.EmailType MapEmailTypeToContract(DomainEnums.EmailType type)
+        => type switch
+        {
+            DomainEnums.EmailType.Personal => ContractEnums.EmailType.Personal,
+            DomainEnums.EmailType.Work => ContractEnums.EmailType.Work,
+            _ => ContractEnums.EmailType.Personal
+        };
+
+    private static ContractEnums.PhoneType MapPhoneTypeToContract(DomainEnums.PhoneType type)
+        => type switch
+        {
+            DomainEnums.PhoneType.Mobile => ContractEnums.PhoneType.Mobile,
+            DomainEnums.PhoneType.Home => ContractEnums.PhoneType.Home,
+            DomainEnums.PhoneType.Work => ContractEnums.PhoneType.Work,
+            _ => ContractEnums.PhoneType.Mobile
+        };
+
+    private static ContractEnums.AddressType MapAddressTypeToContract(DomainEnums.AddressType type)
+        => type switch
+        {
+            DomainEnums.AddressType.Home => ContractEnums.AddressType.Home,
+            DomainEnums.AddressType.Work => ContractEnums.AddressType.Work,
+            DomainEnums.AddressType.Other => ContractEnums.AddressType.Other,
+            _ => ContractEnums.AddressType.Other
         };
 }
