@@ -196,17 +196,16 @@ authGroup.MapPost("/login", async (
             .Send();
 
         // 2) Kısa süre bekle (max 2 sn) -> store’a sonuç düştüyse dön
-        for (int i = 0; i < 20; i++)
+        for (int i = 0; i < 80; i++) // 8 saniye
         {
             if (LoginResultStore.TryGet(correlationId, out var result))
             {
-                // ✅ Okunduktan sonra sil (aynı correlationId tekrar kullanılırsa karışmasın)
                 LoginResultStore.Remove(correlationId);
 
                 return Results.Ok(new
                 {
                     success = result.Success,
-                    status = result.Status,   // "Succeeded" | "Failed"
+                    status = result.Status,
                     message = result.Message,
                     token = result.Token,
                     correlationId

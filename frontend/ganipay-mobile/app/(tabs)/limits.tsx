@@ -9,25 +9,35 @@ const BORDER = "rgba(255,255,255,0.10)";
 const GOLD = "rgba(246,195,64,1)";
 const MUTED = "rgba(255,255,255,0.60)";
 
-type LimitRow = { key: string; title: string; subtitle: string; value: number; currency: "TRY" };
+type LimitRow = {
+  key: string;
+  title: string;
+  subtitle: string;
+  cap: number;      // total limit
+  used: number;     // used amount
+  currency: "TRY";
+};
+
+function clamp01(v: number) {
+  if (v < 0) return 0;
+  if (v > 1) return 1;
+  return v;
+}
 
 export default function LimitsScreen() {
   const router = useRouter();
-
   const [spendingLock, setSpendingLock] = useState(false);
 
   const limits = useMemo<LimitRow[]>(
     () => [
-      { key: "daily", title: "Daily limit", subtitle: "Maximum outgoing per day", value: 15000, currency: "TRY" },
-      { key: "monthly", title: "Monthly limit", subtitle: "Maximum outgoing per month", value: 100000, currency: "TRY" },
-      { key: "single", title: "Single transfer", subtitle: "Maximum per transfer", value: 5000, currency: "TRY" },
+      { key: "daily", title: "Daily limit", subtitle: "Outgoing today", cap: 15000, used: 2350, currency: "TRY" },
+      { key: "monthly", title: "Monthly limit", subtitle: "Outgoing this month", cap: 100000, used: 17850, currency: "TRY" },
+      { key: "single", title: "Single transfer", subtitle: "Maximum per transfer", cap: 5000, used: 0, currency: "TRY" },
     ],
     []
   );
 
-  const onEdit = () => {
-    Alert.alert("Coming soon", "Limit management will be available soon.");
-  };
+  const onEdit = () => Alert.alert("Coming soon", "Limit management will be available soon.");
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
@@ -56,7 +66,7 @@ export default function LimitsScreen() {
         <View style={styles.rowBetween}>
           <View>
             <Text style={styles.cardTitle}>Your limits</Text>
-            <Text style={styles.cardHint}>These limits help you control risk and spending.</Text>
+            <Text style={styles.cardHint}>See your cap, usage and remaining amount.</Text>
           </View>
           <Pressable onPress={onEdit} style={({ pressed }) => [styles.miniBtn, pressed && { opacity: 0.9 }]}>
             <Ionicons name="create-outline" size={16} color={GOLD} />
@@ -64,25 +74,50 @@ export default function LimitsScreen() {
           </Pressable>
         </View>
 
-        {limits.map((l) => (
-          <View key={l.key} style={styles.limitRow}>
-            <View style={styles.limitIcon}>
-              <Ionicons name="speedometer-outline" size={18} color={GOLD} />
+        {limits.map((l) => {
+          const remaining = Math.max(0, l.cap - l.used);
+          const ratio = clamp01(l.cap === 0 ? 0 : l.used / l.cap);
+
+          return (
+            <View key={l.key} style={styles.limitCard}>
+              <View style={styles.limitHeader}>
+                <View style={styles.limitIcon}>
+                  <Ionicons name="speedometer-outline" size={18} color={GOLD} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.limitTitle}>{l.title}</Text>
+                  <Text style={styles.limitSub}>{l.subtitle}</Text>
+                </View>
+                <Text style={styles.limitCap}>₺{l.cap.toLocaleString("tr-TR")}</Text>
+              </View>
+
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${Math.round(ratio * 100)}%` }]} />
+              </View>
+
+              <View style={styles.metaRow}>
+                <View style={styles.metaItem}>
+                  <Text style={styles.metaK}>Used</Text>
+                  <Text style={styles.metaV}>₺{l.used.toLocaleString("tr-TR")}</Text>
+                </View>
+
+                <View style={styles.metaItem}>
+                  <Text style={styles.metaK}>Remaining</Text>
+                  <Text style={[styles.metaV, { color: "rgba(255,255,255,0.92)" }]}>
+                    ₺{remaining.toLocaleString("tr-TR")}
+                  </Text>
+                </View>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.limitTitle}>{l.title}</Text>
-              <Text style={styles.limitSub}>{l.subtitle}</Text>
-            </View>
-            <Text style={styles.limitValue}>₺{l.value.toLocaleString("tr-TR")}</Text>
-          </View>
-        ))}
+          );
+        })}
       </View>
 
       <View style={styles.card}>
         <View style={styles.tipRow}>
           <Ionicons name="information-circle-outline" size={18} color={GOLD} />
           <Text style={styles.tipText}>
-            Limits may vary based on verification level and risk checks. You can adjust them in settings.
+            Limits may vary by verification level and risk checks. Remaining amount updates after each transaction.
           </Text>
         </View>
       </View>
@@ -138,16 +173,16 @@ const styles = StyleSheet.create({
   },
   miniBtnText: { marginLeft: 6, color: "rgba(255,255,255,0.86)", fontWeight: "900", fontSize: 11.5 },
 
-  limitRow: {
+  limitCard: {
     marginTop: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
     borderRadius: 16,
+    padding: 12,
     backgroundColor: "rgba(0,0,0,0.18)",
     borderWidth: 1,
     borderColor: BORDER,
   },
+  limitHeader: { flexDirection: "row", alignItems: "center" },
+
   limitIcon: {
     width: 36,
     height: 36,
@@ -161,7 +196,37 @@ const styles = StyleSheet.create({
   },
   limitTitle: { color: "rgba(255,255,255,0.92)", fontWeight: "900", fontSize: 13 },
   limitSub: { marginTop: 4, color: MUTED, fontWeight: "700", fontSize: 11.5 },
-  limitValue: { color: "rgba(255,255,255,0.90)", fontWeight: "900" },
+  limitCap: { color: "rgba(255,255,255,0.90)", fontWeight: "900" },
+
+  progressTrack: {
+    marginTop: 12,
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: BORDER,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: "rgba(246,195,64,0.35)",
+    borderWidth: 1,
+    borderColor: "rgba(246,195,64,0.40)",
+  },
+
+  metaRow: { flexDirection: "row", marginTop: 12 },
+  metaItem: {
+    flex: 1,
+    borderRadius: 14,
+    padding: 10,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: BORDER,
+    marginRight: 10,
+  },
+  metaK: { color: MUTED, fontWeight: "900", fontSize: 11.5 },
+  metaV: { marginTop: 6, color: GOLD, fontWeight: "900", fontSize: 12 },
 
   tipRow: {
     borderRadius: 14,

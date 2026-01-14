@@ -130,7 +130,7 @@ export default function LoginScreen() {
                 value={phoneNumber}
                 onChangeText={onChangePhone}
                 keyboardType="phone-pad"
-                placeholder="5XXXXXXXXXX"
+                placeholder="05XXXXXXXXXX"
                 placeholderTextColor="rgba(255,255,255,0.35)"
                 style={styles.input}
                 maxLength={11} // ✅ ekstra güvenlik

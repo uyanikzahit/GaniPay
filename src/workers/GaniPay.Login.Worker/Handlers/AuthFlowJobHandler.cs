@@ -16,7 +16,7 @@ public sealed class AuthFlowJobHandler
     public AuthFlowJobHandler(HttpClient http, IConfiguration cfg)
     {
         _http = http;
-        _workflowBaseUrl = (cfg["WorkflowApi:BaseUrl"] ?? "http://localhost:5160").TrimEnd('/');
+        _workflowBaseUrl = (cfg["WorkflowApi:BaseUrl"] ?? "https://localhost:7253").TrimEnd('/');
     }
 
     public async Task Handle(IJobClient client, IJob job)
@@ -158,7 +158,11 @@ public sealed class AuthFlowJobHandler
             success,
             status,
             message,
-            token
+            token,
+
+            customerId = GetString(v, "customerId"),
+            customer = v.TryGetValue("customer", out var cust) ? cust : null,
+            wallets = v.TryGetValue("wallets", out var w) ? w : null
         };
 
         // ✅ Callback at

@@ -85,6 +85,7 @@ export default function TabLayout() {
         icon: "notifications-outline",
         onPress: () => {
           setMenuOpen(false);
+          router.push("/(tabs)/notifications");
         },
       },
       {
@@ -94,6 +95,7 @@ export default function TabLayout() {
         icon: "receipt-outline",
         onPress: () => {
           setMenuOpen(false);
+          router.push("/(tabs)/paybills");
         },
       },
       {
@@ -103,6 +105,7 @@ export default function TabLayout() {
         icon: "storefront-outline",
         onPress: () => {
           setMenuOpen(false);
+          router.push("/(tabs)/partners");
         },
       },
       {
@@ -112,6 +115,7 @@ export default function TabLayout() {
         icon: "document-text-outline",
         onPress: () => {
           setMenuOpen(false);
+          router.push("/(tabs)/legal");
         },
       },
       {
@@ -121,6 +125,7 @@ export default function TabLayout() {
         icon: "information-circle-outline",
         onPress: () => {
           setMenuOpen(false);
+          router.push("/(tabs)/about");
         },
       },
       {
@@ -232,6 +237,12 @@ export default function TabLayout() {
         <Tabs.Screen name="wallet" options={{ href: null }} />
         <Tabs.Screen name="limits" options={{ href: null }} />
         <Tabs.Screen name="security" options={{ href: null }} />
+        <Tabs.Screen name="notifications" options={{ href: null }} />
+        <Tabs.Screen name="paybills" options={{ href: null }} />
+        <Tabs.Screen name="partners" options={{ href: null }} />
+        <Tabs.Screen name="legal" options={{ href: null }} />
+        <Tabs.Screen name="about" options={{ href: null }} />
+
       </Tabs>
 
       {/* ✅ Premium menu modal */}
