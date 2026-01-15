@@ -205,9 +205,15 @@ authGroup.MapPost("/login", async (
                 return Results.Ok(new
                 {
                     success = result.Success,
-                    status = result.Status,
+                    status = result.Status,   // "Succeeded" | "Failed"
                     message = result.Message,
                     token = result.Token,
+
+                    // ✅ yeni alanlar
+                    customerId = result.CustomerId,
+                    customer = result.Customer,
+                    wallets = result.Wallets,
+
                     correlationId
                 });
             }
@@ -242,7 +248,16 @@ authGroup.MapPost("/login/result", (LoginResultCallback body) =>
 
     LoginResultStore.Set(
         body.CorrelationId,
-        new LoginResult(body.Success, body.Status, body.Message, body.Token)
+        new LoginResult(
+            Success: body.Success,
+            Status: body.Status,
+            Message: body.Message,
+            Token: body.Token,
+
+            CustomerId: body.CustomerId,
+            Customer: body.Customer,
+            Wallets: body.Wallets
+        )
     );
 
     return Results.Ok(new { success = true });
@@ -279,6 +294,8 @@ paymentsGroup.MapPost("/topup", async (
         http.Request.Headers.TryGetValue("X-Correlation-Id", out var cid) && !string.IsNullOrWhiteSpace(cid)
             ? cid.ToString()
             : Guid.NewGuid().ToString();
+
+    TopUpResultStore.Remove(correlationId); // ✅ ekl
 
     var variables = new
     {
@@ -319,6 +336,53 @@ paymentsGroup.MapPost("/topup", async (
     }
 });
 
+
+
+paymentsGroup.MapPost("/topup/result", (TopUpResultCallback body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.CorrelationId))
+        return Results.BadRequest(new { success = false, message = "correlationId zorunlu" });
+
+    TopUpResultStore.Set(
+        body.CorrelationId,
+        new TopUpResult(
+            Success: body.Success,
+            Status: body.Status,
+            Message: body.Message,
+            Data: body.Data
+        )
+    );
+
+    return Results.Ok(new { success = true });
+});
+
+paymentsGroup.MapGet("/topup/result/{correlationId}", (string correlationId) =>
+{
+    if (TopUpResultStore.TryGet(correlationId, out var result))
+    {
+        // İstersen kaldır: burada kaldırmazsak client aynı sonucu tekrar çekebilir
+        TopUpResultStore.Remove(correlationId);
+
+        return Results.Ok(new
+        {
+            success = result.Success,
+            status = result.Status,
+            message = result.Message,
+            data = result.Data,
+            correlationId
+        });
+    }
+
+    return Results.NotFound(new
+    {
+        success = false,
+        status = "Running",
+        message = "TopUp is being processed.",
+        correlationId
+    });
+});
+
+
 // -------------------- TRANSFER --------------------
 transfersGroup.MapPost("/transfer", async (
     TransferRequest req,
@@ -341,6 +405,8 @@ transfersGroup.MapPost("/transfer", async (
         http.Request.Headers.TryGetValue("X-Correlation-Id", out var cid) && !string.IsNullOrWhiteSpace(cid)
             ? cid.ToString()
             : Guid.NewGuid().ToString();
+
+    TransferResultStore.Remove(correlationId);
 
     // Modeler’da verdiğin JSON isimleriyle birebir
     var variables = new
@@ -379,6 +445,52 @@ transfersGroup.MapPost("/transfer", async (
     }
 });
 
+
+transfersGroup.MapPost("/transfer/result", (TransferResultCallback body) =>
+{
+    if (string.IsNullOrWhiteSpace(body.CorrelationId))
+        return Results.BadRequest(new { success = false, message = "correlationId zorunlu" });
+
+    TransferResultStore.Set(
+        body.CorrelationId,
+        new TransferResult(
+            Success: body.Success,
+            Status: body.Status,
+            Message: body.Message,
+            Data: body.Data
+        )
+    );
+
+    return Results.Ok(new { success = true });
+});
+
+transfersGroup.MapGet("/transfer/result/{correlationId}", (string correlationId) =>
+{
+    if (TransferResultStore.TryGet(correlationId, out var result))
+    {
+        TransferResultStore.Remove(correlationId);
+
+        return Results.Ok(new
+        {
+            success = result.Success,
+            status = result.Status,
+            message = result.Message,
+            data = result.Data,
+            correlationId
+        });
+    }
+
+    return Results.NotFound(new
+    {
+        success = false,
+        status = "Running",
+        message = "Transfer is being processed.",
+        correlationId
+    });
+});
+
+
+
 app.Lifetime.ApplicationStopping.Register(() =>
 {
     if (app.Services.GetService<IZeebeClient>() is IDisposable d)
@@ -407,7 +519,12 @@ public sealed record LoginResultCallback(
     bool Success,
     string Status,
     string Message,
-    string? Token
+    string? Token,
+
+    // ✅ ekstra alanlar
+    string? CustomerId,
+    object? Customer,
+    object? Wallets
 );
 
 
@@ -437,4 +554,20 @@ public sealed record TransferRequest(
     string CustomerId,
     string ReceiverCustomerId,
     decimal Amount
+);
+
+public sealed record TopUpResultCallback(
+    string CorrelationId,
+    bool Success,
+    string Status,
+    string Message,
+    object? Data
+);
+
+public sealed record TransferResultCallback(
+    string CorrelationId,
+    bool Success,
+    string Status,
+    string Message,
+    object? Data
 );

@@ -6,7 +6,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Colors } from "../theme/colors";
 
 export default function HomeScreen() {
-  const userName = "Gani";
+  const userName = "Mehmet Zahit";
   const balance = "₺11.110.00";
 
   return (
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     position: "relative",
     ...shadow,
   },
-  actionTileDisabled: { opacity: 0.6 },
+  actionTileDisabled: { opacity: 1 },
 
   iconBubble: {
     width: 46,
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   actionText: { fontWeight: "900", fontSize: 13, color: "rgba(255,255,255,0.92)" },
-  disabledText: { color: "rgba(255,255,255,0.75)" },
+  disabledText: { color: "rgba(255,255,255,0.92)" },
 
   sectionHeader: {
     flexDirection: "row",

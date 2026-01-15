@@ -95,12 +95,24 @@ public sealed class CustomerGetJobHandler
             var segment = GetString(b, "segment");
             var type = GetString(b, "type");
 
-            // nested: customer
-            var cust = GetObject(b, "customer");
-            var firstName = cust is null ? null : GetString(cust.Value, "firstName");
-            var lastName = cust is null ? null : GetString(cust.Value, "lastName");
-            var birthDate = cust is null ? null : GetString(cust.Value, "birthDate");
-            var nationality = cust is null ? null : GetString(cust.Value, "nationality");
+            // ✅ İSİMLER individual içinde geliyor (Customer API response böyle)
+            var individual = GetObject(b, "individual");
+
+            var firstName =
+                (individual is null ? null : GetString(individual.Value, "firstName"))
+                ?? GetString(b, "firstName"); // fallback (olur da root'a taşınırsa)
+
+            var lastName =
+                (individual is null ? null : GetString(individual.Value, "lastName"))
+                ?? GetString(b, "lastName");
+
+            var birthDate =
+                (individual is null ? null : GetString(individual.Value, "birthDate"))
+                ?? GetString(b, "birthDate");
+
+            var nationality =
+                (individual is null ? null : GetString(individual.Value, "nationality"))
+                ?? GetString(b, "nationality");
 
             // emails[0].emailAddress
             var email = GetFirstArrayObjectString(b, "emails", "emailAddress");

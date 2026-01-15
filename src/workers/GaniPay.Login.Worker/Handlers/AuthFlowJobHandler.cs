@@ -126,18 +126,27 @@ public sealed class AuthFlowJobHandler
         };
     }
 
+    // ✅ TOKEN FIX: mock token üretme, process'ten gelen gerçek accessToken/refreshToken'ı taşı
     private static object CreateSession(Dictionary<string, object?> v)
     {
-        var accessToken = "mock_access_" + Guid.NewGuid().ToString("N");
-        var refreshToken = "mock_refresh_" + Guid.NewGuid().ToString("N");
+        // Identity Login adımından gelen token'lar
+        var accessToken = GetString(v, "accessToken");
+        var refreshToken = GetString(v, "refreshToken");
+
+        // expiresIn varsa taşı (string/number olabilir)
+        var expiresInStr = GetString(v, "expiresIn");
+        var expiresIn = int.TryParse(expiresInStr, out var sec) ? sec : 3600;
 
         return new
         {
             ok = true,
             errorCode = (string?)null,
+
+            // ✅ overwrite etmez: mock üretmiyoruz
             accessToken,
             refreshToken,
-            expiresIn = 3600,
+
+            expiresIn,
             sessionId = Guid.NewGuid().ToString("N")
         };
     }
@@ -146,11 +155,17 @@ public sealed class AuthFlowJobHandler
     {
         // ✅ Workflow sonucunu çıkar
         var correlationId = GetString(v, "correlationId") ?? "";
+
+        // ✅ gerçek token (CreateSession artık mock üretmediği için burada gerçek gelir)
         var token = GetString(v, "accessToken");
 
         var success = !string.IsNullOrWhiteSpace(token);
         var status = success ? "Succeeded" : "Failed";
         var message = success ? "Login successful" : "The password or phone number is incorrect.";
+
+        // ✅ Akışta üretilen dataları da callback’e taşı
+        v.TryGetValue("customer", out var customerObj);
+        v.TryGetValue("wallets", out var walletsObj);
 
         var payload = new
         {
@@ -160,9 +175,10 @@ public sealed class AuthFlowJobHandler
             message,
             token,
 
+            // ekstra alanlar
             customerId = GetString(v, "customerId"),
-            customer = v.TryGetValue("customer", out var cust) ? cust : null,
-            wallets = v.TryGetValue("wallets", out var w) ? w : null
+            customer = customerObj,
+            wallets = walletsObj
         };
 
         // ✅ Callback at

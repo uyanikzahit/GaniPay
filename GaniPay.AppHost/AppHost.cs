@@ -133,7 +133,8 @@ builder.AddExecutable("topup-worker", "dotnet", topupWorkerDir)
     .WithArgs("run", "--project", topupWorkerCsproj, "--no-launch-profile")
     .WithEnvironment("DOTNET_ENVIRONMENT", "Development");
 
-builder.AddProject<Projects.GaniPay_Workflow_API>("ganipay-workflow-api");
+builder.AddProject<Projects.GaniPay_Workflow_API>("ganipay-workflow-api")
+    .WithExternalHttpEndpoints();
 
 builder.Build().Run();
 
