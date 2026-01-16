@@ -200,7 +200,7 @@ authGroup.MapPost("/login", async (
         {
             if (LoginResultStore.TryGet(correlationId, out var result))
             {
-                LoginResultStore.Remove(correlationId);
+                //LoginResultStore.Remove(correlationId);
 
                 return Results.Ok(new
                 {
@@ -241,7 +241,7 @@ authGroup.MapPost("/login", async (
 });
 
 
-authGroup.MapPost("/login/result", (LoginResultCallback body) =>
+authGroup.MapPost("/login/callback", (LoginResultCallback body) =>
 {
     if (string.IsNullOrWhiteSpace(body.CorrelationId))
         return Results.BadRequest(new { success = false, message = "correlationId zorunlu" });
@@ -253,7 +253,6 @@ authGroup.MapPost("/login/result", (LoginResultCallback body) =>
             Status: body.Status,
             Message: body.Message,
             Token: body.Token,
-
             CustomerId: body.CustomerId,
             Customer: body.Customer,
             Wallets: body.Wallets
@@ -261,6 +260,39 @@ authGroup.MapPost("/login/result", (LoginResultCallback body) =>
     );
 
     return Results.Ok(new { success = true });
+});
+
+
+
+authGroup.MapGet("/login/result/{correlationId}", (string correlationId) =>
+{
+    if (string.IsNullOrWhiteSpace(correlationId))
+        return Results.BadRequest(new { success = false, message = "correlationId zorunlu" });
+
+    if (LoginResultStore.TryGet(correlationId, out var result))
+    {
+        LoginResultStore.Remove(correlationId);
+
+        return Results.Ok(new
+        {
+            success = result.Success,
+            status = result.Status,
+            message = result.Message,
+            token = result.Token,
+            customerId = result.CustomerId,
+            customer = result.Customer,
+            wallets = result.Wallets,
+            correlationId
+        });
+    }
+
+    return Results.NotFound(new
+    {
+        success = false,
+        status = "Running",
+        message = "Login is being processed.",
+        correlationId
+    });
 });
 
 

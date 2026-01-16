@@ -80,22 +80,41 @@ async function postJson<T>(url: string, body: any): Promise<T> {
 
 // ✅ login sonucu alınana kadar bekleyen helper (polling)
 async function pollLoginResult(baseUrl: string, correlationId: string) {
-  const url = `${baseUrl}/api/v1/auth/login/result`;
+  const maxAttempts = 30; // ~30sn (mobil ağ için daha mantıklı)
+  const delayMs = 1000;
 
-  const maxAttempts = 12; // ✅ 12 deneme
-  const delayMs = 700;    // ✅ daha hızlı
   for (let i = 0; i < maxAttempts; i++) {
-    try {
-      const data = await postJson<LoginApiResponse>(url, { correlationId });
+    const url = `${baseUrl}/api/v1/auth/login/result/${encodeURIComponent(correlationId)}`;
 
-      if (data.success === true && data.status === "Succeeded" && data.token) return data;
-      if (data.status === "Failed" || data.success === false) return data;
+    const res = await fetch(url, { method: "GET" });
 
-      await sleep(delayMs);
-    } catch (e) {
-      // ✅ result endpoint’e anlık erişememe vs: devam et ama sonsuza kilitlenme
-      await sleep(delayMs);
+    // 200 -> sonucu aldık
+    if (res.ok) {
+      const data = (await readJsonSafe(res)) as LoginApiResponse | null;
+      if (data) return data;
+
+      return {
+        success: false,
+        status: "Failed",
+        message: "Empty response",
+        correlationId,
+      } as LoginApiResponse;
     }
+
+    // 404 -> hala Running demek (biz böyle tasarladık)
+    if (res.status === 404) {
+      await new Promise((r) => setTimeout(r, delayMs));
+      continue;
+    }
+
+    // başka hata
+    const text = await res.text().catch(() => "");
+    return {
+      success: false,
+      status: "Failed",
+      message: text || `Request failed (${res.status})`,
+      correlationId,
+    } as LoginApiResponse;
   }
 
   return {

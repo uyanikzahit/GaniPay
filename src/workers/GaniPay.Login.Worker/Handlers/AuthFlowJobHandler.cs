@@ -182,11 +182,11 @@ public sealed class AuthFlowJobHandler
         };
 
         // ✅ Callback at
-        var url = $"{_workflowBaseUrl}/api/v1/auth/login/result";
+        var url = $"{_workflowBaseUrl}/api/v1/auth/login/callback";
 
         try
         {
-            Console.WriteLine($"[AuthFlow] login/result callback -> {url} | correlationId={correlationId}");
+            Console.WriteLine($"[AuthFlow] login/callback -> {url} | correlationId={correlationId}");
 
             var resp = await _http.PostAsJsonAsync(url, payload);
             var raw = await resp.Content.ReadAsStringAsync();
@@ -204,7 +204,6 @@ public sealed class AuthFlowJobHandler
         }
         catch (Exception ex)
         {
-            // ❗ önceki sürüm bunu yutuyordu, şimdi görelim
             Console.WriteLine($"[AuthFlow] CALLBACK FAILED: {ex.GetType().Name} - {ex.Message}");
         }
 
