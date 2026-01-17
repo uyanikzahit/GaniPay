@@ -1,13 +1,47 @@
 // app/(tabs)/index.tsx
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Colors } from "../theme/colors";
+import { SessionKeys } from "../../constants/storage";
 
 export default function HomeScreen() {
-  const userName = "Mehmet Zahit";
-  const balance = "₺11.110.00";
+  // 🔽 SADECE BURASI DİNAMİK YAPILDI
+  const [userName, setUserName] = useState<string>("—");
+  const [balance, setBalance] = useState<string>("₺0.00");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const userRaw = await AsyncStorage.getItem(SessionKeys.user);
+        const walletsRaw = await AsyncStorage.getItem(SessionKeys.accountId);
+        const currency = (await AsyncStorage.getItem(SessionKeys.currency)) || "TRY";
+
+        if (userRaw) {
+          const user = JSON.parse(userRaw);
+          const fullName = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
+          if (fullName) setUserName(fullName);
+        }
+
+        // şimdilik login response’tan gelen balance
+        // (sonra transfer/topup sonrası API’den güncellenecek)
+        if (walletsRaw) {
+          // backend response’unda balance varsa burası çalışır
+          // yoksa default kalır
+          const wallet = JSON.parse(walletsRaw);
+          if (wallet?.balance !== undefined) {
+            const formatted = `${currency === "TRY" ? "₺" : ""}${Number(wallet.balance).toFixed(2)}`;
+            setBalance(formatted);
+          }
+        }
+      } catch (e) {
+        console.warn("HomeScreen session read error:", e);
+      }
+    })();
+  }, []);
+  // 🔼 SADECE BURASI DİNAMİK YAPILDI
 
   return (
     <View style={styles.container}>
@@ -91,7 +125,6 @@ function ActionTile({
       </View>
 
       <Text style={[styles.actionText, disabled && styles.disabledText]}>{title}</Text>
-      {/* ✅ Soon kaldırıldı */}
     </TouchableOpacity>
   );
 }
