@@ -24,4 +24,15 @@ public sealed class AccountBalanceHistoryRepository : IAccountBalanceHistoryRepo
             .OrderBy(x => x.CreatedAt)
             .ToListAsync(ct);
     }
+
+
+    public async Task<IReadOnlyList<AccountBalanceHistory>> ListByAccountIdAsync(
+    Guid accountId,
+    CancellationToken ct = default)
+    {
+        return await _db.AccountBalanceHistories.AsNoTracking()
+            .Where(x => x.AccountId == accountId)
+            .OrderByDescending(x => x.CreatedAt) // en yeni üstte (istersen OrderBy yaparýz)
+            .ToListAsync(ct);
+    }
 }

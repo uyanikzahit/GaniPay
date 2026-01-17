@@ -1,4 +1,4 @@
-using GaniPay.Accounting.Application.Contracts.Requests;
+﻿using GaniPay.Accounting.Application.Contracts.Requests;
 using GaniPay.Accounting.Application.Services;
 using GaniPay.Accounting.Infrastructure.DependencyInjection;
 using Microsoft.AspNetCore.Mvc;
@@ -12,6 +12,17 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddAccountingInfrastructure(builder.Configuration);
 
+// ✅ CORS (DEV)
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("DevCors", policy =>
+        policy
+            .AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+    );
+});
+
 var app = builder.Build();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
@@ -19,9 +30,10 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.UseSwagger();
 app.UseSwaggerUI();
 
+// ✅ CORS middleware endpointlerden ÖNCE olmalı
+app.UseCors("DevCors");
+
 var group = app.MapGroup("/api/accounting").WithTags("Accounting");
-
-
 
 // Create account
 group.MapPost("/accounts", async (
@@ -74,8 +86,6 @@ group.MapGet("/customers/{customerId}/wallets", async (
 })
 .WithName("GetCustomerWallets");
 
-
-
 group.MapGet("/accounts/status", async (
     IAccountingService service,
     Guid accountId,
@@ -88,6 +98,15 @@ group.MapGet("/accounts/status", async (
 })
 .WithName("GetAccountStatus");
 
-
+// Get balance history by accountId
+group.MapGet("/accounts/{accountId:guid}/balance-history", async (
+    IAccountingService service,
+    Guid accountId,
+    CancellationToken ct) =>
+{
+    var result = await service.GetBalanceHistoryAsync(accountId, ct);
+    return Results.Ok(result);
+})
+.WithName("GetAccountBalanceHistory");
 
 app.Run();

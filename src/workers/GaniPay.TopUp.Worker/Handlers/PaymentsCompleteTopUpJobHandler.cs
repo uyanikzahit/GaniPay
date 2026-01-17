@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Json;
+﻿using System.Globalization;
+using System.Net.Http.Json;
 using System.Text.Json;
 using Zeebe.Client.Api.Responses;
 using Zeebe.Client.Api.Worker;
@@ -7,11 +8,25 @@ namespace GaniPay.TopUp.Worker.Handlers;
 
 public sealed class PaymentsCompleteTopUpJobHandler
 {
-    private readonly HttpClient _http;
+    private readonly HttpClient _http;          // Payments API
+    private readonly HttpClient _workflowHttp;  // Workflow API
 
     public PaymentsCompleteTopUpJobHandler(IHttpClientFactory httpClientFactory)
     {
         _http = httpClientFactory.CreateClient("Payments");
+
+        // ✅ Workflow API client (bozmayalım diye named client şart koşmuyoruz)
+        _workflowHttp = httpClientFactory.CreateClient();
+
+        var workflowBaseUrl =
+            Environment.GetEnvironmentVariable("WORKFLOW_API_BASEURL")
+            ?? Environment.GetEnvironmentVariable("WorkflowApi__BaseUrl")
+            ?? "http://host.docker.internal:7253";
+
+        workflowBaseUrl = workflowBaseUrl.TrimEnd('/');
+
+        _workflowHttp.BaseAddress = new Uri(workflowBaseUrl);
+        _workflowHttp.Timeout = TimeSpan.FromSeconds(15);
     }
 
     public async Task Handle(IJobClient client, IJob job)
@@ -21,15 +36,12 @@ public sealed class PaymentsCompleteTopUpJobHandler
             using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(job.Variables) ? "{}" : job.Variables);
             var root = doc.RootElement;
 
-            var correlationId = root.TryGetProperty("correlationId", out var c) ? c.GetString() : null;
+            var correlationId = GetString(root, "correlationId");
 
-            bool creditOk =
-                root.TryGetProperty("creditOk", out var ok) && (ok.ValueKind is JsonValueKind.True or JsonValueKind.False)
-                    ? ok.GetBoolean()
-                    : false;
+            bool creditOk = GetBool(root, "creditOk") ?? false;
 
-            var errorCode = root.TryGetProperty("errorCode", out var ec) ? ec.GetString() : null;
-            var errorMessage = root.TryGetProperty("errorMessage", out var em) ? em.GetString() : null;
+            var errorCode = GetString(root, "errorCode");
+            var errorMessage = GetString(root, "errorMessage");
 
             if (string.IsNullOrWhiteSpace(correlationId))
             {
@@ -73,6 +85,10 @@ public sealed class PaymentsCompleteTopUpJobHandler
                     ? okp.GetBoolean()
                     : true;
 
+            // ✅ (EK) Workflow API ResultStore callback (TopUp)
+            // ❗ Bu callback fail olursa akışı patlatmıyoruz, sadece logluyoruz.
+            await TrySendWorkflowResultCallbackAsync(root, correlationId, okResp);
+
             // ✅ BPMN output isimleri paneldekiyle aynı
             var completeVars = new
             {
@@ -96,6 +112,51 @@ public sealed class PaymentsCompleteTopUpJobHandler
         }
     }
 
+    private async Task TrySendWorkflowResultCallbackAsync(JsonElement root, string correlationId, bool okResp)
+    {
+        try
+        {
+            // Operate’ta gördüğün alanları “receipt” gibi minimal toparlıyoruz
+            var data = new
+            {
+                accountId = GetString(root, "accountId"),
+                customerId = GetString(root, "customerId"),
+                amount = GetDecimal(root, "amount"),
+                currency = GetString(root, "currency"),
+                balanceBefore = GetDecimal(root, "balanceBefore"),
+                balanceAfter = GetDecimal(root, "balanceAfter"),
+                accountingTxId = GetString(root, "accountingTxId"),
+                referenceId = GetString(root, "referenceId"),
+                idempotencyKey = GetString(root, "idempotencyKey")
+            };
+
+            var payload = new
+            {
+                correlationId,
+                success = okResp,
+                status = okResp ? "Succeeded" : "Failed",
+                message = okResp ? "TopUp successful" : "TopUp failed",
+                data
+            };
+
+            var url = "/api/v1/payments/topup/result";
+
+            Console.WriteLine($"[TopUp] callback -> {_workflowHttp.BaseAddress}{url} | correlationId={correlationId}");
+
+            var resp = await _workflowHttp.PostAsJsonAsync(url, payload);
+            var raw = await resp.Content.ReadAsStringAsync();
+
+            if (!resp.IsSuccessStatusCode)
+                Console.WriteLine($"[TopUp] CALLBACK HTTP {(int)resp.StatusCode} {resp.ReasonPhrase} | body={raw}");
+            else
+                Console.WriteLine($"[TopUp] CALLBACK OK | body={raw}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[TopUp] CALLBACK FAILED: {ex.GetType().Name} - {ex.Message}");
+        }
+    }
+
     private static async Task CompleteFail(IJobClient client, IJob job, string code, string message, string step)
     {
         var completeVars = new
@@ -110,5 +171,55 @@ public sealed class PaymentsCompleteTopUpJobHandler
         await client.NewCompleteJobCommand(job.Key)
             .Variables(JsonSerializer.Serialize(completeVars))
             .Send();
+    }
+
+    // ----------------- helpers -----------------
+
+    private static string? GetString(JsonElement root, string name)
+    {
+        if (!root.TryGetProperty(name, out var p)) return null;
+
+        return p.ValueKind switch
+        {
+            JsonValueKind.String => p.GetString(),
+            JsonValueKind.Number => p.GetRawText(),
+            JsonValueKind.True => "true",
+            JsonValueKind.False => "false",
+            _ => p.GetRawText()
+        };
+    }
+
+    private static bool? GetBool(JsonElement root, string name)
+    {
+        if (!root.TryGetProperty(name, out var p)) return null;
+
+        if (p.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            return p.GetBoolean();
+
+        if (p.ValueKind == JsonValueKind.String && bool.TryParse(p.GetString(), out var b))
+            return b;
+
+        return null;
+    }
+
+    private static decimal? GetDecimal(JsonElement root, string name)
+    {
+        if (!root.TryGetProperty(name, out var p)) return null;
+
+        if (p.ValueKind == JsonValueKind.Number)
+        {
+            if (p.TryGetDecimal(out var d)) return d;
+            if (p.TryGetDouble(out var dd)) return (decimal)dd;
+            return null;
+        }
+
+        if (p.ValueKind == JsonValueKind.String)
+        {
+            var s = p.GetString();
+            if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var d)) return d;
+            if (decimal.TryParse(s, NumberStyles.Any, CultureInfo.GetCultureInfo("tr-TR"), out d)) return d;
+        }
+
+        return null;
     }
 }

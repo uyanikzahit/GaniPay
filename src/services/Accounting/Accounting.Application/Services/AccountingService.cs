@@ -307,4 +307,33 @@ public sealed class AccountingService : IAccountingService
     }
 
 
+
+    public async Task<IReadOnlyList<AccountBalanceHistoryDto>> GetBalanceHistoryAsync(
+        Guid accountId,
+        CancellationToken ct)
+    {
+        if (accountId == Guid.Empty)
+            throw new InvalidOperationException("AccountId is required.");
+
+        var account = await _accountRepository.GetByIdAsync(accountId, ct);
+        if (account is null)
+            throw new InvalidOperationException("Account not found.");
+
+        var histories = await _historyRepository.ListByAccountIdAsync(accountId, ct);
+
+        return histories.Select(h => new AccountBalanceHistoryDto(
+            h.Id,
+            h.AccountId,
+            h.Direction,
+            h.ChangeAmount,
+            h.BalanceBefore,
+            h.BalanceAfter,
+            h.Currency,
+            h.OperationType,
+            h.ReferenceId,
+            h.CreatedAt
+        )).ToList();
+    }
+
+
 }

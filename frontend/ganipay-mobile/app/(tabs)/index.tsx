@@ -1,47 +1,157 @@
 // app/(tabs)/index.tsx
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter, useFocusEffect } from "expo-router";
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Colors } from "../theme/colors";
 import { SessionKeys } from "../../constants/storage";
+import { getCustomerBalance, getAccountBalanceHistory } from "./dashboard.api";
+
+type DashboardUser = {
+  firstName?: string;
+  lastName?: string;
+};
+
+type BalanceDto = {
+  accountId?: string;
+  customerId?: string;
+  currency?: string;
+  balance?: number;
+};
+
+type BalanceHistoryItem = {
+  id?: string;
+  accountId?: string;
+  direction?: "credit" | "debit" | string;
+  amount?: number;
+  currency?: string;
+  createdAt?: string;
+  operationType?: string | number;
+  referenceId?: string;
+};
+
+function formatMoney(amount: number, currency = "TRY") {
+  const symbol = currency === "TRY" ? "₺" : currency === "USD" ? "$" : currency + " ";
+  const safe = Number.isFinite(amount) ? amount : 0;
+  const formatted = safe.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${symbol}${formatted}`;
+}
+
+function formatTxMeta(dateIso?: string, direction?: string) {
+  if (!dateIso) return direction ? direction : "";
+  const d = new Date(dateIso);
+  const date = d.toLocaleDateString("tr-TR");
+  const time = d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+
+  const dirLabel =
+    direction === "credit" ? "Incoming" : direction === "debit" ? "Outgoing" : direction ? String(direction) : "";
+
+  return `${date} • ${time}${dirLabel ? ` • ${dirLabel}` : ""}`;
+}
+
+function mapTxTitle(tx: BalanceHistoryItem) {
+  if (tx.direction === "credit") return "Top Up";
+  if (tx.direction === "debit") return "Transfer";
+  return "Transaction";
+}
 
 export default function HomeScreen() {
-  // 🔽 SADECE BURASI DİNAMİK YAPILDI
-  const [userName, setUserName] = useState<string>("—");
-  const [balance, setBalance] = useState<string>("₺0.00");
+  const router = useRouter();
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const userRaw = await AsyncStorage.getItem(SessionKeys.user);
-        const walletsRaw = await AsyncStorage.getItem(SessionKeys.accountId);
-        const currency = (await AsyncStorage.getItem(SessionKeys.currency)) || "TRY";
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<DashboardUser>({});
+  const [balanceDto, setBalanceDto] = useState<BalanceDto>({});
+  const [history, setHistory] = useState<BalanceHistoryItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-        if (userRaw) {
-          const user = JSON.parse(userRaw);
-          const fullName = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
-          if (fullName) setUserName(fullName);
+  const load = useCallback(async () => {
+    try {
+      setError(null);
+      setLoading(true);
+
+      const [customerId, currency, accountIdFromSession, userJson] = await AsyncStorage.multiGet([
+        SessionKeys.customerId,
+        SessionKeys.currency,
+        SessionKeys.accountId,
+        SessionKeys.user,
+      ]).then((arr) => arr.map((x) => x[1] ?? ""));
+
+      if (userJson) {
+        try {
+          const u = JSON.parse(userJson) as DashboardUser;
+          setUser({ firstName: u?.firstName, lastName: u?.lastName });
+        } catch {
+          // ignore
         }
-
-        // şimdilik login response’tan gelen balance
-        // (sonra transfer/topup sonrası API’den güncellenecek)
-        if (walletsRaw) {
-          // backend response’unda balance varsa burası çalışır
-          // yoksa default kalır
-          const wallet = JSON.parse(walletsRaw);
-          if (wallet?.balance !== undefined) {
-            const formatted = `${currency === "TRY" ? "₺" : ""}${Number(wallet.balance).toFixed(2)}`;
-            setBalance(formatted);
-          }
-        }
-      } catch (e) {
-        console.warn("HomeScreen session read error:", e);
       }
-    })();
+
+      if (!customerId) throw new Error("customerId bulunamadı. Login sonrası SessionKeys.customerId set edildi mi?");
+
+      const cur = (currency || "TRY").toUpperCase();
+
+      const balanceRes = await getCustomerBalance(customerId, cur);
+
+      const accountId = balanceRes?.accountId || accountIdFromSession;
+      if (!accountId) throw new Error("accountId bulunamadı. Balance response accountId dönmüyor mu?");
+
+      setBalanceDto({
+        accountId,
+        customerId: balanceRes?.customerId || customerId,
+        currency: (balanceRes?.currency || cur).toUpperCase(),
+        balance: typeof balanceRes?.balance === "number" ? balanceRes.balance : Number(balanceRes?.balance ?? 0),
+      });
+
+      const historyRes = await getAccountBalanceHistory(accountId);
+
+      const mapped: BalanceHistoryItem[] = (historyRes ?? []).map((x: any) => ({
+        id: x?.id,
+        accountId: x?.accountId,
+        direction: x?.direction,
+        amount: typeof x?.changeAmount === "number" ? x.changeAmount : Number(x?.changeAmount ?? x?.amount ?? 0),
+        currency: x?.currency,
+        createdAt: x?.createdAt,
+        operationType: x?.operationType,
+        referenceId: x?.referenceId,
+      }));
+
+      setHistory(Array.isArray(mapped) ? mapped : []);
+    } catch (e: any) {
+      setError(e?.message ?? "Dashboard load failed");
+    } finally {
+      setLoading(false);
+    }
   }, []);
-  // 🔼 SADECE BURASI DİNAMİK YAPILDI
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
+  const fullName = useMemo(() => {
+    const fn = (user.firstName ?? "").trim();
+    const ln = (user.lastName ?? "").trim();
+    const name = `${fn} ${ln}`.trim();
+    return name || "User";
+  }, [user.firstName, user.lastName]);
+
+  const balanceText = useMemo(() => {
+    const amount = balanceDto.balance ?? 0;
+    const cur = balanceDto.currency ?? "TRY";
+    return formatMoney(amount, cur);
+  }, [balanceDto.balance, balanceDto.currency]);
+
+  const last3 = useMemo(() => {
+    const sorted = [...history].sort((a, b) => {
+      const ad = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bd = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bd - ad;
+    });
+    return sorted.slice(0, 3);
+  }, [history]);
 
   return (
     <View style={styles.container}>
@@ -63,33 +173,78 @@ export default function HomeScreen() {
             <View style={styles.headerRow}>
               <View>
                 <Text style={styles.welcome}>Welcome,</Text>
-                <Text style={styles.name}>{userName}</Text>
+                <Text style={styles.name}>{loading ? "Loading..." : fullName}</Text>
               </View>
 
               <View style={{ alignItems: "flex-end" }}>
                 <Text style={styles.balanceLabel}>Balance</Text>
-                <Text style={styles.balance}>{balance}</Text>
+                <Text style={styles.balance}>{loading ? "…" : balanceText}</Text>
               </View>
             </View>
 
-            <Text style={styles.subHint}>Your wallet is ready for quick actions.</Text>
+            <Text style={styles.subHint}>{error ? error : "Your wallet is ready for quick actions."}</Text>
           </View>
 
           <View style={styles.actionGrid}>
-            <ActionTile title="Top Up" icon="wallet-outline" variant="teal" onPress={() => {}} />
-            <ActionTile title="Transfer" icon="swap-horizontal-outline" variant="blue" onPress={() => {}} />
-            <ActionTile title="Pay Bills" icon="receipt-outline" variant="purple" disabled />
-            <ActionTile title="Partner Stores" icon="storefront-outline" variant="orange" disabled />
+            <ActionTile title="Top Up" icon="wallet-outline" variant="teal" onPress={() => router.push("/topup")} />
+            <ActionTile
+              title="Transfer"
+              icon="swap-horizontal-outline"
+              variant="blue"
+              onPress={() => router.push("/transfer")}
+            />
+            {/* ✅ artık disabled değil -> yönlendirme var */}
+            <ActionTile
+              title="Pay Bills"
+              icon="receipt-outline"
+              variant="purple"
+              onPress={() => router.push("/paybills")}
+            />
+            <ActionTile
+              title="Partner Stores"
+              icon="storefront-outline"
+              variant="orange"
+              onPress={() => router.push("/partners")}
+            />
           </View>
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Last Transactions</Text>
-            <Text style={styles.sectionLink}>View all</Text>
+            <Text style={styles.sectionLink} onPress={() => router.push("/wallet")}>
+              View all
+            </Text>
           </View>
 
-          <TxItem title="Top Up" amount="+ ₺200.00" meta="Today • Pending" />
-          <TxItem title="Transfer" amount="- ₺120.00" meta="Today • Completed" />
-          <TxItem title="Top Up" amount="+ ₺50.00" meta="Yesterday • Completed" />
+          {last3.length === 0 ? (
+            <View style={styles.txItem}>
+              <View style={{ gap: 4 }}>
+                <Text style={styles.txTitle}>No transactions yet</Text>
+                <Text style={styles.txMeta}>Your recent activity will appear here.</Text>
+              </View>
+              <Text style={styles.txAmount}> </Text>
+            </View>
+          ) : (
+            last3.map((tx, idx) => {
+              const title = mapTxTitle(tx);
+              const isCredit = String(tx.direction).toLowerCase() === "credit";
+
+              const amount = typeof tx.amount === "number" ? tx.amount : Number(tx.amount ?? 0);
+              const cur = (tx.currency ?? balanceDto.currency ?? "TRY").toUpperCase();
+              const amountText = `${isCredit ? "+" : "-"} ${formatMoney(Math.abs(amount), cur)}`;
+
+              const meta = formatTxMeta(tx.createdAt, tx.direction);
+
+              return (
+                <TxItem
+                  key={tx.id ?? String(idx)}
+                  title={title}
+                  amount={amountText}
+                  meta={meta}
+                  titleTone={isCredit ? "positive" : "negative"}
+                />
+              );
+            })
+          )}
 
           <View style={{ height: 28 }} />
         </ScrollView>
@@ -136,14 +291,34 @@ const variantStyles = {
   orange: { bubbleBg: "rgba(234,88,12,0.14)", bubbleBorder: "rgba(234,88,12,0.22)", icon: "rgba(234,88,12,1)" },
 } as const;
 
-function TxItem({ title, amount, meta }: { title: string; amount: string; meta: string }) {
+function TxItem({
+  title,
+  amount,
+  meta,
+  titleTone,
+}: {
+  title: string;
+  amount: string;
+  meta: string;
+  titleTone?: "positive" | "negative";
+}) {
   const isPositive = amount.trim().startsWith("+");
+
   return (
     <View style={styles.txItem}>
       <View style={{ gap: 4 }}>
-        <Text style={styles.txTitle}>{title}</Text>
+        <Text
+          style={[
+            styles.txTitle,
+            titleTone === "positive" ? styles.txTitlePositive : null,
+            titleTone === "negative" ? styles.txTitleNegative : null,
+          ]}
+        >
+          {title}
+        </Text>
         <Text style={styles.txMeta}>{meta}</Text>
       </View>
+
       <Text style={[styles.txAmount, isPositive ? styles.positive : styles.negative]}>{amount}</Text>
     </View>
   );
@@ -251,6 +426,10 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   txTitle: { fontWeight: "900", color: "rgba(255,255,255,0.92)" },
+  // ✅ title rengi: Top Up yeşil, Transfer kırmızı
+  txTitlePositive: { color: "rgba(134, 239, 172, 0.95)" },
+  txTitleNegative: { color: "rgba(252, 165, 165, 0.95)" },
+
   txMeta: { color: "rgba(255,255,255,0.60)", fontSize: 12, fontWeight: "700" },
 
   txAmount: { fontWeight: "900", color: "rgba(255,255,255,0.92)" },

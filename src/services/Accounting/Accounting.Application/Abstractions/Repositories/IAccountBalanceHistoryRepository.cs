@@ -11,4 +11,8 @@ public interface IAccountBalanceHistoryRepository
         DateTime fromUtc,
         DateTime toUtc,
         CancellationToken ct = default);
+
+    Task<IReadOnlyList<AccountBalanceHistory>> ListByAccountIdAsync(
+    Guid accountId,
+    CancellationToken ct = default);
 }

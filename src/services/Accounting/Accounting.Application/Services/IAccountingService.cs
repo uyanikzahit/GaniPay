@@ -15,4 +15,9 @@ public interface IAccountingService
 
     Task<CustomerWalletsDto> GetCustomerWalletsAsync(Guid customerId, CancellationToken ct);
 
+
+    Task<IReadOnlyList<AccountBalanceHistoryDto>> GetBalanceHistoryAsync(
+        Guid accountId,
+        CancellationToken ct);
+
 }
