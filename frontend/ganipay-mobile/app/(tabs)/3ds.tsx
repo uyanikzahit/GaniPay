@@ -77,47 +77,62 @@ export default function ThreeDSScreen() {
     router.back();
   };
 
-  const confirm = async () => {
-    if (!payload) return;
+ const confirm = async () => {
+  if (!payload) return;
 
-    setError(null);
+  setError(null);
 
-    if (secondsLeft === 0) {
-      setError("Code expired. Please go back and try again.");
-      return;
-    }
+  if (secondsLeft === 0) {
+    setError("Code expired. Please go back and try again.");
+    return;
+  }
 
-    // ✅ Random kabul: sadece 6 hane yeterli
-    if (!otpOk) {
-      setError("Please enter a 6-digit code.");
-      return;
-    }
+  if (!otpOk) {
+    setError("Please enter a 6-digit code.");
+    return;
+  }
 
-    try {
-      setVerifying(true);
+  try {
+    setVerifying(true);
 
-      // ✅ 3-4 sn “onaylanıyor” beklet
-      await sleep(3500);
+    // ✅ 3-4 sn “onaylanıyor” beklet
+    await sleep(3500);
 
-      // ✅ Sadece tek istek: POST /api/v1/payments/topup
-      await startTopUp(payload);
+    // ✅ Sadece tek istek: POST /api/v1/payments/topup
+    const res = await startTopUp(payload);
 
-      // pending temizle
-      await AsyncStorage.removeItem(PendingTopUpKey).catch(() => {});
+    // pending temizle
+    await AsyncStorage.removeItem(PendingTopUpKey).catch(() => {});
 
-      // Success: basit mesaj + wallet’a dön
-      Alert.alert("Success", "Top up successful.", [
-        { text: "Done", onPress: () => router.replace("/(tabs)/wallet") },
-      ]);
-    } catch (e: any) {
-      Alert.alert("Failed", e?.message || "Top up failed. Please try again.", [
-        { text: "Back", onPress: () => router.replace("/(tabs)/topup") },
-      ]);
-    } finally {
-      setVerifying(false);
-    }
-  };
+    // ✅ Success/Fail tespiti (backend'in döndürdüğü forma göre)
+      const status = (res?.status ?? "").toString();
 
+      // ✅ Running’i de success say (backend async çalışıyor)
+      const ok = res?.success === true || status === "Succeeded" || status === "Running";
+
+      router.replace({
+        pathname: "/(tabs)/topup-result",
+        params: {
+          status: ok ? "success" : "failed",
+          message: ok
+            ? "Top up successful. Redirecting to your wallet..."
+            : (res?.message || "Top up failed. Please try again."),
+        },
+      });
+  } catch (e: any) {
+    await AsyncStorage.removeItem(PendingTopUpKey).catch(() => {});
+
+    router.replace({
+      pathname: "/(tabs)/topup-result",
+      params: {
+        status: "failed",
+        message: e?.message || "Top up failed. Please try again.",
+      },
+    });
+  } finally {
+    setVerifying(false);
+  }
+};
   if (loading) {
     return (
       <View style={[styles.page, styles.center]}>
@@ -150,7 +165,7 @@ export default function ThreeDSScreen() {
           <Ionicons name="shield-checkmark-outline" size={18} color={GOLD} />
         </View>
         <Text style={styles.title}>3D Secure Verification</Text>
-        <Text style={styles.sub}>Enter any 6-digit code (demo).</Text>
+        <Text style={styles.sub}>Enter any 6-digit code.</Text>
       </View>
 
       <View style={styles.card}>

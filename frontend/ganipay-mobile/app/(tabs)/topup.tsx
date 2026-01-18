@@ -161,7 +161,7 @@ export default function TopupScreen() {
       customerId: sessionCustomerId,
       accountId: sessionAccountId,
       amount: Number(amount.toFixed(2)),
-      currency: sessionCurrency || "TRY",
+      currency: "TRY",
       idempotencyKey: safeIdempotencyKey(),
       referenceId: ibanRaw.replace(/\s+/g, ""),
     };
@@ -170,7 +170,14 @@ export default function TopupScreen() {
     try {
       setLoading(true);
       await AsyncStorage.setItem(PendingTopUpKey, JSON.stringify(payload));
-      // 3D Secure simülasyon ekranına git
+
+      // ✅ form reset
+      setAmountText("");
+      setIbanDigits("TR");
+      setCardNumber("");
+      setExpiry("");
+      setCvv("");
+      setCardholder("");
       router.push("/(tabs)/3ds");
     } catch {
       Alert.alert("Error", "Unable to continue. Please try again.");

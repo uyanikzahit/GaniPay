@@ -1,3 +1,4 @@
+import React, { useEffect } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -7,15 +8,16 @@ const CARD = "rgba(255,255,255,0.06)";
 const BORDER = "rgba(255,255,255,0.10)";
 const GOLD = "rgba(246,195,64,1)";
 const MUTED = "rgba(255,255,255,0.60)";
+const DANGER = "rgba(255,71,87,0.85)";
 
 export default function TopUpResultScreen() {
   const router = useRouter();
-  const { status, message } = useLocalSearchParams<{
-    status: "success" | "failed";
-    message?: string;
-  }>();
+  const params = useLocalSearchParams<{ status?: string; message?: string }>();
 
+  const status = params.status === "success" ? "success" : "failed";
   const isSuccess = status === "success";
+
+
 
   return (
     <View style={styles.page}>
@@ -23,29 +25,23 @@ export default function TopUpResultScreen() {
         <Ionicons
           name={isSuccess ? "checkmark-circle-outline" : "close-circle-outline"}
           size={64}
-          color={isSuccess ? GOLD : "rgba(255,71,87,0.85)"}
+          color={isSuccess ? GOLD : DANGER}
         />
 
-        <Text style={styles.title}>
-          {isSuccess ? "Top up completed" : "Top up failed"}
-        </Text>
+        <Text style={styles.title}>{isSuccess ? "Top up completed" : "Top up failed"}</Text>
 
         <Text style={styles.message}>
-          {message ??
+          {params.message ??
             (isSuccess
-              ? "Your balance has been updated successfully."
+              ? "Top up successful. Redirecting to home..."
               : "Something went wrong. Please try again.")}
         </Text>
 
         <Pressable
-          onPress={() =>
-            router.replace(isSuccess ? "/(tabs)/wallet" : "/(tabs)/topup")
-          }
+          onPress={() => router.replace(isSuccess ? "/(tabs)" : "/(tabs)/topup")}
           style={styles.primaryBtn}
         >
-          <Text style={styles.primaryText}>
-            {isSuccess ? "Go to Wallet" : "Try Again"}
-          </Text>
+          <Text style={styles.primaryText}>{isSuccess ? "Go to Home" : "Try Again"}</Text>
         </Pressable>
       </View>
     </View>
