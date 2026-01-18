@@ -242,6 +242,9 @@ export default function TabLayout() {
         <Tabs.Screen name="partners" options={{ href: null }} />
         <Tabs.Screen name="legal" options={{ href: null }} />
         <Tabs.Screen name="about" options={{ href: null }} />
+        <Tabs.Screen name="3ds" options={{ href: null }} />
+        
+
 
       </Tabs>
 
