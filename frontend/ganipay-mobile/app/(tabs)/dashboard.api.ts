@@ -7,13 +7,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SessionKeys } from "../../constants/storage";
 
 const WEB_ACCOUNTING_BASE_URL = "http://localhost:5103";
-// Mobile kısmını sonra açacağız (şimdilik web)
+const REAL_DEVICE_ACCOUNTING_BASE_URL = "http://192.168.1.5:5104"; // PC IP + 5104
 // const REAL_DEVICE_ACCOUNTING_BASE_URL = "http://192.168.1.5:5103";
 
 function getAccountingBaseUrl() {
   if (Platform.OS === "web") return WEB_ACCOUNTING_BASE_URL;
-  // şimdilik web dışı da localhost kalsın, sonra mobile IP'ye çeviririz
-  return WEB_ACCOUNTING_BASE_URL;
+  return REAL_DEVICE_ACCOUNTING_BASE_URL;
 }
 
 async function authHeaders() {

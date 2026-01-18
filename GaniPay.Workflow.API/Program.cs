@@ -327,7 +327,8 @@ paymentsGroup.MapPost("/topup", async (
             ? cid.ToString()
             : Guid.NewGuid().ToString();
 
-    TopUpResultStore.Remove(correlationId); // ✅ ekl
+    // ✅ Aynı correlationId ile daha önce store’a yazılmış eski bir sonuç varsa temizle
+    TopUpResultStore.Remove(correlationId);
 
     var variables = new
     {
@@ -344,20 +345,53 @@ paymentsGroup.MapPost("/topup", async (
 
     try
     {
+        // 1) Workflow başlat
         var resp = await zeebe.NewCreateProcessInstanceCommand()
             .BpmnProcessId(topUpProcessId)
             .LatestVersion()
             .Variables(variablesJson)
             .Send();
 
-        return Results.Accepted(
-            value: new
+        // 2) Kısa süre bekle -> callback geldiyse aynı response’ta sonucu dön
+        //    (TopUp’ta login gibi detay yok; sadece başarılı/başarısız İngilizce mesaj)
+        for (int i = 0; i < 80; i++) // 8 saniye (80 * 100ms)
+        {
+            if (TopUpResultStore.TryGet(correlationId, out var result))
             {
-                success = true,
-                correlationId,
-                processId = topUpProcessId,
-                processInstanceKey = resp.ProcessInstanceKey
-            });
+                // İstersen burada remove et; ben "tek seferlik gösterim" için kaldırıyorum
+                TopUpResultStore.Remove(correlationId);
+
+                var message = result.Success
+                    ? "Top up completed successfully."
+                    : "Top up failed.";
+
+                // Worker message gönderiyorsa onu tercih edelim (ama İngilizce şartın için fallback var)
+                if (!string.IsNullOrWhiteSpace(result.Message))
+                    message = result.Message;
+
+                return Results.Ok(new
+                {
+                    success = result.Success,
+                    status = result.Success ? "Succeeded" : "Failed",
+                    message,
+                    data = result.Data,
+                    correlationId
+                });
+            }
+
+            await Task.Delay(100, ct);
+        }
+
+        // 3) Hâlâ yoksa -> workflow çalışıyor
+        return Results.Accepted(value: new
+        {
+            success = false,
+            status = "Running",
+            correlationId,
+            processId = topUpProcessId,
+            processInstanceKey = resp.ProcessInstanceKey,
+            message = "Top up is being processed."
+        });
     }
     catch (Exception ex)
     {
@@ -369,18 +403,28 @@ paymentsGroup.MapPost("/topup", async (
 });
 
 
-
 paymentsGroup.MapPost("/topup/result", (TopUpResultCallback body) =>
 {
     if (string.IsNullOrWhiteSpace(body.CorrelationId))
         return Results.BadRequest(new { success = false, message = "correlationId zorunlu" });
 
+    // ✅ Çok minimal normalize (status boş gelirse success'e göre doldur)
+    var normalizedStatus =
+        string.IsNullOrWhiteSpace(body.Status)
+            ? (body.Success ? "Succeeded" : "Failed")
+            : body.Status;
+
+    var normalizedMessage =
+        string.IsNullOrWhiteSpace(body.Message)
+            ? (body.Success ? "Top up completed successfully." : "Top up failed.")
+            : body.Message;
+
     TopUpResultStore.Set(
         body.CorrelationId,
         new TopUpResult(
             Success: body.Success,
-            Status: body.Status,
-            Message: body.Message,
+            Status: normalizedStatus,
+            Message: normalizedMessage,
             Data: body.Data
         )
     );
@@ -390,9 +434,11 @@ paymentsGroup.MapPost("/topup/result", (TopUpResultCallback body) =>
 
 paymentsGroup.MapGet("/topup/result/{correlationId}", (string correlationId) =>
 {
+    if (string.IsNullOrWhiteSpace(correlationId))
+        return Results.BadRequest(new { success = false, message = "correlationId zorunlu" });
+
     if (TopUpResultStore.TryGet(correlationId, out var result))
     {
-        // İstersen kaldır: burada kaldırmazsak client aynı sonucu tekrar çekebilir
         TopUpResultStore.Remove(correlationId);
 
         return Results.Ok(new
@@ -409,7 +455,7 @@ paymentsGroup.MapGet("/topup/result/{correlationId}", (string correlationId) =>
     {
         success = false,
         status = "Running",
-        message = "TopUp is being processed.",
+        message = "Top up is being processed.",
         correlationId
     });
 });

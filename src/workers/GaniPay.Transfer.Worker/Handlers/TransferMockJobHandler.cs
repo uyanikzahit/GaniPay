@@ -1,4 +1,4 @@
-using System.Text.Json;
+ï»¿using System.Text.Json;
 using Zeebe.Client.Api.Responses;
 using Zeebe.Client.Api.Worker;
 
@@ -36,19 +36,19 @@ public sealed class TransferMockJobHandler
                 catch { return def; }
             }
 
-            // Debug / trace için faydalý
+            // Debug / trace iÃ§in faydalÄ±
             var idempotencyKey = GetString("idempotencyKey");
             var referenceIdRaw = GetString("referenceId") ?? idempotencyKey;
             var referenceId = Guid.TryParse(referenceIdRaw, out var gid) ? gid.ToString() : Guid.NewGuid().ToString();
 
-            // JobType’a göre mock davranýþý
+            // JobTypeâ€™a gÃ¶re mock davranÄ±ÅŸÄ±
             object completeVars = job.Type switch
             {
                 // 1) Resolve Receiver (AML) - mock
                 "transfer.receiver.resolve" => new
                 {
                     receiverResolved = true,
-                    // senin BPMN’de receiverResolved üzerinden gateway karar veriyor
+                    // senin BPMNâ€™de receiverResolved Ã¼zerinden gateway karar veriyor
                     errorCode = (string?)null,
                     errorMessage = (string?)null,
                     failedAtStep = (string?)null
@@ -68,7 +68,7 @@ public sealed class TransferMockJobHandler
                 // 3) Initiate Transfer (Payments) - mock
                 "payments.transfer.initiate" => new
                 {
-                    // BPMN’de Gw_InitiateOk “correlationId set?” üzerinden gidiyor
+                    // BPMNâ€™de Gw_InitiateOk â€œcorrelationId set?â€ Ã¼zerinden gidiyor
                     correlationId = $"trf-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
                     status = "Running", // istersen "Running" / "Accepted"
                     paymentsCorrelationId = $"trf-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
@@ -83,7 +83,7 @@ public sealed class TransferMockJobHandler
                     failedAtStep = (string?)null
                 },
 
-                // 4) Notify (mock) - iki job type ayný handler
+                // 4) Notify (mock) - iki job type aynÄ± handler
                 "notification.send.sender" => new
                 {
                     receiverNotifyMessageId = $"msg-receiver-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
@@ -103,10 +103,10 @@ public sealed class TransferMockJobHandler
                 // 5) Complete Transfer - mock
                 "payments.transfer.complete" => new
                 {
-                    // senin BPMN’de complete sonrasý success event’e gidiyor (Flow_0kenwne)
+                    // senin BPMNâ€™de complete sonrasÄ± success eventâ€™e gidiyor (Flow_0kenwne)
                     persistOk = true,
                     paymentsStatusUpdated = true,
-                    // istersen ledgerOk’a göre status bas
+                    // istersen ledgerOkâ€™a gÃ¶re status bas
                     status = GetBool("ledgerOk", true) ? "Succeeded" : "Failed",
 
                     referenceId,
@@ -117,7 +117,7 @@ public sealed class TransferMockJobHandler
                     failedAtStep = (string?)null
                 },
 
-                // default: bilmediðimiz job type gelirse fail yerine complete edip trace bas (dev ortamý)
+                // default: bilmediÄŸimiz job type gelirse fail yerine complete edip trace bas (dev ortamÄ±)
                 _ => new
                 {
                     errorCode = "MOCK_UNKNOWN_JOBTYPE",

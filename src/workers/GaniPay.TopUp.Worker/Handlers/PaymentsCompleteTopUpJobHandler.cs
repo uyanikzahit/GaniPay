@@ -21,7 +21,7 @@ public sealed class PaymentsCompleteTopUpJobHandler
         var workflowBaseUrl =
             Environment.GetEnvironmentVariable("WORKFLOW_API_BASEURL")
             ?? Environment.GetEnvironmentVariable("WorkflowApi__BaseUrl")
-            ?? "http://host.docker.internal:7253";
+            ?? "https://localhost:7253"; // ✅ default https
 
         workflowBaseUrl = workflowBaseUrl.TrimEnd('/');
 
@@ -87,7 +87,7 @@ public sealed class PaymentsCompleteTopUpJobHandler
 
             // ✅ (EK) Workflow API ResultStore callback (TopUp)
             // ❗ Bu callback fail olursa akışı patlatmıyoruz, sadece logluyoruz.
-            await TrySendWorkflowResultCallbackAsync(root, correlationId, okResp);
+            await TrySendWorkflowResultCallbackAsync(root, correlationId, creditOk, okResp, errorCode, errorMessage);
 
             // ✅ BPMN output isimleri paneldekiyle aynı
             var completeVars = new
@@ -112,13 +112,20 @@ public sealed class PaymentsCompleteTopUpJobHandler
         }
     }
 
-    private async Task TrySendWorkflowResultCallbackAsync(JsonElement root, string correlationId, bool okResp)
+    private async Task TrySendWorkflowResultCallbackAsync(
+        JsonElement root,
+        string correlationId,
+        bool creditOk,
+        bool paymentsStatusUpdated,
+        string? errorCode,
+        string? errorMessage)
     {
         try
         {
             // Operate’ta gördüğün alanları “receipt” gibi minimal toparlıyoruz
             var data = new
             {
+                // işlem datası
                 accountId = GetString(root, "accountId"),
                 customerId = GetString(root, "customerId"),
                 amount = GetDecimal(root, "amount"),
@@ -127,15 +134,22 @@ public sealed class PaymentsCompleteTopUpJobHandler
                 balanceAfter = GetDecimal(root, "balanceAfter"),
                 accountingTxId = GetString(root, "accountingTxId"),
                 referenceId = GetString(root, "referenceId"),
-                idempotencyKey = GetString(root, "idempotencyKey")
+                idempotencyKey = GetString(root, "idempotencyKey"),
+
+                // meta
+                creditOk,
+                paymentsStatusUpdated,
+                errorCode,
+                errorMessage
             };
 
+            // ✅ SUCCESS / STATUS: gerçek iş sonucu creditOk'a göre
             var payload = new
             {
                 correlationId,
-                success = okResp,
-                status = okResp ? "Succeeded" : "Failed",
-                message = okResp ? "TopUp successful" : "TopUp failed",
+                success = creditOk,
+                status = creditOk ? "Succeeded" : "Failed",
+                message = creditOk ? "TopUp successful" : (errorMessage ?? "TopUp failed"),
                 data
             };
 

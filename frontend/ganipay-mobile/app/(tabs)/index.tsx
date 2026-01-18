@@ -1,9 +1,12 @@
 // app/(tabs)/index.tsx
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useFocusEffect } from "expo-router";
+
+
+
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Colors } from "../theme/colors";
@@ -61,73 +64,86 @@ function mapTxTitle(tx: BalanceHistoryItem) {
 export default function HomeScreen() {
   const router = useRouter();
 
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [user, setUser] = useState<DashboardUser>({});
   const [balanceDto, setBalanceDto] = useState<BalanceDto>({});
   const [history, setHistory] = useState<BalanceHistoryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      setError(null);
-      setLoading(true);
+const load = useCallback(async (opts?: { silent?: boolean }) => {
+  const silent = opts?.silent === true;
 
-      const [customerId, currency, accountIdFromSession, userJson] = await AsyncStorage.multiGet([
-        SessionKeys.customerId,
-        SessionKeys.currency,
-        SessionKeys.accountId,
-        SessionKeys.user,
-      ]).then((arr) => arr.map((x) => x[1] ?? ""));
+  try {
+    setError(null);
 
-      if (userJson) {
-        try {
-          const u = JSON.parse(userJson) as DashboardUser;
-          setUser({ firstName: u?.firstName, lastName: u?.lastName });
-        } catch {
-          // ignore
-        }
-      }
+    // ✅ İlk açılışta loading göster, geri dönüşte gösterme
+    if (silent) setRefreshing(true);
+    else setInitialLoading(true);
 
-      if (!customerId) throw new Error("customerId bulunamadı. Login sonrası SessionKeys.customerId set edildi mi?");
+    const [customerId, currency, accountIdFromSession, userJson] = await AsyncStorage.multiGet([
+      SessionKeys.customerId,
+      SessionKeys.currency,
+      SessionKeys.accountId,
+      SessionKeys.user,
+    ]).then((arr) => arr.map((x) => x[1] ?? ""));
 
-      const cur = (currency || "TRY").toUpperCase();
-
-      const balanceRes = await getCustomerBalance(customerId, cur);
-
-      const accountId = balanceRes?.accountId || accountIdFromSession;
-      if (!accountId) throw new Error("accountId bulunamadı. Balance response accountId dönmüyor mu?");
-
-      setBalanceDto({
-        accountId,
-        customerId: balanceRes?.customerId || customerId,
-        currency: (balanceRes?.currency || cur).toUpperCase(),
-        balance: typeof balanceRes?.balance === "number" ? balanceRes.balance : Number(balanceRes?.balance ?? 0),
-      });
-
-      const historyRes = await getAccountBalanceHistory(accountId);
-
-      const mapped: BalanceHistoryItem[] = (historyRes ?? []).map((x: any) => ({
-        id: x?.id,
-        accountId: x?.accountId,
-        direction: x?.direction,
-        amount: typeof x?.changeAmount === "number" ? x.changeAmount : Number(x?.changeAmount ?? x?.amount ?? 0),
-        currency: x?.currency,
-        createdAt: x?.createdAt,
-        operationType: x?.operationType,
-        referenceId: x?.referenceId,
-      }));
-
-      setHistory(Array.isArray(mapped) ? mapped : []);
-    } catch (e: any) {
-      setError(e?.message ?? "Dashboard load failed");
-    } finally {
-      setLoading(false);
+    if (userJson) {
+      try {
+        const u = JSON.parse(userJson) as DashboardUser;
+        // ✅ sessiz yenilemede de isim hemen kalsın
+        setUser({ firstName: u?.firstName, lastName: u?.lastName });
+      } catch {}
     }
-  }, []);
+
+    if (!customerId) throw new Error("customerId bulunamadı. Login sonrası SessionKeys.customerId set edildi mi?");
+
+    const cur = (currency || "TRY").toUpperCase();
+
+    const balanceRes = await getCustomerBalance(customerId, cur);
+
+    const accountId = balanceRes?.accountId || accountIdFromSession;
+    if (!accountId) throw new Error("accountId bulunamadı. Balance response accountId dönmüyor mu?");
+
+    setBalanceDto({
+      accountId,
+      customerId: balanceRes?.customerId || customerId,
+      currency: (balanceRes?.currency || cur).toUpperCase(),
+      balance: typeof balanceRes?.balance === "number" ? balanceRes.balance : Number(balanceRes?.balance ?? 0),
+    });
+
+    const historyRes = await getAccountBalanceHistory(accountId);
+
+    const mapped: BalanceHistoryItem[] = (historyRes ?? []).map((x: any) => ({
+      id: x?.id,
+      accountId: x?.accountId,
+      direction: x?.direction,
+      amount: typeof x?.changeAmount === "number" ? x.changeAmount : Number(x?.changeAmount ?? x?.amount ?? 0),
+      currency: x?.currency,
+      createdAt: x?.createdAt,
+      operationType: x?.operationType,
+      referenceId: x?.referenceId,
+    }));
+
+    setHistory(Array.isArray(mapped) ? mapped : []);
+  } catch (e: any) {
+    setError(e?.message ?? "Dashboard load failed");
+  } finally {
+    if (silent) setRefreshing(false);
+    else setInitialLoading(false);
+  }
+}, []);
+
+
+
+useEffect(() => {
+  load({ silent: false });
+}, [load]);
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      // ✅ geri gelince UI flicker yok, arkada yenile
+      load({ silent: true });
     }, [load])
   );
 
@@ -173,12 +189,12 @@ export default function HomeScreen() {
             <View style={styles.headerRow}>
               <View>
                 <Text style={styles.welcome}>Welcome,</Text>
-                <Text style={styles.name}>{loading ? "Loading..." : fullName}</Text>
+                <Text style={styles.name}>{initialLoading ? "Loading..." : fullName}</Text>
               </View>
 
               <View style={{ alignItems: "flex-end" }}>
                 <Text style={styles.balanceLabel}>Balance</Text>
-                <Text style={styles.balance}>{loading ? "…" : balanceText}</Text>
+                <Text style={styles.balance}>{initialLoading ? "…" : balanceText}</Text>
               </View>
             </View>
 
