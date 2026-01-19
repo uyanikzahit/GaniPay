@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, TextInput } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { startTopUp, TopUpPayload } from "./topup.api";
+import { startTransfer, TransferPayload } from "./transfer.api";
 
 const BG = "#0B1220";
 const CARD = "rgba(255,255,255,0.06)";
@@ -13,7 +13,7 @@ const MUTED = "rgba(255,255,255,0.60)";
 const SOFT = "rgba(255,255,255,0.35)";
 const DANGER = "rgba(255,71,87,0.85)";
 
-const PendingTopUpKey = "ganipay.pendingTopUp.v1";
+const PendingTransferKey = "ganipay.pendingTransfer.v1";
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -21,10 +21,10 @@ function sleep(ms: number) {
 function onlyDigits(s: string) {
   return s.replace(/\D/g, "");
 }
-function maskRef(ref: string) {
-  const c = (ref || "").replace(/\s+/g, "");
-  if (c.length < 10) return c;
-  return `${c.slice(0, 6)} **** **** ${c.slice(-4)}`;
+function maskReceiver(value: string) {
+  const v = (value || "").trim();
+  if (v.length <= 10) return v;
+  return `${v.slice(0, 6)}…${v.slice(-4)}`;
 }
 function resetUi(setOtp: any, setError: any, setSecondsLeft: any) {
   setOtp("");
@@ -32,10 +32,10 @@ function resetUi(setOtp: any, setError: any, setSecondsLeft: any) {
   setSecondsLeft(180);
 }
 
-export default function ThreeDSScreen() {
+export default function Transfer3DSScreen() {
   const router = useRouter();
 
-  const [payload, setPayload] = useState<TopUpPayload | null>(null);
+  const [payload, setPayload] = useState<TransferPayload | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [otp, setOtp] = useState("");
@@ -43,10 +43,19 @@ export default function ThreeDSScreen() {
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Sayfa her açıldığında temiz UI
+  useFocusEffect(
+    React.useCallback(() => {
+      resetUi(setOtp, setError, setSecondsLeft);
+      return () => {};
+    }, [])
+  );
+
+  // payload oku
   useEffect(() => {
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem(PendingTopUpKey);
+        const raw = await AsyncStorage.getItem(PendingTransferKey);
         setPayload(raw ? JSON.parse(raw) : null);
       } catch {
         setPayload(null);
@@ -56,6 +65,7 @@ export default function ThreeDSScreen() {
     })();
   }, []);
 
+  // timer
   useEffect(() => {
     if (loading) return;
     if (!payload) return;
@@ -72,13 +82,13 @@ export default function ThreeDSScreen() {
     if (!payload) return null;
     return {
       amount: payload.amount.toFixed(2),
-      currency: payload.currency,
-      ref: maskRef(payload.referenceId),
+      currency: payload.currency ?? "TRY",
+      receiver: maskReceiver(payload.receiverCustomerId),
     };
   }, [payload]);
 
   const cancel = async () => {
-    await AsyncStorage.removeItem(PendingTopUpKey).catch(() => {});
+    await AsyncStorage.removeItem(PendingTransferKey).catch(() => {});
     resetUi(setOtp, setError, setSecondsLeft);
     router.back();
   };
@@ -93,6 +103,7 @@ export default function ThreeDSScreen() {
       return;
     }
 
+    // ✅ mock: herhangi 6 hane kabul
     if (!otpOk) {
       setError("Please enter a 6-digit code.");
       return;
@@ -101,40 +112,34 @@ export default function ThreeDSScreen() {
     try {
       setVerifying(true);
 
-      // 3-4 sn “onaylanıyor” simülasyonu
+      // 3-4 sn onaylanıyor simülasyonu
       await sleep(3500);
 
-      // Tek istek: POST /api/v1/payments/topup
-      const res = await startTopUp(payload);
+      const res = await startTransfer(payload);
 
-      // ✅ UI temizle + pending sil + local payload temizle
+      // ✅ UI + pending temizle
       resetUi(setOtp, setError, setSecondsLeft);
-      setPayload(null);
-      await AsyncStorage.removeItem(PendingTopUpKey).catch(() => {});
+      await AsyncStorage.removeItem(PendingTransferKey).catch(() => {});
 
       const status = (res?.status ?? "").toString();
       const ok = res?.success === true || status === "Succeeded" || status === "Running";
 
       router.replace({
-        pathname: "/(tabs)/topup-result",
+        pathname: "/(tabs)/transfer-result",
         params: {
           status: ok ? "success" : "failed",
-          message: ok
-            ? "Top up successful."
-            : (res?.message || "Top up failed. Please try again."),
+          message: ok ? "Transfer successful." : (res?.message || "Transfer failed. Please try again."),
         },
       });
     } catch (e: any) {
-      // ✅ hata olsa bile UI temizle + pending sil
       resetUi(setOtp, setError, setSecondsLeft);
-      setPayload(null);
-      await AsyncStorage.removeItem(PendingTopUpKey).catch(() => {});
+      await AsyncStorage.removeItem(PendingTransferKey).catch(() => {});
 
       router.replace({
-        pathname: "/(tabs)/topup-result",
+        pathname: "/(tabs)/transfer-result",
         params: {
           status: "failed",
-          message: e?.message || "Top up failed. Please try again.",
+          message: e?.message || "Transfer failed. Please try again.",
         },
       });
     } finally {
@@ -154,17 +159,15 @@ export default function ThreeDSScreen() {
   if (!payload || !summary) {
     return (
       <View style={[styles.page, styles.center, { padding: 18 }]}>
-        <Text style={styles.h1}>No pending payment</Text>
-        <Text style={[styles.mutedText, { textAlign: "center" }]}>
-          Go back and start the top up again.
-        </Text>
+        <Text style={styles.h1}>No pending transfer</Text>
+        <Text style={[styles.mutedText, { textAlign: "center" }]}>Go back and start the transfer again.</Text>
 
         <Pressable
-          onPress={() => router.replace("/(tabs)/topup")}
+          onPress={() => router.replace("/(tabs)/transfer")}
           style={({ pressed }) => [styles.secondaryBtn, pressed && { opacity: 0.9 }]}
         >
           <Ionicons name="arrow-back-outline" size={18} color="rgba(255,255,255,0.92)" />
-          <Text style={styles.secondaryBtnText}>Back to Top up</Text>
+          <Text style={styles.secondaryBtnText}>Back to Transfer</Text>
         </Pressable>
       </View>
     );
@@ -186,19 +189,15 @@ export default function ThreeDSScreen() {
       <View style={styles.card}>
         <View style={styles.summaryRow}>
           <Text style={styles.label}>Amount</Text>
-          <Text style={styles.value}>
-            {summary.amount} {summary.currency}
-          </Text>
+          <Text style={styles.value}>{summary.amount} {summary.currency}</Text>
         </View>
         <View style={styles.summaryRow}>
-          <Text style={styles.label}>Reference</Text>
-          <Text style={styles.value}>{summary.ref}</Text>
+          <Text style={styles.label}>Receiver</Text>
+          <Text style={styles.value}>{summary.receiver}</Text>
         </View>
         <View style={[styles.summaryRow, { marginBottom: 0 }]}>
           <Text style={styles.label}>Timer</Text>
-          <Text style={styles.value}>
-            {mm.toString().padStart(2, "0")}:{ss.toString().padStart(2, "0")}
-          </Text>
+          <Text style={styles.value}>{mm.toString().padStart(2, "0")}:{ss.toString().padStart(2, "0")}</Text>
         </View>
       </View>
 
@@ -269,14 +268,10 @@ const styles = StyleSheet.create({
 
   header: { alignItems: "center", marginTop: 8 },
   badge: {
-    width: 44,
-    height: 44,
-    borderRadius: 16,
+    width: 44, height: 44, borderRadius: 16,
     backgroundColor: "rgba(246,195,64,0.10)",
-    borderWidth: 1,
-    borderColor: "rgba(246,195,64,0.22)",
-    alignItems: "center",
-    justifyContent: "center",
+    borderWidth: 1, borderColor: "rgba(246,195,64,0.22)",
+    alignItems: "center", justifyContent: "center",
   },
   title: { marginTop: 12, color: "rgba(255,255,255,0.92)", fontSize: 18, fontWeight: "900" },
   sub: { marginTop: 6, color: MUTED, fontSize: 12.5, fontWeight: "700", textAlign: "center" },

@@ -443,12 +443,12 @@ const styles = StyleSheet.create({
   },
   txTitle: { fontWeight: "900", color: "rgba(255,255,255,0.92)" },
   // ✅ title rengi: Top Up yeşil, Transfer kırmızı
-  txTitlePositive: { color: "rgba(134, 239, 172, 0.95)" },
-  txTitleNegative: { color: "rgba(252, 165, 165, 0.95)" },
+  txTitlePositive: { color: "rgba(46,213,115,0.95)" },
+  txTitleNegative: { color: "rgba(255,71,87,0.95)" },
 
   txMeta: { color: "rgba(255,255,255,0.60)", fontSize: 12, fontWeight: "700" },
 
   txAmount: { fontWeight: "900", color: "rgba(255,255,255,0.92)" },
-  positive: { color: "rgba(134, 239, 172, 0.95)" },
-  negative: { color: "rgba(252, 165, 165, 0.95)" },
+  positive: { color: "rgba(46,213,115,0.95)" },
+  negative: { color: "rgba(255,71,87,0.95)" },
 });

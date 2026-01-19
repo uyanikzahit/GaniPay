@@ -1,7 +1,9 @@
-import React, { useMemo } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from "react-native";
+// app/(tabs)/account.tsx
+import React, { useEffect, useMemo, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { clearSession, loadSession, StoredSession } from "@/constants/storage";
 
 const BG = "#0B1220";
 const CARD = "rgba(255,255,255,0.06)";
@@ -10,57 +12,201 @@ const GOLD = "rgba(246,195,64,1)";
 const MUTED = "rgba(255,255,255,0.60)";
 const SOFT = "rgba(255,255,255,0.35)";
 
+function safeStr(v: any): string | null {
+  if (v === undefined || v === null) return null;
+  const s = String(v).trim();
+  return s.length ? s : null;
+}
+
+// ✅ ID/Identity mask: 12345678901 -> 1234•••••8901
+function maskIdentity(input?: string | null, keepStart = 4, keepEnd = 4) {
+  const s = safeStr(input);
+  if (!s) return "—";
+  const len = s.length;
+  if (len <= keepStart + keepEnd) return s;
+  const start = s.slice(0, keepStart);
+  const end = s.slice(-keepEnd);
+  const dots = "•".repeat(Math.max(4, len - keepStart - keepEnd));
+  return `${start}${dots}${end}`;
+}
+
+function buildFullName(customer: any) {
+  const first = safeStr(customer?.firstName ?? customer?.name);
+  const last = safeStr(customer?.lastName ?? customer?.surname);
+  const full = `${first ?? ""} ${last ?? ""}`.trim();
+  return full || "—";
+}
+
+function buildEmail(customer: any) {
+  return (
+    safeStr(customer?.email) ??
+    safeStr(customer?.primaryEmail) ??
+    safeStr(Array.isArray(customer?.emails) ? customer?.emails?.[0]?.value : null) ??
+    null
+  );
+}
+
+function buildPhone(customer: any) {
+  // Telefonu AÇIK istedin → direkt gösteriyoruz
+  return (
+    safeStr(customer?.phoneNumber) ??
+    safeStr(customer?.phone) ??
+    safeStr(customer?.gsm) ??
+    safeStr(Array.isArray(customer?.phones) ? customer?.phones?.[0]?.value : null) ??
+    null
+  );
+}
+
+function buildAddress(customer: any) {
+  const addr =
+    customer?.address ??
+    customer?.primaryAddress ??
+    (Array.isArray(customer?.addresses) ? customer?.addresses?.[0] : null);
+
+  if (!addr) return null;
+  if (typeof addr === "string") return safeStr(addr);
+
+  const line1 = safeStr(addr?.addressLine1 ?? addr?.line1 ?? addr?.addressLine);
+  const district = safeStr(addr?.district ?? addr?.town);
+  const city = safeStr(addr?.city);
+  const postal = safeStr(addr?.postalCode ?? addr?.zipCode);
+
+  const parts = [line1, district, city].filter(Boolean) as string[];
+  const s = parts.join(", ");
+  if (!s) return null;
+  return postal ? `${s} ${postal}` : s;
+}
+
+function buildTier(customer: any) {
+  return safeStr(customer?.segment ?? customer?.tier) ?? "Standard";
+}
+
+function buildIdentity(customer: any, session: StoredSession | null) {
+  // backend’de identityNumber / nationalId gibi alanlar olabilir
+  return (
+    safeStr(customer?.identityNumber) ??
+    safeStr(customer?.nationalId) ??
+    safeStr(customer?.tckn) ??
+    safeStr(session?.customerId) ?? // en garanti olan
+    null
+  );
+}
+
 export default function AccountScreen() {
   const router = useRouter();
+  const [session, setSession] = useState<StoredSession | null>(null);
 
-  const user = useMemo(
-    () => ({
-      fullName: "Mehmet Zahit",
-      phone: "+90 506 *** ** 00",
-      email: "zahit.test@ganipay.io",
-      tier: "Standard",
-    }),
-    []
-  );
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const s = await loadSession();
+      if (!alive) return;
+      setSession(s);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
-  const onAction = (title: string) => Alert.alert(title, "This feature will be available soon.");
+  const vm = useMemo(() => {
+    const customer = (session?.customer ?? session?.user ?? {}) as any;
+
+    const fullName = buildFullName(customer);
+    const email = buildEmail(customer);
+    const phone = buildPhone(customer);
+    const address = buildAddress(customer);
+    const tier = buildTier(customer);
+
+    const identityRaw = buildIdentity(customer, session);
+    const identityMasked = maskIdentity(identityRaw, 4, 4);
+
+    // currency: wallet ekranına koyacağız ama account header’da küçük bilgi olarak göstermek istersen
+    const currency = safeStr(session?.currency ?? customer?.currency);
+
+    return {
+      fullName,
+      email: email ?? "—",
+      phone: phone ?? "—",
+      address: address ?? "—",
+      tier,
+      currency,
+      identityMasked,
+    };
+  }, [session]);
+
+  // ✅ Layout’taki gibi: direkt logout
+  const onLogout = async () => {
+    try {
+      await clearSession();
+    } finally {
+      router.replace("/(auth)/login");
+    }
+  };
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
       <Text style={styles.title}>Account</Text>
       <Text style={styles.sub}>Profile & settings</Text>
 
+      {/* ✅ Profile card */}
       <View style={styles.card}>
         <View style={styles.profileRow}>
           <View style={styles.avatar}>
             <Ionicons name="person-outline" size={22} color={GOLD} />
           </View>
+
           <View style={{ flex: 1 }}>
-            <Text style={styles.profileName}>{user.fullName}</Text>
-            <Text style={styles.profileSub}>{user.tier} • Verified</Text>
+            <Text style={styles.profileName}>{vm.fullName}</Text>
+            <Text style={styles.profileSub}>
+              {vm.tier} • Verified{vm.currency ? ` • ${vm.currency}` : ""}
+            </Text>
           </View>
-          <Pressable onPress={() => onAction("Edit profile")} style={({ pressed }) => [styles.miniBtn, pressed && { opacity: 0.9 }]}>
+
+          <Pressable
+            onPress={() => {}}
+            style={({ pressed }) => [styles.miniBtn, pressed && { opacity: 0.9 }]}
+          >
             <Ionicons name="create-outline" size={16} color={GOLD} />
             <Text style={styles.miniBtnText}>Edit</Text>
           </Pressable>
         </View>
 
+        {/* ✅ Phone (AÇIK) */}
         <View style={styles.infoRow}>
           <Ionicons name="call-outline" size={16} color={SOFT} />
-          <Text style={styles.infoText}>{user.phone}</Text>
+          <Text style={styles.infoText}>{vm.phone}</Text>
         </View>
 
+        {/* ✅ Email */}
         <View style={styles.infoRow}>
           <Ionicons name="mail-outline" size={16} color={SOFT} />
-          <Text style={styles.infoText}>{user.email}</Text>
+          <Text style={styles.infoText}>{vm.email}</Text>
+        </View>
+
+        {/* ✅ Address */}
+        <View style={styles.infoRow}>
+          <Ionicons name="location-outline" size={16} color={SOFT} />
+          <Text style={styles.infoText} numberOfLines={2}>
+            {vm.address}
+          </Text>
+        </View>
+
+        {/* ✅ Identity (MASK’Lİ) */}
+        <View style={styles.infoRow}>
+          <Ionicons name="shield-outline" size={16} color={SOFT} />
+          <Text style={styles.infoText}>{vm.identityMasked}</Text>
         </View>
       </View>
 
+      {/* ✅ Preferences */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Preferences</Text>
-        <Text style={styles.cardHint}>Manage your app preferences and privacy.</Text>
+        <Text style={styles.cardHint}>Manage your authentication, limits and legal settings.</Text>
 
-        <Pressable onPress={() => router.push("/(tabs)/security")} style={({ pressed }) => [styles.item, pressed && { opacity: 0.9 }]}>
+        <Pressable
+          onPress={() => router.push("/(tabs)/security")}
+          style={({ pressed }) => [styles.item, pressed && { opacity: 0.9 }]}
+        >
           <View style={styles.iconWrap}>
             <Ionicons name="shield-checkmark-outline" size={18} color={GOLD} />
           </View>
@@ -71,7 +217,10 @@ export default function AccountScreen() {
           <Ionicons name="chevron-forward" size={16} color={SOFT} />
         </Pressable>
 
-        <Pressable onPress={() => router.push("/(tabs)/limits")} style={({ pressed }) => [styles.item, pressed && { opacity: 0.9 }]}>
+        <Pressable
+          onPress={() => router.push("/(tabs)/limits")}
+          style={({ pressed }) => [styles.item, pressed && { opacity: 0.9 }]}
+        >
           <View style={styles.iconWrap}>
             <Ionicons name="speedometer-outline" size={18} color={GOLD} />
           </View>
@@ -82,7 +231,10 @@ export default function AccountScreen() {
           <Ionicons name="chevron-forward" size={16} color={SOFT} />
         </Pressable>
 
-        <Pressable onPress={() => onAction("Legal")} style={({ pressed }) => [styles.item, pressed && { opacity: 0.9 }]}>
+        <Pressable
+          onPress={() => router.push("/(tabs)/legal")}
+          style={({ pressed }) => [styles.item, pressed && { opacity: 0.9 }]}
+        >
           <View style={styles.iconWrap}>
             <Ionicons name="document-text-outline" size={18} color={GOLD} />
           </View>
@@ -94,11 +246,9 @@ export default function AccountScreen() {
         </Pressable>
       </View>
 
+      {/* ✅ Logout */}
       <View style={styles.card}>
-        <Pressable
-          onPress={() => onAction("Log out")}
-          style={({ pressed }) => [styles.dangerBtn, pressed && { opacity: 0.9 }]}
-        >
+        <Pressable onPress={onLogout} style={({ pressed }) => [styles.dangerBtn, pressed && { opacity: 0.9 }]}>
           <Ionicons name="log-out-outline" size={18} color="rgba(255,255,255,0.92)" />
           <Text style={styles.dangerText}>Log out</Text>
         </Pressable>
@@ -153,7 +303,7 @@ const styles = StyleSheet.create({
   miniBtnText: { marginLeft: 6, color: "rgba(255,255,255,0.86)", fontWeight: "900", fontSize: 11.5 },
 
   infoRow: { marginTop: 12, flexDirection: "row", alignItems: "center" },
-  infoText: { marginLeft: 10, color: "rgba(255,255,255,0.86)", fontWeight: "800" },
+  infoText: { marginLeft: 10, color: "rgba(255,255,255,0.86)", fontWeight: "800", flex: 1 },
 
   cardTitle: { color: "rgba(255,255,255,0.92)", fontSize: 14, fontWeight: "900" },
   cardHint: { marginTop: 6, color: "rgba(255,255,255,0.55)", fontSize: 11.5, fontWeight: "700", lineHeight: 16 },

@@ -1,5 +1,5 @@
 // app/(tabs)/_layout.tsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Tabs, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -12,6 +12,12 @@ import {
   Text,
   Switch,
 } from "react-native";
+
+import { clearSession } from "@/constants/storage";
+
+// ✅ i18n
+import { t, type Lang } from "@/constants/i18n";
+import { getLang, setLang } from "@/constants/prefs";
 
 const NAV_BG = "#0B1220";
 const BORDER = "rgba(255,255,255,0.10)";
@@ -33,14 +39,35 @@ export default function TabLayout() {
 
   // ✅ Local-only settings
   const [darkMode, setDarkMode] = useState(true);
-  const [language, setLanguage] = useState<"EN" | "TR">("EN");
+
+  // ✅ persisted language
+  const [language, setLanguage] = useState<Lang>("EN");
+
+  // ✅ load saved language once
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const saved = await getLang();
+      if (!alive) return;
+      setLanguage(saved);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const toggleLanguage = async () => {
+    const next: Lang = language === "EN" ? "TR" : "EN";
+    setLanguage(next);      // UI instantly
+    await setLang(next);    // persist
+  };
 
   const items: MenuItem[] = useMemo(
     () => [
       {
         key: "profile",
-        title: "Profile details",
-        subtitle: "Personal info, verification status",
+        title: t(language, "menu.profile"),
+        subtitle: t(language, "menu.profile.sub"),
         icon: "person-circle-outline",
         onPress: () => {
           setMenuOpen(false);
@@ -49,8 +76,8 @@ export default function TabLayout() {
       },
       {
         key: "wallet",
-        title: "Wallet",
-        subtitle: "Funding sources & balances",
+        title: t(language, "menu.wallet"),
+        subtitle: t(language, "menu.wallet.sub"),
         icon: "wallet-outline",
         onPress: () => {
           setMenuOpen(false);
@@ -60,8 +87,8 @@ export default function TabLayout() {
 
       {
         key: "limits",
-        title: "Spending limits",
-        subtitle: "Daily/Monthly limits, rules",
+        title: t(language, "menu.limits"),
+        subtitle: t(language, "menu.limits.sub"),
         icon: "speedometer-outline",
         onPress: () => {
           setMenuOpen(false);
@@ -70,8 +97,8 @@ export default function TabLayout() {
       },
       {
         key: "security",
-        title: "Security",
-        subtitle: "PIN, biometrics, sign-in options",
+        title: t(language, "menu.security"),
+        subtitle: t(language, "menu.security.sub"),
         icon: "shield-checkmark-outline",
         onPress: () => {
           setMenuOpen(false);
@@ -80,8 +107,8 @@ export default function TabLayout() {
       },
       {
         key: "notifications",
-        title: "Notifications",
-        subtitle: "Alerts & preferences",
+        title: t(language, "menu.notifications"),
+        subtitle: t(language, "menu.notifications.sub"),
         icon: "notifications-outline",
         onPress: () => {
           setMenuOpen(false);
@@ -90,8 +117,8 @@ export default function TabLayout() {
       },
       {
         key: "paybills",
-        title: "Pay bills",
-        subtitle: "Utilities & subscriptions",
+        title: t(language, "menu.paybills"),
+        subtitle: t(language, "menu.paybills.sub"),
         icon: "receipt-outline",
         onPress: () => {
           setMenuOpen(false);
@@ -100,8 +127,8 @@ export default function TabLayout() {
       },
       {
         key: "partners",
-        title: "Partner stores",
-        subtitle: "Deals & supported merchants",
+        title: t(language, "menu.partners"),
+        subtitle: t(language, "menu.partners.sub"),
         icon: "storefront-outline",
         onPress: () => {
           setMenuOpen(false);
@@ -110,8 +137,8 @@ export default function TabLayout() {
       },
       {
         key: "legal",
-        title: "Legal",
-        subtitle: "Terms, privacy policy",
+        title: t(language, "menu.legal"),
+        subtitle: t(language, "menu.legal.sub"),
         icon: "document-text-outline",
         onPress: () => {
           setMenuOpen(false);
@@ -120,8 +147,8 @@ export default function TabLayout() {
       },
       {
         key: "about",
-        title: "About GaniPay",
-        subtitle: "Version, build info",
+        title: t(language, "menu.about"),
+        subtitle: t(language, "menu.about.sub"),
         icon: "information-circle-outline",
         onPress: () => {
           setMenuOpen(false);
@@ -130,17 +157,18 @@ export default function TabLayout() {
       },
       {
         key: "logout",
-        title: "Log out",
-        subtitle: "End this session",
+        title: t(language, "menu.logout"),
+        subtitle: t(language, "menu.logout.sub"),
         icon: "log-out-outline",
         tone: "danger",
-        onPress: () => {
+        onPress: async () => {
           setMenuOpen(false);
-          // router.replace("/(auth)/login");
+          await clearSession();
+          router.replace("/(auth)/login");
         },
       },
     ],
-    [router]
+    [router, language]
   );
 
   return (
@@ -198,40 +226,37 @@ export default function TabLayout() {
           }),
         }}
       >
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: "Home",
-            tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="topup"
-          options={{
-            title: "Top Up",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="wallet-outline" size={size} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="transfer"
-          options={{
-            title: "Transfer",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="swap-horizontal-outline" size={size} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="account"
-          options={{
-            title: "Account",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="person-circle-outline" size={size} color={color} />
-            ),
-          }}
-        />
+<Tabs.Screen
+  name="index"
+  options={{
+    title: t(language, "tabs.home"),
+    tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
+  }}
+/>
+
+<Tabs.Screen
+  name="topup"
+  options={{
+    title: t(language, "tabs.topup"),
+    tabBarIcon: ({ color, size }) => <Ionicons name="wallet-outline" size={size} color={color} />,
+  }}
+/>
+
+<Tabs.Screen
+  name="transfer"
+  options={{
+    title: t(language, "tabs.transfer"),
+    tabBarIcon: ({ color, size }) => <Ionicons name="swap-horizontal-outline" size={size} color={color} />,
+  }}
+/>
+
+<Tabs.Screen
+  name="account"
+  options={{
+    title: t(language, "tabs.account"),
+    tabBarIcon: ({ color, size }) => <Ionicons name="person-circle-outline" size={size} color={color} />,
+  }}
+/>
 
         {/* ✅ SABİT KALMASI İÇİN: tab bar’da görünmeyen screens (HATASIZ) */}
         <Tabs.Screen name="wallet" options={{ href: null }} />
@@ -244,9 +269,8 @@ export default function TabLayout() {
         <Tabs.Screen name="about" options={{ href: null }} />
         <Tabs.Screen name="3ds" options={{ href: null }} />
         <Tabs.Screen name="topup-result" options={{ href: null }} />
-        
-
-
+        <Tabs.Screen name="transfer-result" options={{ href: null }} />
+        <Tabs.Screen name="transfer-3ds" options={{ href: null }} />
       </Tabs>
 
       {/* ✅ Premium menu modal */}
@@ -261,7 +285,7 @@ export default function TabLayout() {
         <View style={styles.sheetWrap} pointerEvents="box-none">
           <View style={styles.sheet}>
             <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Menu</Text>
+              <Text style={styles.sheetTitle}>{t(language, "menu.title")}</Text>
               <Pressable
                 onPress={() => setMenuOpen(false)}
                 style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.85 }]}
@@ -273,7 +297,7 @@ export default function TabLayout() {
             {/* ✅ Sadece Dark mode + Language yan yana */}
             <View style={styles.quickRow}>
               <View style={styles.quickItem}>
-                <Text style={styles.quickLabel}>Dark mode</Text>
+                <Text style={styles.quickLabel}>{t(language, "menu.darkMode")}</Text>
                 <Switch
                   value={darkMode}
                   onValueChange={setDarkMode}
@@ -286,10 +310,12 @@ export default function TabLayout() {
               </View>
 
               <Pressable
-                onPress={() => setLanguage((p) => (p === "EN" ? "TR" : "EN"))}
+                onPress={toggleLanguage}
                 style={({ pressed }) => [styles.langPill, pressed && { opacity: 0.9 }]}
               >
-                <Text style={styles.langText}>Language: {language}</Text>
+                <Text style={styles.langText}>
+                  {t(language, "menu.language")}: {language}
+                </Text>
               </Pressable>
             </View>
 
@@ -351,8 +377,8 @@ export default function TabLayout() {
                     </View>
 
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.itemTitle}>Top up</Text>
-                      <Text style={styles.itemSub}>Add money to your wallet</Text>
+                      <Text style={styles.itemTitle}>{t(language, "menu.topup")}</Text>
+                      <Text style={styles.itemSub}>{t(language, "menu.topup.sub")}</Text>
                     </View>
 
                     <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.35)" />
@@ -371,8 +397,8 @@ export default function TabLayout() {
                     </View>
 
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.itemTitle}>Transfer</Text>
-                      <Text style={styles.itemSub}>Send money instantly</Text>
+                      <Text style={styles.itemTitle}>{t(language, "menu.transfer")}</Text>
+                      <Text style={styles.itemSub}>{t(language, "menu.transfer.sub")}</Text>
                     </View>
 
                     <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.35)" />

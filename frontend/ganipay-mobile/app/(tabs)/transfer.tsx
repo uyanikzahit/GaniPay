@@ -1,7 +1,11 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import { SessionKeys } from "../../constants/storage";
+import { TransferPayload } from "./transfer.api";
 
 const BG = "#0B1220";
 const CARD = "rgba(255,255,255,0.06)";
@@ -9,6 +13,8 @@ const BORDER = "rgba(255,255,255,0.10)";
 const GOLD = "rgba(246,195,64,1)";
 const MUTED = "rgba(255,255,255,0.60)";
 const SOFT = "rgba(255,255,255,0.35)";
+
+const PendingTransferKey = "ganipay.pendingTransfer.v1";
 
 function parseAmount(text: string) {
   const normalized = text.replace(",", ".").replace(/[^0-9.]/g, "");
@@ -18,47 +24,100 @@ function parseAmount(text: string) {
   return { cleanedText: cleaned, value: Number.isFinite(num) ? num : 0 };
 }
 
-function maskPhone(phone: string) {
-  const clean = phone.replace(/\D/g, "");
-  if (clean.length < 7) return phone;
-  return `${clean.slice(0, 3)}****${clean.slice(-2)}`;
+function safeIdempotencyKey() {
+  return `idem_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+function safeReferenceId() {
+  return `ref_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+function cleanAccountNumber(text: string) {
+  return text.replace(/\s+/g, "");
+}
+function maskAccountNumber(v: string) {
+  const s = cleanAccountNumber(v);
+  if (s.length <= 10) return s;
+  return `${s.slice(0, 6)}…${s.slice(-4)}`;
 }
 
 export default function TransferScreen() {
   const router = useRouter();
 
-  const [phone, setPhone] = useState("");
+  const [sessionCustomerId, setSessionCustomerId] = useState<string | null>(null);
+  const [sessionAccountId, setSessionAccountId] = useState<string | null>(null);
+  const [sessionReady, setSessionReady] = useState(false);
+
+  // UI (receiverCustomerId = accountNumber)
+  const [accountNumber, setAccountNumber] = useState("");
   const [amountText, setAmountText] = useState("");
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const cid = await AsyncStorage.getItem(SessionKeys.customerId);
+        const aid = await AsyncStorage.getItem(SessionKeys.accountId);
+        setSessionCustomerId(cid);
+        setSessionAccountId(aid);
+      } finally {
+        setSessionReady(true);
+      }
+    })();
+  }, []);
+
   const amountParsed = useMemo(() => parseAmount(amountText), [amountText]);
   const amount = amountParsed.value;
 
+  const receiverOk = useMemo(
+    () => cleanAccountNumber(accountNumber).length >= 12, // GUID gibi değerler için
+    [accountNumber]
+  );
+
   const canSubmit = useMemo(() => {
+    if (!sessionReady) return false;
     if (loading) return false;
-    if (phone.replace(/\D/g, "").length < 10) return false;
+    if (!sessionCustomerId || !sessionAccountId) return false;
+    if (!receiverOk) return false;
     if (!amountText.trim() || amount <= 0) return false;
     if (amount > 1_000_000) return false;
     return true;
-  }, [loading, phone, amountText, amount]);
+  }, [sessionReady, loading, sessionCustomerId, sessionAccountId, receiverOk, amountText, amount]);
 
   const onSubmit = async () => {
+    if (!sessionCustomerId || !sessionAccountId) {
+      Alert.alert("Session missing", "Please login again.");
+      router.replace("/(auth)/login");
+      return;
+    }
+
+    const payload: TransferPayload = {
+      customerId: sessionCustomerId,
+      accountId: sessionAccountId,
+      receiverCustomerId: cleanAccountNumber(accountNumber),
+      amount: Number(amount.toFixed(2)),
+      currency: "TRY",
+      idempotencyKey: safeIdempotencyKey(),
+      referenceId: safeReferenceId(),
+      ...(note.trim() ? { note: note.trim() } : {}),
+    };
+
     try {
       setLoading(true);
-      await new Promise((r) => setTimeout(r, 650));
 
-      Alert.alert(
-        "Transfer created",
-        `Receiver: ${maskPhone(phone)}\nAmount: ${amount.toFixed(2)} TRY${note ? `\nNote: ${note}` : ""}`,
-        [{ text: "Done", onPress: () => router.push("/(tabs)/wallet") }]
-      );
+      // ✅ Transfer API çağrısı burada YOK.
+      // ✅ Sadece 3DS ekranına gidebilmek için payload’ı saklıyoruz.
+      await AsyncStorage.setItem(PendingTransferKey, JSON.stringify(payload));
 
-      setPhone("");
+      // ✅ Form sıfırla (3DS’e geçince topup gibi temiz kalsın)
+      setAccountNumber("");
       setAmountText("");
       setNote("");
+
+      // ✅ 3DS sayfasına yönlendir
+      router.push("/(tabs)/transfer-3ds");
     } catch {
-      Alert.alert("Transfer failed", "Please try again.");
+      Alert.alert("Error", "Unable to continue. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -71,7 +130,7 @@ export default function TransferScreen() {
           <Ionicons name="chevron-back" size={18} color="rgba(255,255,255,0.85)" />
         </Pressable>
 
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.title}>Transfer</Text>
           <Text style={styles.sub}>Send money instantly</Text>
         </View>
@@ -79,19 +138,24 @@ export default function TransferScreen() {
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Receiver</Text>
-        <Text style={styles.cardHint}>Enter the recipient phone number.</Text>
+        <Text style={styles.cardHint}>Paste recipient account number (demo: receiverCustomerId).</Text>
 
         <View style={styles.inputRow}>
-          <Ionicons name="call-outline" size={18} color={SOFT} />
+          <Ionicons name="key-outline" size={18} color={SOFT} />
           <TextInput
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="e.g. 506 000 00 00"
+            value={accountNumber}
+            onChangeText={(t) => setAccountNumber(cleanAccountNumber(t))}
+            placeholder="Paste account number"
             placeholderTextColor="rgba(255,255,255,0.25)"
-            keyboardType="phone-pad"
+            autoCapitalize="none"
+            autoCorrect={false}
             style={styles.input}
           />
         </View>
+
+        <Text style={[styles.helper, { marginTop: 8 }]}>
+          {receiverOk ? `Preview: ${maskAccountNumber(accountNumber)}` : "Enter a valid account number"}
+        </Text>
 
         <View style={styles.divider} />
 
@@ -146,12 +210,12 @@ export default function TransferScreen() {
           {loading ? (
             <>
               <Ionicons name="time-outline" size={18} color="rgba(255,255,255,0.92)" />
-              <Text style={styles.primaryBtnText}>Processing...</Text>
+              <Text style={styles.primaryBtnText}>Continue...</Text>
             </>
           ) : (
             <>
-              <Ionicons name="send-outline" size={18} color="rgba(255,255,255,0.92)" />
-              <Text style={styles.primaryBtnText}>Send</Text>
+              <Ionicons name="shield-checkmark-outline" size={18} color="rgba(255,255,255,0.92)" />
+              <Text style={styles.primaryBtnText}>Continue to 3D Secure</Text>
             </>
           )}
         </Pressable>
@@ -221,6 +285,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginLeft: 10,
     paddingVertical: 0,
+    minWidth: 0,
   },
 
   currencyPill: {
