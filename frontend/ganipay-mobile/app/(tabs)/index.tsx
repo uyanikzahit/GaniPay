@@ -1,17 +1,21 @@
 // app/(tabs)/index.tsx
 import React, { useCallback, useMemo, useState, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, DeviceEventEmitter } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter, useFocusEffect } from "expo-router";
-
-
-
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Colors } from "../theme/colors";
 import { SessionKeys } from "../../constants/storage";
 import { getCustomerBalance, getAccountBalanceHistory } from "./dashboard.api";
+
+// ✅ i18n
+import { t, type Lang } from "../../constants/i18n";
+import { getLang, LANG_CHANGED, getTheme, THEME_CHANGED } from "../../constants/prefs";
+
+// ✅ theme types
+import type { ThemeMode } from "../../constants/Colors";
 
 type DashboardUser = {
   firstName?: string;
@@ -43,22 +47,30 @@ function formatMoney(amount: number, currency = "TRY") {
   return `${symbol}${formatted}`;
 }
 
-function formatTxMeta(dateIso?: string, direction?: string) {
+function formatTxMeta(dateIso?: string, direction?: string, lang: Lang = "EN") {
   if (!dateIso) return direction ? direction : "";
   const d = new Date(dateIso);
   const date = d.toLocaleDateString("tr-TR");
   const time = d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
 
+  const dir = String(direction ?? "").toLowerCase();
   const dirLabel =
-    direction === "credit" ? "Incoming" : direction === "debit" ? "Outgoing" : direction ? String(direction) : "";
+    dir === "credit"
+      ? t(lang, "tx.incoming")
+      : dir === "debit"
+      ? t(lang, "tx.outgoing")
+      : direction
+      ? String(direction)
+      : "";
 
   return `${date} • ${time}${dirLabel ? ` • ${dirLabel}` : ""}`;
 }
 
-function mapTxTitle(tx: BalanceHistoryItem) {
-  if (tx.direction === "credit") return "Top Up";
-  if (tx.direction === "debit") return "Transfer";
-  return "Transaction";
+function mapTxTitle(tx: BalanceHistoryItem, lang: Lang = "EN") {
+  const dir = String(tx.direction ?? "").toLowerCase();
+  if (dir === "credit") return t(lang, "tx.topup");
+  if (dir === "debit") return t(lang, "tx.transfer");
+  return t(lang, "tx.transaction");
 }
 
 export default function HomeScreen() {
@@ -71,80 +83,120 @@ export default function HomeScreen() {
   const [history, setHistory] = useState<BalanceHistoryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-const load = useCallback(async (opts?: { silent?: boolean }) => {
-  const silent = opts?.silent === true;
+  // ✅ dil state
+  const [lang, setLangState] = useState<Lang>("EN");
 
-  try {
-    setError(null);
+  // ✅ theme state
+  const [theme, setThemeState] = useState<ThemeMode>("dark");
 
-    // ✅ İlk açılışta loading göster, geri dönüşte gösterme
-    if (silent) setRefreshing(true);
-    else setInitialLoading(true);
-
-    const [customerId, currency, accountIdFromSession, userJson] = await AsyncStorage.multiGet([
-      SessionKeys.customerId,
-      SessionKeys.currency,
-      SessionKeys.accountId,
-      SessionKeys.user,
-    ]).then((arr) => arr.map((x) => x[1] ?? ""));
-
-    if (userJson) {
-      try {
-        const u = JSON.parse(userJson) as DashboardUser;
-        // ✅ sessiz yenilemede de isim hemen kalsın
-        setUser({ firstName: u?.firstName, lastName: u?.lastName });
-      } catch {}
+  const loadLang = useCallback(async () => {
+    try {
+      const l = await getLang();
+      setLangState(l);
+    } catch {
+      setLangState("EN");
     }
+  }, []);
 
-    if (!customerId) throw new Error("customerId bulunamadı. Login sonrası SessionKeys.customerId set edildi mi?");
+  const loadTheme = useCallback(async () => {
+    try {
+      const m = await getTheme();
+      setThemeState(m);
+    } catch {
+      setThemeState("dark");
+    }
+  }, []);
 
-    const cur = (currency || "TRY").toUpperCase();
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
 
-    const balanceRes = await getCustomerBalance(customerId, cur);
+    try {
+      setError(null);
 
-    const accountId = balanceRes?.accountId || accountIdFromSession;
-    if (!accountId) throw new Error("accountId bulunamadı. Balance response accountId dönmüyor mu?");
+      // ✅ İlk açılışta loading göster, geri dönüşte gösterme
+      if (silent) setRefreshing(true);
+      else setInitialLoading(true);
 
-    setBalanceDto({
-      accountId,
-      customerId: balanceRes?.customerId || customerId,
-      currency: (balanceRes?.currency || cur).toUpperCase(),
-      balance: typeof balanceRes?.balance === "number" ? balanceRes.balance : Number(balanceRes?.balance ?? 0),
+      const [customerId, currency, accountIdFromSession, userJson] = await AsyncStorage.multiGet([
+        SessionKeys.customerId,
+        SessionKeys.currency,
+        SessionKeys.accountId,
+        SessionKeys.user,
+      ]).then((arr) => arr.map((x) => x[1] ?? ""));
+
+      if (userJson) {
+        try {
+          const u = JSON.parse(userJson) as DashboardUser;
+          setUser({ firstName: u?.firstName, lastName: u?.lastName });
+        } catch {}
+      }
+
+      if (!customerId) throw new Error("customerId bulunamadı. Login sonrası SessionKeys.customerId set edildi mi?");
+
+      const cur = (currency || "TRY").toUpperCase();
+
+      const balanceRes = await getCustomerBalance(customerId, cur);
+
+      const accountId = balanceRes?.accountId || accountIdFromSession;
+      if (!accountId) throw new Error("accountId bulunamadı. Balance response accountId dönmüyor mu?");
+
+      setBalanceDto({
+        accountId,
+        customerId: balanceRes?.customerId || customerId,
+        currency: (balanceRes?.currency || cur).toUpperCase(),
+        balance: typeof balanceRes?.balance === "number" ? balanceRes.balance : Number(balanceRes?.balance ?? 0),
+      });
+
+      const historyRes = await getAccountBalanceHistory(accountId);
+
+      const mapped: BalanceHistoryItem[] = (historyRes ?? []).map((x: any) => ({
+        id: x?.id,
+        accountId: x?.accountId,
+        direction: x?.direction,
+        amount: typeof x?.changeAmount === "number" ? x.changeAmount : Number(x?.changeAmount ?? x?.amount ?? 0),
+        currency: x?.currency,
+        createdAt: x?.createdAt,
+        operationType: x?.operationType,
+        referenceId: x?.referenceId,
+      }));
+
+      setHistory(Array.isArray(mapped) ? mapped : []);
+    } catch (e: any) {
+      setError(e?.message ?? "Dashboard load failed");
+    } finally {
+      if (silent) setRefreshing(false);
+      else setInitialLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // ✅ ilk açılışta dili + theme al
+    loadLang();
+    loadTheme();
+    load({ silent: false });
+
+    // ✅ dil değişince anında güncelle
+    const subLang = DeviceEventEmitter.addListener(LANG_CHANGED, (next: Lang) => {
+      setLangState(next);
     });
 
-    const historyRes = await getAccountBalanceHistory(accountId);
+    // ✅ theme değişince anında güncelle
+    const subTheme = DeviceEventEmitter.addListener(THEME_CHANGED, (next: ThemeMode) => {
+      setThemeState(next);
+    });
 
-    const mapped: BalanceHistoryItem[] = (historyRes ?? []).map((x: any) => ({
-      id: x?.id,
-      accountId: x?.accountId,
-      direction: x?.direction,
-      amount: typeof x?.changeAmount === "number" ? x.changeAmount : Number(x?.changeAmount ?? x?.amount ?? 0),
-      currency: x?.currency,
-      createdAt: x?.createdAt,
-      operationType: x?.operationType,
-      referenceId: x?.referenceId,
-    }));
-
-    setHistory(Array.isArray(mapped) ? mapped : []);
-  } catch (e: any) {
-    setError(e?.message ?? "Dashboard load failed");
-  } finally {
-    if (silent) setRefreshing(false);
-    else setInitialLoading(false);
-  }
-}, []);
-
-
-
-useEffect(() => {
-  load({ silent: false });
-}, [load]);
+    return () => {
+      subLang.remove();
+      subTheme.remove();
+    };
+  }, [load, loadLang, loadTheme]);
 
   useFocusEffect(
     useCallback(() => {
-      // ✅ geri gelince UI flicker yok, arkada yenile
+      loadLang();
+      loadTheme();
       load({ silent: true });
-    }, [load])
+    }, [load, loadLang, loadTheme])
   );
 
   const fullName = useMemo(() => {
@@ -169,86 +221,151 @@ useEffect(() => {
     return sorted.slice(0, 3);
   }, [history]);
 
+  // ✅ theme-based colors (UI bozulmasın diye sadece renk mapliyoruz)
+  const isLight = theme === "light";
+
+  const themeStyles = useMemo(() => {
+    // Dark palette = mevcut tasarımın aynısı
+    // Light palette = aynı layout ama açık ton
+    const pageBg = isLight ? "#F5F7FB" : Colors.bg;
+
+    const hero = isLight ? ["#F5F7FB", "#FFFFFF", "#EEF2FF"] : [Colors.bg, "#0B1220", "#12223E"];
+    const goldGlow = isLight
+      ? ["rgba(246,195,64,0.30)", "rgba(246,195,64,0)"]
+      : ["rgba(246,195,64,0.55)", "rgba(246,195,64,0)"];
+
+    const cardBg = isLight ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.06)";
+    const cardBorder = isLight ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.10)";
+
+    const textMain = isLight ? "rgba(10,18,32,0.95)" : "rgba(255,255,255,0.96)";
+    const textSoft = isLight ? "rgba(10,18,32,0.75)" : "rgba(255,255,255,0.80)";
+    const textMuted = isLight ? "rgba(10,18,32,0.60)" : "rgba(255,255,255,0.62)";
+
+    const txMeta = isLight ? "rgba(10,18,32,0.60)" : "rgba(255,255,255,0.60)";
+    const sectionTitle = isLight ? "rgba(10,18,32,0.92)" : "rgba(255,255,255,0.92)";
+
+    // action tile
+    const tileBg = cardBg;
+    const tileBorder = cardBorder;
+    const tileText = isLight ? "rgba(10,18,32,0.92)" : "rgba(255,255,255,0.92)";
+
+    return {
+      pageBg,
+      hero,
+      goldGlow,
+      cardBg,
+      cardBorder,
+      textMain,
+      textSoft,
+      textMuted,
+      txMeta,
+      sectionTitle,
+      tileBg,
+      tileBorder,
+      tileText,
+    };
+  }, [isLight]);
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: themeStyles.pageBg }]}>
       <LinearGradient
-        colors={[Colors.bg, "#0B1220", "#12223E"]}
+        colors={themeStyles.hero as any}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.hero}
       >
         <LinearGradient
-          colors={["rgba(246,195,64,0.55)", "rgba(246,195,64,0)"]}
+          colors={themeStyles.goldGlow as any}
           start={{ x: 0.15, y: 0 }}
           end={{ x: 0.85, y: 1 }}
           style={styles.goldGlow}
         />
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.headerCard}>
+          <View style={[styles.headerCard, { backgroundColor: themeStyles.cardBg, borderColor: themeStyles.cardBorder }]}>
             <View style={styles.headerRow}>
               <View>
-                <Text style={styles.welcome}>Welcome,</Text>
-                <Text style={styles.name}>{initialLoading ? "Loading..." : fullName}</Text>
+                <Text style={[styles.welcome, { color: themeStyles.textSoft }]}>{t(lang, "home.welcome")}</Text>
+                <Text style={[styles.name, { color: themeStyles.textMain }]}>
+                  {initialLoading ? t(lang, "home.loading") : fullName}
+                </Text>
               </View>
 
               <View style={{ alignItems: "flex-end" }}>
-                <Text style={styles.balanceLabel}>Balance</Text>
-                <Text style={styles.balance}>{initialLoading ? "…" : balanceText}</Text>
+                <Text style={[styles.balanceLabel, { color: themeStyles.textSoft }]}>{t(lang, "home.balance")}</Text>
+                <Text style={[styles.balance, { color: themeStyles.textMain }]}>{initialLoading ? "…" : balanceText}</Text>
               </View>
             </View>
 
-            <Text style={styles.subHint}>{error ? error : "Your wallet is ready for quick actions."}</Text>
+            <Text style={[styles.subHint, { color: themeStyles.textMuted }]}>
+              {error ? error : t(lang, "home.ready")}
+            </Text>
           </View>
 
           <View style={styles.actionGrid}>
-            <ActionTile title="Top Up" icon="wallet-outline" variant="teal" onPress={() => router.push("/topup")} />
             <ActionTile
-              title="Transfer"
+              title={t(lang, "home.topup")}
+              icon="wallet-outline"
+              variant="teal"
+              onPress={() => router.push("/topup")}
+              tileBg={themeStyles.tileBg}
+              tileBorder={themeStyles.tileBorder}
+              tileText={themeStyles.tileText}
+            />
+            <ActionTile
+              title={t(lang, "home.transfer")}
               icon="swap-horizontal-outline"
               variant="blue"
               onPress={() => router.push("/transfer")}
+              tileBg={themeStyles.tileBg}
+              tileBorder={themeStyles.tileBorder}
+              tileText={themeStyles.tileText}
             />
-            {/* ✅ artık disabled değil -> yönlendirme var */}
             <ActionTile
-              title="Pay Bills"
+              title={t(lang, "home.paybills")}
               icon="receipt-outline"
               variant="purple"
               onPress={() => router.push("/paybills")}
+              tileBg={themeStyles.tileBg}
+              tileBorder={themeStyles.tileBorder}
+              tileText={themeStyles.tileText}
             />
             <ActionTile
-              title="Partner Stores"
+              title={t(lang, "home.partners")}
               icon="storefront-outline"
               variant="orange"
               onPress={() => router.push("/partners")}
+              tileBg={themeStyles.tileBg}
+              tileBorder={themeStyles.tileBorder}
+              tileText={themeStyles.tileText}
             />
           </View>
 
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Last Transactions</Text>
+            <Text style={[styles.sectionTitle, { color: themeStyles.sectionTitle }]}>{t(lang, "home.lastTransactions")}</Text>
             <Text style={styles.sectionLink} onPress={() => router.push("/wallet")}>
-              View all
+              {t(lang, "home.viewAll")}
             </Text>
           </View>
 
           {last3.length === 0 ? (
-            <View style={styles.txItem}>
+            <View style={[styles.txItem, { backgroundColor: themeStyles.cardBg, borderColor: themeStyles.cardBorder }]}>
               <View style={{ gap: 4 }}>
-                <Text style={styles.txTitle}>No transactions yet</Text>
-                <Text style={styles.txMeta}>Your recent activity will appear here.</Text>
+                <Text style={[styles.txTitle, { color: themeStyles.sectionTitle }]}>{t(lang, "home.noTx")}</Text>
+                <Text style={[styles.txMeta, { color: themeStyles.txMeta }]}>{t(lang, "home.noTxSub")}</Text>
               </View>
               <Text style={styles.txAmount}> </Text>
             </View>
           ) : (
             last3.map((tx, idx) => {
-              const title = mapTxTitle(tx);
+              const title = mapTxTitle(tx, lang);
               const isCredit = String(tx.direction).toLowerCase() === "credit";
 
               const amount = typeof tx.amount === "number" ? tx.amount : Number(tx.amount ?? 0);
               const cur = (tx.currency ?? balanceDto.currency ?? "TRY").toUpperCase();
               const amountText = `${isCredit ? "+" : "-"} ${formatMoney(Math.abs(amount), cur)}`;
 
-              const meta = formatTxMeta(tx.createdAt, tx.direction);
+              const meta = formatTxMeta(tx.createdAt, tx.direction, lang);
 
               return (
                 <TxItem
@@ -257,6 +374,10 @@ useEffect(() => {
                   amount={amountText}
                   meta={meta}
                   titleTone={isCredit ? "positive" : "negative"}
+                  cardBg={themeStyles.cardBg}
+                  cardBorder={themeStyles.cardBorder}
+                  metaColor={themeStyles.txMeta}
+                  titleColor={themeStyles.sectionTitle}
                 />
               );
             })
@@ -275,18 +396,28 @@ function ActionTile({
   onPress,
   disabled,
   variant,
+  tileBg,
+  tileBorder,
+  tileText,
 }: {
   title: string;
   icon: React.ComponentProps<typeof Ionicons>["name"];
   onPress?: () => void;
   disabled?: boolean;
   variant: "teal" | "blue" | "purple" | "orange";
+  tileBg: string;
+  tileBorder: string;
+  tileText: string;
 }) {
   const v = variantStyles[variant];
 
   return (
     <TouchableOpacity
-      style={[styles.actionTile, disabled && styles.actionTileDisabled]}
+      style={[
+        styles.actionTile,
+        { backgroundColor: tileBg, borderColor: tileBorder },
+        disabled && styles.actionTileDisabled,
+      ]}
       onPress={onPress}
       disabled={disabled}
       activeOpacity={0.85}
@@ -295,7 +426,7 @@ function ActionTile({
         <Ionicons name={icon} size={24} color={v.icon} />
       </View>
 
-      <Text style={[styles.actionText, disabled && styles.disabledText]}>{title}</Text>
+      <Text style={[styles.actionText, { color: tileText }, disabled && styles.disabledText]}>{title}</Text>
     </TouchableOpacity>
   );
 }
@@ -312,27 +443,36 @@ function TxItem({
   amount,
   meta,
   titleTone,
+  cardBg,
+  cardBorder,
+  metaColor,
+  titleColor,
 }: {
   title: string;
   amount: string;
   meta: string;
   titleTone?: "positive" | "negative";
+  cardBg: string;
+  cardBorder: string;
+  metaColor: string;
+  titleColor: string;
 }) {
   const isPositive = amount.trim().startsWith("+");
 
   return (
-    <View style={styles.txItem}>
+    <View style={[styles.txItem, { backgroundColor: cardBg, borderColor: cardBorder }]}>
       <View style={{ gap: 4 }}>
         <Text
           style={[
             styles.txTitle,
+            { color: titleColor },
             titleTone === "positive" ? styles.txTitlePositive : null,
             titleTone === "negative" ? styles.txTitleNegative : null,
           ]}
         >
           {title}
         </Text>
-        <Text style={styles.txMeta}>{meta}</Text>
+        <Text style={[styles.txMeta, { color: metaColor }]}>{meta}</Text>
       </View>
 
       <Text style={[styles.txAmount, isPositive ? styles.positive : styles.negative]}>{amount}</Text>
@@ -379,17 +519,15 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 16,
     marginBottom: 14,
-    backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
     ...shadow,
   },
   headerRow: { flexDirection: "row", justifyContent: "space-between" },
-  welcome: { color: "rgba(255,255,255,0.80)", fontWeight: "800" },
-  name: { color: "rgba(255,255,255,0.96)", fontSize: 20, fontWeight: "900", marginTop: 2 },
-  balanceLabel: { color: "rgba(255,255,255,0.72)", fontWeight: "800" },
-  balance: { color: "rgba(255,255,255,0.96)", fontSize: 18, fontWeight: "900", marginTop: 2 },
-  subHint: { marginTop: 10, color: "rgba(255,255,255,0.62)", fontSize: 12, fontWeight: "700" },
+  welcome: { fontWeight: "800" },
+  name: { fontSize: 20, fontWeight: "900", marginTop: 2 },
+  balanceLabel: { fontWeight: "800" },
+  balance: { fontSize: 18, fontWeight: "900", marginTop: 2 },
+  subHint: { marginTop: 10, fontSize: 12, fontWeight: "700" },
 
   actionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 6, marginBottom: 6 },
 
@@ -401,8 +539,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.06)",
     position: "relative",
     ...shadow,
   },
@@ -417,8 +553,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1,
   },
-  actionText: { fontWeight: "900", fontSize: 13, color: "rgba(255,255,255,0.92)" },
-  disabledText: { color: "rgba(255,255,255,0.92)" },
+  actionText: { fontWeight: "900", fontSize: 13 },
+  disabledText: {},
 
   sectionHeader: {
     flexDirection: "row",
@@ -426,7 +562,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 14,
   },
-  sectionTitle: { fontSize: 16, fontWeight: "900", color: "rgba(255,255,255,0.92)" },
+  sectionTitle: { fontSize: 16, fontWeight: "900" },
   sectionLink: { color: "rgba(246,195,64,0.95)", fontWeight: "900" },
 
   txItem: {
@@ -437,16 +573,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.06)",
     ...shadow,
   },
-  txTitle: { fontWeight: "900", color: "rgba(255,255,255,0.92)" },
-  // ✅ title rengi: Top Up yeşil, Transfer kırmızı
+  txTitle: { fontWeight: "900" },
   txTitlePositive: { color: "rgba(46,213,115,0.95)" },
   txTitleNegative: { color: "rgba(255,71,87,0.95)" },
 
-  txMeta: { color: "rgba(255,255,255,0.60)", fontSize: 12, fontWeight: "700" },
+  txMeta: { fontSize: 12, fontWeight: "700" },
 
   txAmount: { fontWeight: "900", color: "rgba(255,255,255,0.92)" },
   positive: { color: "rgba(46,213,115,0.95)" },

@@ -33,16 +33,32 @@ const en: Dict = {
   "menu.logout": "Log out",
   "menu.logout.sub": "End this session",
 
+  // TABS
   "tabs.home": "Home",
   "tabs.topup": "Top Up",
   "tabs.transfer": "Transfer",
   "tabs.account": "Account",
 
-  // HOME (index.tsx’e göre tamamlayacağız)
+  // HOME
   "home.welcome": "Welcome,",
-  "home.quickActions": "Quick actions",
+  "home.loading": "Loading...",
+  "home.balance": "Balance",
+  "home.ready": "Your wallet is ready for quick actions.",
+  "home.topup": "Top Up",
+  "home.transfer": "Transfer",
+  "home.paybills": "Pay Bills",
+  "home.partners": "Partner Stores",
   "home.lastTransactions": "Last Transactions",
   "home.viewAll": "View all",
+  "home.noTx": "No transactions yet",
+  "home.noTxSub": "Your recent activity will appear here.",
+
+  // TX labels
+  "tx.incoming": "Incoming",
+  "tx.outgoing": "Outgoing",
+  "tx.topup": "Top Up",
+  "tx.transfer": "Transfer",
+  "tx.transaction": "Transaction",
 };
 
 const tr: Dict = {
@@ -58,7 +74,7 @@ const tr: Dict = {
   "menu.topup.sub": "Cüzdanına para ekle",
   "menu.transfer": "Transfer",
   "menu.transfer.sub": "Anında para gönder",
-  "menu.limits": "Harcamа limitleri",
+  "menu.limits": "Harcama limitleri",
   "menu.limits.sub": "Günlük/Aylık limitler, kurallar",
   "menu.security": "Güvenlik",
   "menu.security.sub": "PIN, biyometri, giriş seçenekleri",
@@ -75,16 +91,32 @@ const tr: Dict = {
   "menu.logout": "Çıkış yap",
   "menu.logout.sub": "Oturumu sonlandır",
 
-  // HOME (index.tsx’e göre tamamlayacağız)
-  "home.welcome": "Hoş geldin,",
-  "home.quickActions": "Hızlı işlemler",
-  "home.lastTransactions": "Son işlemler",
-  "home.viewAll": "Tümünü gör",
-
+  // TABS
   "tabs.home": "Ana Sayfa",
   "tabs.topup": "Para Yükle",
   "tabs.transfer": "Transfer",
   "tabs.account": "Hesap",
+
+  // HOME
+  "home.welcome": "Hoş geldin,",
+  "home.loading": "Yükleniyor...",
+  "home.balance": "Bakiye",
+  "home.ready": "Cüzdanın hızlı işlemler için hazır.",
+  "home.topup": "Para Yükle",
+  "home.transfer": "Transfer",
+  "home.paybills": "Fatura Öde",
+  "home.partners": "Partner Mağazalar",
+  "home.lastTransactions": "Son işlemler",
+  "home.viewAll": "Tümünü gör",
+  "home.noTx": "Henüz işlem yok",
+  "home.noTxSub": "Son işlemlerin burada görünecek.",
+
+  // TX labels
+  "tx.incoming": "Gelen",
+  "tx.outgoing": "Giden",
+  "tx.topup": "Para Yükle",
+  "tx.transfer": "Transfer",
+  "tx.transaction": "İşlem",
 };
 
 export function t(lang: Lang, key: string) {

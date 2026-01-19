@@ -17,12 +17,12 @@ import { clearSession } from "@/constants/storage";
 
 // ✅ i18n
 import { t, type Lang } from "@/constants/i18n";
-import { getLang, setLang } from "@/constants/prefs";
+import { getLang, setLang, getTheme, setTheme } from "@/constants/prefs";
 
-const NAV_BG = "#0B1220";
-const BORDER = "rgba(255,255,255,0.10)";
+// ✅ theme colors
+import { getColors, type ThemeMode } from "@/constants/Colors";
+
 const GOLD = "rgba(246,195,64,1)";
-const INACTIVE = "#98a2b3";
 
 type MenuItem = {
   key: string;
@@ -37,19 +37,23 @@ export default function TabLayout() {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // ✅ Local-only settings
-  const [darkMode, setDarkMode] = useState(true);
-
   // ✅ persisted language
   const [language, setLanguage] = useState<Lang>("EN");
 
-  // ✅ load saved language once
+  // ✅ persisted theme
+  const [theme, setThemeState] = useState<ThemeMode>("dark");
+
+  // derived colors
+  const C = useMemo(() => getColors(theme), [theme]);
+
+  // ✅ load saved settings once
   useEffect(() => {
     let alive = true;
     (async () => {
-      const saved = await getLang();
+      const [savedLang, savedTheme] = await Promise.all([getLang(), getTheme()]);
       if (!alive) return;
-      setLanguage(saved);
+      setLanguage(savedLang);
+      setThemeState(savedTheme);
     })();
     return () => {
       alive = false;
@@ -58,8 +62,14 @@ export default function TabLayout() {
 
   const toggleLanguage = async () => {
     const next: Lang = language === "EN" ? "TR" : "EN";
-    setLanguage(next);      // UI instantly
-    await setLang(next);    // persist
+    setLanguage(next); // UI instantly
+    await setLang(next); // persist + emit
+  };
+
+  const toggleTheme = async (isDark: boolean) => {
+    const next: ThemeMode = isDark ? "dark" : "light";
+    setThemeState(next); // UI instantly
+    await setTheme(next); // persist + emit
   };
 
   const items: MenuItem[] = useMemo(
@@ -84,7 +94,6 @@ export default function TabLayout() {
           router.push("/(tabs)/wallet");
         },
       },
-
       {
         key: "limits",
         title: t(language, "menu.limits"),
@@ -176,10 +185,9 @@ export default function TabLayout() {
       <Tabs
         screenOptions={{
           headerShown: true,
-          headerStyle: { backgroundColor: NAV_BG },
+          headerStyle: { backgroundColor: C.navBg },
           headerShadowVisible: false,
 
-          // ✅ Logo kesin sol + 2x büyütme
           headerTitle: "",
           headerLeftContainerStyle: { paddingLeft: 0, marginLeft: 0 },
           headerLeft: () => (
@@ -195,29 +203,33 @@ export default function TabLayout() {
           headerRight: () => (
             <Pressable
               onPress={() => setMenuOpen(true)}
-              style={({ pressed }) => [styles.menuBtn, pressed && { opacity: 0.85 }]}
+              style={({ pressed }) => [
+                styles.menuBtn,
+                { backgroundColor: C.card, borderColor: C.border },
+                pressed && { opacity: 0.85 },
+              ]}
               hitSlop={10}
             >
-              <Ionicons name="menu" size={22} color={GOLD} />
+              <Ionicons name="menu" size={22} color={C.gold} />
             </Pressable>
           ),
 
-          tabBarActiveTintColor: GOLD,
-          tabBarInactiveTintColor: INACTIVE,
+          tabBarActiveTintColor: C.gold,
+          tabBarInactiveTintColor: C.tabInactive,
           tabBarShowLabel: false,
 
           tabBarStyle: Platform.select({
             ios: {
-              backgroundColor: NAV_BG,
-              borderTopColor: BORDER,
+              backgroundColor: C.navBg,
+              borderTopColor: C.border,
               borderTopWidth: 1,
               height: 86,
               paddingBottom: 18,
               paddingTop: 10,
             },
             default: {
-              backgroundColor: NAV_BG,
-              borderTopColor: BORDER,
+              backgroundColor: C.navBg,
+              borderTopColor: C.border,
               borderTopWidth: 1,
               height: 64,
               paddingBottom: 10,
@@ -226,39 +238,47 @@ export default function TabLayout() {
           }),
         }}
       >
-<Tabs.Screen
-  name="index"
-  options={{
-    title: t(language, "tabs.home"),
-    tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
-  }}
-/>
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: t(language, "tabs.home"),
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="home" size={size} color={color} />
+            ),
+          }}
+        />
 
-<Tabs.Screen
-  name="topup"
-  options={{
-    title: t(language, "tabs.topup"),
-    tabBarIcon: ({ color, size }) => <Ionicons name="wallet-outline" size={size} color={color} />,
-  }}
-/>
+        <Tabs.Screen
+          name="topup"
+          options={{
+            title: t(language, "tabs.topup"),
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="wallet-outline" size={size} color={color} />
+            ),
+          }}
+        />
 
-<Tabs.Screen
-  name="transfer"
-  options={{
-    title: t(language, "tabs.transfer"),
-    tabBarIcon: ({ color, size }) => <Ionicons name="swap-horizontal-outline" size={size} color={color} />,
-  }}
-/>
+        <Tabs.Screen
+          name="transfer"
+          options={{
+            title: t(language, "tabs.transfer"),
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="swap-horizontal-outline" size={size} color={color} />
+            ),
+          }}
+        />
 
-<Tabs.Screen
-  name="account"
-  options={{
-    title: t(language, "tabs.account"),
-    tabBarIcon: ({ color, size }) => <Ionicons name="person-circle-outline" size={size} color={color} />,
-  }}
-/>
+        <Tabs.Screen
+          name="account"
+          options={{
+            title: t(language, "tabs.account"),
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="person-circle-outline" size={size} color={color} />
+            ),
+          }}
+        />
 
-        {/* ✅ SABİT KALMASI İÇİN: tab bar’da görünmeyen screens (HATASIZ) */}
+        {/* hidden screens */}
         <Tabs.Screen name="wallet" options={{ href: null }} />
         <Tabs.Screen name="limits" options={{ href: null }} />
         <Tabs.Screen name="security" options={{ href: null }} />
@@ -283,27 +303,39 @@ export default function TabLayout() {
         <Pressable style={styles.backdrop} onPress={() => setMenuOpen(false)} />
 
         <View style={styles.sheetWrap} pointerEvents="box-none">
-          <View style={styles.sheet}>
+          <View
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: theme === "light" ? "rgba(255,255,255,0.96)" : "rgba(10,18,32,0.96)",
+                borderColor: C.border,
+              },
+            ]}
+          >
             <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>{t(language, "menu.title")}</Text>
+              <Text style={[styles.sheetTitle, { color: C.text }]}>{t(language, "menu.title")}</Text>
               <Pressable
                 onPress={() => setMenuOpen(false)}
-                style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.85 }]}
+                style={({ pressed }) => [
+                  styles.closeBtn,
+                  { backgroundColor: C.card, borderColor: C.border },
+                  pressed && { opacity: 0.85 },
+                ]}
               >
-                <Ionicons name="close" size={18} color="rgba(255,255,255,0.85)" />
+                <Ionicons name="close" size={18} color={C.text} />
               </Pressable>
             </View>
 
-            {/* ✅ Sadece Dark mode + Language yan yana */}
+            {/* ✅ Dark mode + Language */}
             <View style={styles.quickRow}>
-              <View style={styles.quickItem}>
-                <Text style={styles.quickLabel}>{t(language, "menu.darkMode")}</Text>
+              <View style={[styles.quickItem, { backgroundColor: C.card, borderColor: C.border }]}>
+                <Text style={[styles.quickLabel, { color: C.text }]}>{t(language, "menu.darkMode")}</Text>
                 <Switch
-                  value={darkMode}
-                  onValueChange={setDarkMode}
-                  thumbColor={darkMode ? GOLD : undefined}
+                  value={theme === "dark"}
+                  onValueChange={toggleTheme}
+                  thumbColor={theme === "dark" ? GOLD : undefined}
                   trackColor={{
-                    false: "rgba(255,255,255,0.18)",
+                    false: theme === "light" ? "rgba(10,18,32,0.18)" : "rgba(255,255,255,0.18)",
                     true: "rgba(246,195,64,0.25)",
                   }}
                 />
@@ -311,7 +343,10 @@ export default function TabLayout() {
 
               <Pressable
                 onPress={toggleLanguage}
-                style={({ pressed }) => [styles.langPill, pressed && { opacity: 0.9 }]}
+                style={({ pressed }) => [
+                  styles.langPill,
+                  pressed && { opacity: 0.9 },
+                ]}
               >
                 <Text style={styles.langText}>
                   {t(language, "menu.language")}: {language}
@@ -319,9 +354,9 @@ export default function TabLayout() {
               </Pressable>
             </View>
 
-            <View style={styles.sheetDivider} />
+            <View style={[styles.sheetDivider, { backgroundColor: C.border }]} />
 
-            {/* ✅ Menü listesi: wallet'ın altına Top up + Transfer ekliyoruz */}
+            {/* ✅ MENU LIST + Wallet altına Topup/Transfer ekle */}
             {items.map((it) => {
               const row = (
                 <Pressable
@@ -338,7 +373,7 @@ export default function TabLayout() {
                     <Ionicons
                       name={it.icon}
                       size={18}
-                      color={it.tone === "danger" ? "rgba(252,165,165,0.95)" : GOLD}
+                      color={it.tone === "danger" ? "rgba(252,165,165,0.95)" : C.gold}
                     />
                   </View>
 
@@ -346,25 +381,29 @@ export default function TabLayout() {
                     <Text
                       style={[
                         styles.itemTitle,
-                        it.tone === "danger" && styles.itemTitleDanger,
+                        { color: it.tone === "danger" ? "rgba(252,165,165,0.95)" : C.text },
                       ]}
                     >
                       {it.title}
                     </Text>
-                    {!!it.subtitle && <Text style={styles.itemSub}>{it.subtitle}</Text>}
+                    {!!it.subtitle && (
+                      <Text style={[styles.itemSub, { color: C.muted }]}>{it.subtitle}</Text>
+                    )}
                   </View>
 
-                  <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.35)" />
+                  <Ionicons name="chevron-forward" size={16} color={C.soft} />
                 </Pressable>
               );
 
+              // ✅ wallet değilse aynen bas
               if (it.key !== "wallet") return row;
 
+              // ✅ wallet ise altına Topup + Transfer ekle (önceki mantık)
               return (
                 <View key="wallet-group">
                   {row}
 
-                  {/* ✅ Top up (Wallet altında, aynı format) */}
+                  {/* ✅ Top up (Wallet altında) */}
                   <Pressable
                     onPress={() => {
                       setMenuOpen(false);
@@ -373,18 +412,18 @@ export default function TabLayout() {
                     style={({ pressed }) => [styles.item, pressed && { opacity: 0.9 }]}
                   >
                     <View style={styles.itemIconWrap}>
-                      <Ionicons name="wallet-outline" size={18} color={GOLD} />
+                      <Ionicons name="wallet-outline" size={18} color={C.gold} />
                     </View>
 
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.itemTitle}>{t(language, "menu.topup")}</Text>
-                      <Text style={styles.itemSub}>{t(language, "menu.topup.sub")}</Text>
+                      <Text style={[styles.itemTitle, { color: C.text }]}>{t(language, "menu.topup")}</Text>
+                      <Text style={[styles.itemSub, { color: C.muted }]}>{t(language, "menu.topup.sub")}</Text>
                     </View>
 
-                    <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.35)" />
+                    <Ionicons name="chevron-forward" size={16} color={C.soft} />
                   </Pressable>
 
-                  {/* ✅ Transfer (Wallet altında, aynı format) */}
+                  {/* ✅ Transfer (Wallet altında) */}
                   <Pressable
                     onPress={() => {
                       setMenuOpen(false);
@@ -393,15 +432,15 @@ export default function TabLayout() {
                     style={({ pressed }) => [styles.item, pressed && { opacity: 0.9 }]}
                   >
                     <View style={styles.itemIconWrap}>
-                      <Ionicons name="swap-horizontal-outline" size={18} color={GOLD} />
+                      <Ionicons name="swap-horizontal-outline" size={18} color={C.gold} />
                     </View>
 
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.itemTitle}>{t(language, "menu.transfer")}</Text>
-                      <Text style={styles.itemSub}>{t(language, "menu.transfer.sub")}</Text>
+                      <Text style={[styles.itemTitle, { color: C.text }]}>{t(language, "menu.transfer")}</Text>
+                      <Text style={[styles.itemSub, { color: C.muted }]}>{t(language, "menu.transfer.sub")}</Text>
                     </View>
 
-                    <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.35)" />
+                    <Ionicons name="chevron-forward" size={16} color={C.soft} />
                   </Pressable>
                 </View>
               );
@@ -414,7 +453,6 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  // ✅ Logo tamamen sola + 2x hissi
   headerLeftWrap: {
     height: 56,
     justifyContent: "center",
@@ -432,9 +470,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
     marginRight: 10,
   },
 
@@ -452,9 +488,7 @@ const styles = StyleSheet.create({
     width: "86%",
     borderRadius: 18,
     padding: 12,
-    backgroundColor: "rgba(10,18,32,0.96)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
     overflow: "hidden",
   },
 
@@ -466,16 +500,15 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     paddingBottom: 10,
   },
-  sheetTitle: { color: "rgba(255,255,255,0.92)", fontSize: 14, fontWeight: "900" },
+  sheetTitle: { fontSize: 14, fontWeight: "900" },
+
   closeBtn: {
     width: 34,
     height: 34,
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
   },
 
   quickRow: { flexDirection: "row", gap: 10, paddingHorizontal: 6, paddingBottom: 10 },
@@ -483,14 +516,12 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 14,
     padding: 10,
-    backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  quickLabel: { color: "rgba(255,255,255,0.80)", fontSize: 12, fontWeight: "900" },
+  quickLabel: { fontSize: 12, fontWeight: "900" },
 
   langPill: {
     flex: 1,
@@ -506,7 +537,6 @@ const styles = StyleSheet.create({
 
   sheetDivider: {
     height: 1,
-    backgroundColor: "rgba(255,255,255,0.10)",
     marginVertical: 8,
   },
 
@@ -534,33 +564,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(252,165,165,0.22)",
   },
 
-  itemTitle: { color: "rgba(255,255,255,0.92)", fontSize: 13, fontWeight: "900" },
-  itemTitleDanger: { color: "rgba(252,165,165,0.95)" },
-  itemSub: { marginTop: 3, color: "rgba(255,255,255,0.55)", fontSize: 11.5, fontWeight: "700" },
-
-  // (Dosyanda vardı, dokunmadım)
-  subItem: {
-    marginLeft: 44,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    marginBottom: 8,
-  },
-  subIconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(246,195,64,0.10)",
-    borderWidth: 1,
-    borderColor: "rgba(246,195,64,0.22)",
-  },
-  subTitle: { flex: 1, color: "rgba(255,255,255,0.90)", fontSize: 12.5, fontWeight: "900" },
+  itemTitle: { fontSize: 13, fontWeight: "900" },
+  itemSub: { marginTop: 3, fontSize: 11.5, fontWeight: "700" },
 });
