@@ -2,11 +2,11 @@
 import { Platform } from "react-native";
 import { saveSession } from "@/constants/storage";
 
-const WEB_BASE_URL = "https://localhost:7253";
+const WEB_BASE_URL = "http://localhost:9080/workflow-api";
 
 // ✅ Mobile (HTTP) — Aspire üzerinden açtığın port
-const REAL_DEVICE_BASE_URL = "http://192.168.1.5:5210";
-const ANDROID_EMU_BASE_URL = "http://10.0.2.2:5210"; // Android emulator
+const REAL_DEVICE_BASE_URL = "http://192.168.1.5:9080/workflow-api";
+const ANDROID_EMU_BASE_URL = "http://10.0.2.2:9080/workflow-api";
 
 export function getBaseUrl() {
   if (Platform.OS === "web") return WEB_BASE_URL;
@@ -30,7 +30,6 @@ export type LoginApiResponse = {
   token?: string;
   correlationId?: string;
 
-  // backend’den gelenler
   customerId?: string;
   customer?: {
     firstName?: string;
@@ -60,11 +59,7 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function fetchWithTimeout(
-  url: string,
-  options: RequestInit,
-  timeoutMs = 60000
-) {
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 60000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -96,16 +91,12 @@ async function postJson<T>(url: string, body: any): Promise<T> {
   return data;
 }
 
-// ✅ login sonucu alınana kadar bekleyen helper (polling)
 async function pollLoginResult(baseUrl: string, correlationId: string) {
   const maxAttempts = 30;
   const delayMs = 1000;
 
   for (let i = 0; i < maxAttempts; i++) {
-    const url = `${baseUrl}/api/v1/auth/login/result/${encodeURIComponent(
-      correlationId
-    )}`;
-
+    const url = `${baseUrl}/api/v1/auth/login/result/${encodeURIComponent(correlationId)}`;
     const res = await fetch(url, { method: "GET" });
 
     if (res.ok) {
@@ -119,11 +110,7 @@ async function pollLoginResult(baseUrl: string, correlationId: string) {
     }
 
     const text = await res.text().catch(() => "");
-    return {
-      success: false,
-      status: "Failed",
-      message: text,
-    };
+    return { success: false, status: "Failed", message: text };
   }
 
   return {
@@ -133,22 +120,17 @@ async function pollLoginResult(baseUrl: string, correlationId: string) {
   };
 }
 
-// ✅ ASIL LOGIN
-export async function login(
-  payload: LoginPayload
-): Promise<LoginApiResponse> {
+export async function login(payload: LoginPayload): Promise<LoginApiResponse> {
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}/api/v1/auth/login`;
 
   const first = await postJson<LoginApiResponse>(url, payload);
 
-  // 1️⃣ Direkt succeeded
   if (first.success && first.status === "Succeeded" && first.token) {
     await saveLoginSession(first);
     return first;
   }
 
-  // 2️⃣ Running → poll
   if (first.status === "Running" && first.correlationId) {
     const result = await pollLoginResult(baseUrl, first.correlationId);
 
@@ -162,7 +144,6 @@ export async function login(
   return first;
 }
 
-// 🔐 Session kaydetme helper
 async function saveLoginSession(res: LoginApiResponse) {
   const account = res.wallets?.accounts?.[0];
 

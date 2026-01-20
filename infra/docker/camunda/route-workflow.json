@@ -1,0 +1,15 @@
+{
+  "name": "workflow-api",
+  "uri": "/workflow-api/*",
+  "plugins": {
+    "proxy-rewrite": {
+      "regex_uri": ["^/workflow-api/(.*)", "/$1"]
+    }
+  },
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": {
+      "host.docker.internal:5210": 1
+    }
+  }
+}

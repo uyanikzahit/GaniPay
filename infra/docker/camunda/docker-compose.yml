@@ -65,19 +65,23 @@ services:
       - ganipay-net
 
   # -------------------- APISIX STACK --------------------
-  # APISIX config store (etcd)
+  # APISIX config store (etcd)  ✅ PERSISTENT
   etcd:
     image: quay.io/coreos/etcd:v3.5.11
-    environment:
-      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
-      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
-      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
-      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://etcd:2380
-      - ETCD_INITIAL_CLUSTER=etcd=http://etcd:2380
-      - ETCD_INITIAL_CLUSTER_STATE=new
-      - ETCD_NAME=etcd
+    command: >
+      /usr/local/bin/etcd
+      --name etcd
+      --data-dir /etcd-data
+      --listen-client-urls http://0.0.0.0:2379
+      --advertise-client-urls http://etcd:2379
+      --listen-peer-urls http://0.0.0.0:2380
+      --initial-advertise-peer-urls http://etcd:2380
+      --initial-cluster etcd=http://etcd:2380
+      --initial-cluster-state new
     ports:
       - "2379:2379"
+    volumes:
+      - etcd_data:/etcd-data
     restart: unless-stopped
     networks:
       - ganipay-net
@@ -103,6 +107,7 @@ volumes:
   zeebe:
   elastic:
   pgdata:
+  etcd_data:
 
 networks:
   ganipay-net:
@@ -133,7 +138,7 @@ configs:
             defaultRoles.admin.users:
               - "demo"
 
-        database.index.numberOfReplicas: 0
+        database.index.numberOfreplicas: 0
 
         data:
           secondary-storage:

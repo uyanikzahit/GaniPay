@@ -12,13 +12,9 @@ import type { RegisterPayload } from "./register.types";
  * - iOS simulator: localhost çalışır (Mac)
  * - Expo Go fiziksel cihaz: PC IP gerekir (örn http://192.168.1.20:7253)
  */
-const WEB_BASE_URL = "https://localhost:7253";
-
-// Android emulator için özel localhost
-const ANDROID_EMULATOR_BASE_URL = "https://10.0.2.2:7253";
-
-// Fiziksel cihaz için PC IP yaz (wifi aynı olmalı)
-const DEVICE_BASE_URL = "http://YOUR_PC_IP:7253";
+const WEB_BASE_URL = "http://localhost:9080/workflow-api";
+const ANDROID_EMULATOR_BASE_URL = "http://10.0.2.2:9080/workflow-api";
+const DEVICE_BASE_URL = "http://192.168.1.5:9080/workflow-api";
 
 // İstersen ENV’den de alabilirsin (app.json -> extra.apiBaseUrl)
 function getEnvBaseUrl(): string | null {

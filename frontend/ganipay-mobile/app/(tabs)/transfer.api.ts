@@ -2,10 +2,9 @@ import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SessionKeys } from "../../constants/storage";
 
-// Workflow API baseUrl mantığını login.api.ts ile aynı tuttuk
-const WEB_BASE_URL = "https://localhost:7253";
-const REAL_DEVICE_BASE_URL = "http://192.168.1.5:5210";
-const ANDROID_EMU_BASE_URL = "http://10.0.2.2:5210";
+const WEB_BASE_URL = "http://localhost:9080/workflow-api";
+const REAL_DEVICE_BASE_URL = "http://192.168.1.5:9080/workflow-api";
+const ANDROID_EMU_BASE_URL = "http://10.0.2.2:9080/workflow-api";
 
 function getBaseUrl() {
   if (Platform.OS === "web") return WEB_BASE_URL;
