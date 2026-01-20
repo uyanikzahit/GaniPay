@@ -35,7 +35,6 @@ services:
       - xpack.security.enabled=false
       - cluster.routing.allocation.disk.threshold_enabled=false
       - action.auto_create_index=true
-      # Windows/WSL2 ortamlarında stabilite için:
       - ES_JAVA_OPTS=-Xms1g -Xmx1g
     restart: unless-stopped
     healthcheck:
@@ -48,7 +47,6 @@ services:
       - elastic:/usr/share/elasticsearch/data
     networks:
       - ganipay-net
-  
 
   # GaniPay DB (dev ortamı için tek Postgres)
   postgres:
@@ -62,6 +60,41 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres-init:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - ganipay-net
+
+  # -------------------- APISIX STACK --------------------
+  # APISIX config store (etcd)
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.11
+    environment:
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://etcd:2380
+      - ETCD_INITIAL_CLUSTER=etcd=http://etcd:2380
+      - ETCD_INITIAL_CLUSTER_STATE=new
+      - ETCD_NAME=etcd
+    ports:
+      - "2379:2379"
+    restart: unless-stopped
+    networks:
+      - ganipay-net
+
+  # API Gateway - APISIX
+  apisix:
+    image: apache/apisix:3.9.0-debian
+    depends_on:
+      - etcd
+    ports:
+      - "9080:9080"  # Gateway HTTP
+      - "9180:9180"  # Admin API (dev)
+      - "9443:9443"  # HTTPS (opsiyonel)
+    environment:
+      APISIX_DEPLOYMENT_ETCD_HOST: '["http://etcd:2379"]'
+    volumes:
+      - ./config.yaml:/usr/local/apisix/conf/config.yaml:ro
     restart: unless-stopped
     networks:
       - ganipay-net
@@ -107,6 +140,3 @@ configs:
             type: elasticsearch
             elasticsearch:
               url: "http://elasticsearch:9200"
-
-
-              

@@ -1,0 +1,10 @@
+{
+  "name": "camunda-ui",
+  "uri": "/*",
+  "upstream": {
+    "type": "roundrobin",
+    "nodes": {
+      "orchestration:8080": 1
+    }
+  }
+}

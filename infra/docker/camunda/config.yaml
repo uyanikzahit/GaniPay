@@ -1,13 +1,16 @@
-apisix:
+﻿apisix:
   node_listen: 9080
 
 deployment:
   admin:
     allow_admin:
       - 0.0.0.0/0
+    admin_listen:
+      ip: 0.0.0.0
+      port: 9180
     admin_key:
-      - name: "admin"
-        key: "ganipay-admin-key"
+      - name: admin
+        key: ganipay-admin-key
         role: admin
 
 etcd:
