@@ -1,4 +1,4 @@
-export type Segment = "STANDARD" | "CORPORATE";
+export type Segment = "STANDARD" | "INSTITUTIONAL";
 export type AddressType = "HOME";
 
 export type RegisterForm = {

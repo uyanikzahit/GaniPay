@@ -42,7 +42,7 @@
       <bpmn:incoming>Flow_0qi1iik</bpmn:incoming>
       <bpmn:outgoing>Flow_151iyfc</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:serviceTask id="T_CustomerGetById" name="Customer Get By Id">
+    <bpmn:serviceTask id="T_CustomerGetById" name="Customer Get">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="real.customer.getById" />
       </bpmn:extensionElements>
@@ -285,6 +285,7 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="S_GetById" bpmnElement="T_CustomerGetById">
         <dc:Bounds x="1325" y="130" width="190" height="80" />
+        <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="S_Sanction" bpmnElement="T_SanctionQuery">
         <dc:Bounds x="1990" y="130" width="160" height="80" />

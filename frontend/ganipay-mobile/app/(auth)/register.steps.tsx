@@ -71,9 +71,9 @@ export function StepAccount({ form, setForm }: Props) {
           onPress={() => set("segment", "STANDARD")}
         />
         <SegmentPill
-          active={form.segment === "CORPORATE"}
-          text="Corporate"
-          onPress={() => set("segment", "CORPORATE")}
+          active={form.segment === "INSTITUTIONAL"}
+          text="Institutional"
+          onPress={() => set("segment", "INSTITUTIONAL")}
         />
       </View>
 

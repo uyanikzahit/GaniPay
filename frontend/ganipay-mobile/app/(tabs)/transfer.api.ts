@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SessionKeys } from "../../constants/storage";
 
+// Workflow API baseUrl mantığını login.api.ts ile aynı tuttuk (APISIX Gateway)
 const WEB_BASE_URL = "http://localhost:9080/workflow-api";
 const REAL_DEVICE_BASE_URL = "http://192.168.1.5:9080/workflow-api";
 const ANDROID_EMU_BASE_URL = "http://10.0.2.2:9080/workflow-api";
@@ -49,7 +50,9 @@ async function readJsonSafe(res: Response) {
   }
 }
 
-export async function startTransfer(payload: TransferPayload): Promise<TransferApiResponse> {
+export async function startTransfer(
+  payload: TransferPayload
+): Promise<TransferApiResponse> {
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}/api/v1/transfers/transfer`;
 
@@ -65,5 +68,7 @@ export async function startTransfer(payload: TransferPayload): Promise<TransferA
   }
 
   const data = (await readJsonSafe(res)) as TransferApiResponse | null;
-  return data ?? { success: true, status: "Running", message: "Transfer is being processed." };
+  return (
+    data ?? { success: true, status: "Running", message: "Transfer is being processed." }
+  );
 }
