@@ -29,7 +29,7 @@
       <bpmn:incoming>Flow_ValidateOk_To_AccountStatus</bpmn:incoming>
       <bpmn:outgoing>Flow_AccountStatus_To_Gw_Account</bpmn:outgoing>
     </bpmn:serviceTask>
-    <bpmn:serviceTask id="Task_PersistResult" name="Complete TopUp">
+    <bpmn:serviceTask id="Task_PersistResult" name="Finalize TopUp Transaction">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="payments.topup.complete" retries="3" />
         <zeebe:ioMapping>
@@ -164,7 +164,7 @@
     <bpmn:sequenceFlow id="Flow_ValidateOk_To_AccountStatus" sourceRef="Gw_ValidateOk" targetRef="Task_AccountStatus">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=validateOk=true</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-    <bpmn:serviceTask id="Task_OrderCreate" name="Initiate TopUp">
+    <bpmn:serviceTask id="Task_OrderCreate" name="Initiate TopUp Payment">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="payments.topup.initiate" retries="3" />
         <zeebe:ioMapping>

@@ -28,7 +28,7 @@
       <bpmn:incoming>Flow_1bd21p0</bpmn:incoming>
       <bpmn:outgoing>Flow_08conq2</bpmn:outgoing>
     </bpmn:intermediateThrowEvent>
-    <bpmn:serviceTask id="Task_CustomerDaily" name="Customer Limits Evaluation Get">
+    <bpmn:serviceTask id="Task_CustomerDaily" name="Check Customer Limit Usage">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="customer.limits.evaluation.get" retries="3" />
         <zeebe:ioMapping>
@@ -53,7 +53,7 @@
       <bpmn:incoming>Flow_0eoyfsu</bpmn:incoming>
       <bpmn:outgoing>Flow_027sawo</bpmn:outgoing>
     </bpmn:intermediateThrowEvent>
-    <bpmn:serviceTask id="Activity_0hv1p0q" name="Wallet to Wallet Limits Control">
+    <bpmn:serviceTask id="Activity_0hv1p0q" name="Validate Transfer Limits">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="wallet.to.wallet.limits.control" retries="3" />
         <zeebe:ioMapping>
@@ -121,12 +121,18 @@
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_wallet_system_limits_control">
     <bpmndi:BPMNPlane id="BPMNPlane_wallet_system_limits_control" bpmnElement="wallet_system_limits_control">
+      <bpmndi:BPMNShape id="Shape_StartEvent_1" bpmnElement="StartEvent_1">
+        <dc:Bounds x="152" y="322" width="36" height="36" />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Task_LimitDefs" bpmnElement="Task_LimitDefs">
         <dc:Bounds x="370" y="298" width="260" height="84" />
         <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Gw_1" bpmnElement="Gw_1" isMarkerVisible="true">
         <dc:Bounds x="675" y="315" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_Event_1" bpmnElement="Event_1">
+        <dc:Bounds x="242" y="322" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Shape_Task_CustomerDaily" bpmnElement="Task_CustomerDaily">
         <dc:Bounds x="790" y="298" width="260" height="84" />
@@ -169,31 +175,17 @@
           <dc:Bounds x="598" y="180" width="58" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Shape_Event_1" bpmnElement="Event_1">
-        <dc:Bounds x="242" y="322" width="36" height="36" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Shape_StartEvent_1" bpmnElement="StartEvent_1">
-        <dc:Bounds x="152" y="322" width="36" height="36" />
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Edge_Flow_LimitDefs_To_Gw1" bpmnElement="Flow_LimitDefs_To_Gw1">
         <di:waypoint x="630" y="340" />
         <di:waypoint x="675" y="340" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1b3pvlv_di" bpmnElement="Flow_1b3pvlv">
-        <di:waypoint x="700" y="315" />
-        <di:waypoint x="700" y="208" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_07phzhj_di" bpmnElement="Flow_07phzhj">
-        <di:waypoint x="725" y="340" />
-        <di:waypoint x="790" y="340" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_1bd21p0_di" bpmnElement="Flow_1bd21p0">
-        <di:waypoint x="188" y="340" />
-        <di:waypoint x="242" y="340" />
-      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_CustomerDaily_To_Gw3" bpmnElement="Flow_CustomerDaily_To_Gw3">
         <di:waypoint x="1050" y="340" />
         <di:waypoint x="1090" y="340" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1b3pvlv_di" bpmnElement="Flow_1b3pvlv">
+        <di:waypoint x="700" y="315" />
+        <di:waypoint x="700" y="208" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_0eoyfsu_di" bpmnElement="Flow_0eoyfsu">
         <di:waypoint x="1115" y="365" />
@@ -202,12 +194,6 @@
       <bpmndi:BPMNEdge id="Flow_1ye0tn1_di" bpmnElement="Flow_1ye0tn1">
         <di:waypoint x="1140" y="340" />
         <di:waypoint x="1200" y="340" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_027sawo_di" bpmnElement="Flow_027sawo">
-        <di:waypoint x="1115" y="548" />
-        <di:waypoint x="1115" y="620" />
-        <di:waypoint x="1740" y="620" />
-        <di:waypoint x="1740" y="365" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_0autyzx_di" bpmnElement="Flow_0autyzx">
         <di:waypoint x="1460" y="340" />
@@ -221,12 +207,6 @@
         <di:waypoint x="1575" y="340" />
         <di:waypoint x="1632" y="340" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_0ajqqqm_di" bpmnElement="Flow_0ajqqqm">
-        <di:waypoint x="1550" y="172" />
-        <di:waypoint x="1550" y="80" />
-        <di:waypoint x="1740" y="80" />
-        <di:waypoint x="1740" y="315" />
-      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Edge_Flow_Event3_To_End" bpmnElement="Flow_Event3_To_End">
         <di:waypoint x="1668" y="340" />
         <di:waypoint x="1715" y="340" />
@@ -237,9 +217,29 @@
         <di:waypoint x="1740" y="80" />
         <di:waypoint x="1740" y="315" />
       </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_027sawo_di" bpmnElement="Flow_027sawo">
+        <di:waypoint x="1115" y="548" />
+        <di:waypoint x="1115" y="620" />
+        <di:waypoint x="1740" y="620" />
+        <di:waypoint x="1740" y="365" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0ajqqqm_di" bpmnElement="Flow_0ajqqqm">
+        <di:waypoint x="1550" y="172" />
+        <di:waypoint x="1550" y="80" />
+        <di:waypoint x="1740" y="80" />
+        <di:waypoint x="1740" y="315" />
+      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_135o4b2_di" bpmnElement="Flow_135o4b2">
         <di:waypoint x="1765" y="340" />
         <di:waypoint x="1852" y="340" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_07phzhj_di" bpmnElement="Flow_07phzhj">
+        <di:waypoint x="725" y="340" />
+        <di:waypoint x="790" y="340" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1bd21p0_di" bpmnElement="Flow_1bd21p0">
+        <di:waypoint x="188" y="340" />
+        <di:waypoint x="242" y="340" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_08conq2_di" bpmnElement="Flow_08conq2">
         <di:waypoint x="278" y="340" />

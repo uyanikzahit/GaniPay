@@ -28,7 +28,7 @@
       </bpmn:extensionElements>
     </bpmn:serviceTask>
     <bpmn:sequenceFlow id="F_04" sourceRef="T_CustomerPhoneGet" targetRef="G_IsNewCustomer" />
-    <bpmn:exclusiveGateway id="G_IsNewCustomer" name="Customer Control" default="Flow_09c4cij">
+    <bpmn:exclusiveGateway id="G_IsNewCustomer" default="Flow_09c4cij">
       <bpmn:incoming>F_04</bpmn:incoming>
       <bpmn:outgoing>Flow_09c4cij</bpmn:outgoing>
     </bpmn:exclusiveGateway>
@@ -82,34 +82,8 @@
     <bpmn:sequenceFlow id="F_14" sourceRef="T_IbanVerification" targetRef="G_IbanOk" />
     <bpmn:exclusiveGateway id="G_IbanOk" name="Iban Verification Succeeded" default="Flow_0ui3mp3">
       <bpmn:outgoing>Flow_0ui3mp3</bpmn:outgoing>
+      <bpmn:outgoing>F_IbanOk</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="F_IbanOk" sourceRef="G_IbanOk" targetRef="Gateway_1roozw8">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=ibanVerification.ok = true</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
-    <bpmn:serviceTask id="T_AddressVerification" name="Governance Address Number Verification">
-      <bpmn:extensionElements>
-        <zeebe:taskDefinition type="real.address.verification" />
-      </bpmn:extensionElements>
-      <bpmn:incoming>Flow_1fak551</bpmn:incoming>
-    </bpmn:serviceTask>
-    <bpmn:sequenceFlow id="F_15" sourceRef="T_AddressVerification" targetRef="G_AddressOk" />
-    <bpmn:exclusiveGateway id="G_AddressOk" name="Address Number Verification Succeeded" default="Flow_07ntwmr">
-      <bpmn:outgoing>Flow_07ntwmr</bpmn:outgoing>
-    </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="F_AddressOk" sourceRef="G_AddressOk" targetRef="Gateway_1srv49s">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=addressVerification.ok = true</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
-    <bpmn:serviceTask id="T_SimCheck" name="SIM Check Control">
-      <bpmn:extensionElements>
-        <zeebe:taskDefinition type="mock.sim.check.control" />
-        <zeebe:ioMapping>
-          <zeebe:output source="={ ok: true }" target="validation" />
-          <zeebe:output source="=&#34;SUCCESS&#34;" target="validationStatus" />
-        </zeebe:ioMapping>
-      </bpmn:extensionElements>
-      <bpmn:incoming>Flow_1voiv6j</bpmn:incoming>
-      <bpmn:outgoing>Flow_0cyazdm</bpmn:outgoing>
-    </bpmn:serviceTask>
     <bpmn:endEvent id="E_ValidationSuccess" name="End Validation">
       <bpmn:incoming>Flow_0qb8hz8</bpmn:incoming>
     </bpmn:endEvent>
@@ -193,28 +167,7 @@
       <bpmn:outgoing>Flow_02i4urb</bpmn:outgoing>
     </bpmn:intermediateThrowEvent>
     <bpmn:sequenceFlow id="Flow_02i4urb" sourceRef="Event_1i51yq3" targetRef="Gateway_1ssk200" />
-    <bpmn:exclusiveGateway id="Gateway_1roozw8" default="Flow_1fak551">
-      <bpmn:incoming>F_IbanOk</bpmn:incoming>
-      <bpmn:outgoing>Flow_1fak551</bpmn:outgoing>
-      <bpmn:outgoing>Flow_0jwx48t</bpmn:outgoing>
-    </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_1fak551" sourceRef="Gateway_1roozw8" targetRef="T_AddressVerification" />
-    <bpmn:exclusiveGateway id="Gateway_1srv49s">
-      <bpmn:incoming>F_AddressOk</bpmn:incoming>
-      <bpmn:incoming>Flow_0jwx48t</bpmn:incoming>
-      <bpmn:outgoing>Flow_1voiv6j</bpmn:outgoing>
-    </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_0jwx48t" sourceRef="Gateway_1roozw8" targetRef="Gateway_1srv49s">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=addressVerification.required = false</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="Flow_07ntwmr" sourceRef="G_AddressOk" targetRef="Event_0hnl9k5" />
-    <bpmn:intermediateThrowEvent id="Event_0hnl9k5" name="Governance Address Number Verification Failed">
-      <bpmn:incoming>Flow_07ntwmr</bpmn:incoming>
-      <bpmn:outgoing>Flow_05t12v7</bpmn:outgoing>
-    </bpmn:intermediateThrowEvent>
-    <bpmn:sequenceFlow id="Flow_05t12v7" sourceRef="Event_0hnl9k5" targetRef="Gateway_1ssk200" />
     <bpmn:exclusiveGateway id="Gateway_1ssk200">
-      <bpmn:incoming>Flow_05t12v7</bpmn:incoming>
       <bpmn:incoming>Flow_02i4urb</bpmn:incoming>
       <bpmn:incoming>Flow_00gspzj</bpmn:incoming>
       <bpmn:incoming>Flow_0u4j9tu</bpmn:incoming>
@@ -223,10 +176,10 @@
       <bpmn:incoming>Flow_1mz5aar</bpmn:incoming>
       <bpmn:incoming>Flow_1ml36fq</bpmn:incoming>
       <bpmn:incoming>Flow_1nbd0yl</bpmn:incoming>
+      <bpmn:incoming>Flow_05t12v7</bpmn:incoming>
       <bpmn:incoming>Flow_0cyazdm</bpmn:incoming>
       <bpmn:outgoing>Flow_0qb8hz8</bpmn:outgoing>
     </bpmn:exclusiveGateway>
-    <bpmn:sequenceFlow id="Flow_1voiv6j" sourceRef="Gateway_1srv49s" targetRef="T_SimCheck" />
     <bpmn:sequenceFlow id="Flow_0qb8hz8" sourceRef="Gateway_1ssk200" targetRef="E_ValidationSuccess">
       <bpmn:extensionElements />
     </bpmn:sequenceFlow>
@@ -245,6 +198,57 @@
       <bpmn:outgoing>Flow_17ri083</bpmn:outgoing>
     </bpmn:serviceTask>
     <bpmn:sequenceFlow id="Flow_17ri083" sourceRef="T_CustomerGetByEmail" targetRef="Gateway_07r47hh" />
+    <bpmn:intermediateThrowEvent id="Event_0hnl9k5" name="Governance Address Number Verification Failed">
+      <bpmn:incoming>Flow_07ntwmr</bpmn:incoming>
+      <bpmn:outgoing>Flow_05t12v7</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:sequenceFlow id="Flow_05t12v7" sourceRef="Event_0hnl9k5" targetRef="Gateway_1ssk200" />
+    <bpmn:sequenceFlow id="F_IbanOk" sourceRef="G_IbanOk" targetRef="Gateway_1roozw8">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=ibanVerification.ok = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:exclusiveGateway id="Gateway_1roozw8" default="Flow_1fak551">
+      <bpmn:incoming>F_IbanOk</bpmn:incoming>
+      <bpmn:outgoing>Flow_1fak551</bpmn:outgoing>
+      <bpmn:outgoing>Flow_0jwx48t</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_1fak551" sourceRef="Gateway_1roozw8" targetRef="T_AddressVerification" />
+    <bpmn:serviceTask id="T_AddressVerification" name="Governance Address Number Verification">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="real.address.verification" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1fak551</bpmn:incoming>
+      <bpmn:outgoing>F_15</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="F_15" sourceRef="T_AddressVerification" targetRef="G_AddressOk" />
+    <bpmn:exclusiveGateway id="G_AddressOk" name="Address Number Verification Succeeded" default="Flow_07ntwmr">
+      <bpmn:incoming>F_15</bpmn:incoming>
+      <bpmn:outgoing>Flow_07ntwmr</bpmn:outgoing>
+      <bpmn:outgoing>F_AddressOk</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_07ntwmr" sourceRef="G_AddressOk" targetRef="Event_0hnl9k5" />
+    <bpmn:exclusiveGateway id="Gateway_1srv49s">
+      <bpmn:incoming>Flow_0jwx48t</bpmn:incoming>
+      <bpmn:incoming>F_AddressOk</bpmn:incoming>
+      <bpmn:outgoing>Flow_1voiv6j</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_1voiv6j" sourceRef="Gateway_1srv49s" targetRef="T_SimCheck" />
+    <bpmn:sequenceFlow id="Flow_0jwx48t" sourceRef="Gateway_1roozw8" targetRef="Gateway_1srv49s">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=addressVerification.required = false</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_AddressOk" sourceRef="G_AddressOk" targetRef="Gateway_1srv49s">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=addressVerification.ok = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:serviceTask id="T_SimCheck" name="SIM Check Control">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.sim.check.control" />
+        <zeebe:ioMapping>
+          <zeebe:output source="={ ok: true }" target="validation" />
+          <zeebe:output source="=&#34;SUCCESS&#34;" target="validationStatus" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1voiv6j</bpmn:incoming>
+      <bpmn:outgoing>Flow_0cyazdm</bpmn:outgoing>
+    </bpmn:serviceTask>
     <bpmn:sequenceFlow id="Flow_0cyazdm" sourceRef="T_SimCheck" targetRef="Gateway_1ssk200" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="Diagram_RegisterValidation">

@@ -46,15 +46,14 @@ export function getWorkflowDirectBaseUrl() {
   return REAL_DEVICE_DIRECT;
 }
 
-/** ✅ Gateway base */
 export function getGatewayBaseUrl() {
   const extra = getExtra();
 
-  // app.json extra.gatewayBaseUrl ile override edilebilir
+  // app.json extra.gatewayBaseUrl ile override edilebilir.
   const env = (extra.gatewayBaseUrl ?? "").trim();
   if (env) return env;
 
-  // default gateway değerleri (istersen değiştirirsin)
+  // default gateway değerleri.
   const WEB_GATEWAY = "http://localhost:9080";
   const ANDROID_EMU_GATEWAY = "http://10.0.2.2:9080";
   const REAL_DEVICE_GATEWAY = "http://192.168.1.5:9080";
@@ -64,20 +63,15 @@ export function getGatewayBaseUrl() {
   return REAL_DEVICE_GATEWAY;
 }
 
-/**
- * ✅ BÜTÜN api.ts dosyalarının kullanacağı tek fonksiyon.
- * Varsayılan DIRECT döner (bozmaz).
- * Sadece extra.useGateway=true ise APISIX'e döner.
- */
 export function getWorkflowApiBaseUrl() {
   const extra = getExtra();
   const useGateway = asBool(extra.useGateway);
 
   if (!useGateway) {
-    // ✅ senin çalışan eski düzen
+   
     return getWorkflowDirectBaseUrl();
   }
 
-  // ✅ APISIX üzerinden erişim
+
   return `${getGatewayBaseUrl()}/workflow-api`;
 }
