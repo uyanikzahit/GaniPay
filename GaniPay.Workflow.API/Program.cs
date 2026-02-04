@@ -10,19 +10,17 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 
-// ✅ CORS (builder.Build() öncesi)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
     {
         policy
             .WithOrigins(
-                "http://localhost:8082", // Expo web
-                "https://localhost:8082" // bazen https'e düşebilir
+                "http://localhost:8082", 
+                "https://localhost:8082" 
             )
             .AllowAnyHeader()
             .AllowAnyMethod();
-        // .AllowCredentials(); // sadece cookie/auth gerekiyorsa aç
     });
 });
 

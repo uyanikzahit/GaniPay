@@ -138,7 +138,7 @@ export default function TransferScreen() {
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Receiver</Text>
-        <Text style={styles.cardHint}>Paste recipient account number (demo: receiverCustomerId).</Text>
+        <Text style={styles.cardHint}>Paste recipient account number.</Text>
 
         <View style={styles.inputRow}>
           <Ionicons name="key-outline" size={18} color={SOFT} />
