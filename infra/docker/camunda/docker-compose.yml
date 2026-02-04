@@ -103,6 +103,26 @@ services:
     networks:
       - ganipay-net
 
+  workflow-api:
+    build:
+      context: ../../../GaniPay.Workflow.API
+      dockerfile: Dockerfile
+    container_name: ganipay-workflow-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Zeebe__GatewayAddress: orchestration:26500
+      Zeebe__RegisterProcessId: register
+      Zeebe__LoginProcessId: login
+      Zeebe__TopUpProcessId: topup
+      Zeebe__TransferProcessId: transfer
+    ports:
+      - "5210:8080"
+    networks:
+      - ganipay-net
+    depends_on:
+      orchestration:
+        condition: service_healthy
+
 volumes:
   zeebe:
   elastic:
