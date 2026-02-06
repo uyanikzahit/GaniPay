@@ -128,6 +128,36 @@ services:
 
 
 
+  customer-api:
+    build:
+      context: ../../../
+      dockerfile: src/services/Customer/Customer.API/Dockerfile
+    container_name: ganipay-customer-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+    ports:
+      - "5212:8080"
+    networks:
+      - ganipay-net
+    depends_on:
+      - postgres
+
+
+  accounting-api:
+    build:
+      context: ../../../
+      dockerfile: src/services/Accounting/Accounting.API/Dockerfile
+    container_name: ganipay-accounting-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+    ports:
+      - "5213:8080"
+    networks:
+      - ganipay-net
+    depends_on:
+      - postgres
+      
+
   identity-api:
       build:
         context: ../../../
