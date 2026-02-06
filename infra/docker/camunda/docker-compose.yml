@@ -123,6 +123,22 @@ services:
       orchestration:
         condition: service_healthy
 
+
+
+  identity-api:
+      build:
+        context: ../../../
+        dockerfile: src/services/Identity/Identity.API/Dockerfile
+      container_name: ganipay-identity-api
+      environment:
+        ASPNETCORE_ENVIRONMENT: Development
+      ports:
+        - "5211:8080"
+      networks:
+        - ganipay-net
+      depends_on:
+        - postgres
+
 volumes:
   zeebe:
   elastic:
