@@ -103,6 +103,9 @@ services:
     networks:
       - ganipay-net
 
+
+
+#apis
   workflow-api:
     build:
       context: ../../../GaniPay.Workflow.API
@@ -138,6 +141,32 @@ services:
         - ganipay-net
       depends_on:
         - postgres
+
+
+
+
+#workers
+
+  login-worker:
+    build:
+      context: ../../../
+      dockerfile: src/workers/GaniPay.Login.Worker/Dockerfile
+    container_name: ganipay-login-worker
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Zeebe__GatewayAddress: orchestration:26500
+      # Login worker hangi API'leri çağırıyorsa onları da docker network hostnames ile ver
+      # Örnek (projendeki config key'lerine göre gerekirse isimleri düzeltiriz):
+      IdentityApi__BaseUrl: http://identity-api:8080
+      CustomerApi__BaseUrl: http://customer-api:8080
+      AccountingApi__BaseUrl: http://accounting-api:8080
+    networks:
+      - ganipay-net
+    depends_on:
+      - orchestration
+      - identity-api
+
+
 
 volumes:
   zeebe:
