@@ -165,6 +165,8 @@ services:
       container_name: ganipay-identity-api
       environment:
         ASPNETCORE_ENVIRONMENT: Development
+        ConnectionStrings__IdentityDb: Host=postgres;Port=5432;Database=ganipay_identity;Username=ganipay;Password=ganipay123
+
       ports:
         - "5211:8080"
       networks:
