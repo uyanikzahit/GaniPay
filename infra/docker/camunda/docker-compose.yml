@@ -118,6 +118,7 @@ services:
       Zeebe__LoginProcessId: login
       Zeebe__TopUpProcessId: topup
       Zeebe__TransferProcessId: transfer
+      ASPNETCORE_URLS: http://+:8080
     ports:
       - "5210:8080"
     networks:
@@ -135,6 +136,8 @@ services:
     container_name: ganipay-customer-api
     environment:
       ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__CustomerDb: Host=postgres;Port=5432;Database=ganipay_customer;Username=ganipay;Password=ganipay123
+
     ports:
       - "5212:8080"
     networks:
@@ -150,6 +153,8 @@ services:
     container_name: ganipay-accounting-api
     environment:
       ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__AccountingDb: Host=postgres;Port=5432;Database=ganipay_accounting;Username=ganipay;Password=ganipay123
+
     ports:
       - "5213:8080"
     networks:

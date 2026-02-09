@@ -279,7 +279,8 @@ authGroup.MapGet("/login/result/{correlationId}", (string correlationId) =>
         });
     }
 
-    return Results.NotFound(new
+    // ❗️404 verme, 200 dön ki UI hata sanmasın
+    return Results.Ok(new
     {
         success = false,
         status = "Running",
