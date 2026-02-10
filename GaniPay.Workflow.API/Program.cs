@@ -1,7 +1,8 @@
-﻿using System.Text.Json;
+﻿using GaniPay.Workflow.API.ResultStore;
+using Microsoft.OpenApi.Models;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Zeebe.Client;
-using GaniPay.Workflow.API.ResultStore;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -59,7 +60,22 @@ app.UseCors("Frontend");
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
+    app.UseSwagger(c =>
+    {
+        c.PreSerializeFilters.Add((swagger, httpReq) =>
+        {
+            // APISIX altında /workflow-api ile servis ediliyor
+            var prefix = "/workflow-api";
+
+            swagger.Servers = new List<OpenApiServer>
+            {
+                new OpenApiServer
+                {
+                    Url = $"{httpReq.Scheme}://{httpReq.Host}{prefix}"
+                }
+            };
+        });
+    });
     app.UseSwaggerUI();
 }
 
