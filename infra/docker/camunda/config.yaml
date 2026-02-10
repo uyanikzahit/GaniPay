@@ -38,6 +38,19 @@ apisix:
             - "/$1"
       upstream_id: 2001
 
+
+    # ---- Payments API ----
+    - id: 1005
+      name: payments-api
+      uri: /payments-api/*
+      methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+      plugins:
+        proxy-rewrite:
+          regex_uri:
+            - "^/payments-api/(.*)"
+            - "/$1"
+      upstream_id: 2005
+
     # ---- Identity API ----
     - id: 1002
       name: identity-api
@@ -98,3 +111,9 @@ apisix:
       type: roundrobin
       nodes:
         "accounting-api:8080": 1
+
+    - id: 2005
+      name: payments-api-upstream
+      type: roundrobin
+      nodes:
+        "payments-api:8080": 1

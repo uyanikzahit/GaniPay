@@ -180,7 +180,20 @@ services:
         - postgres
 
 
-
+  payments-api:
+    build:
+      context: ../../../
+      dockerfile: src/services/Payments/Payments.API/Dockerfile
+    container_name: ganipay-payments-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__PaymentsDb: Host=postgres;Port=5432;Database=ganipay_payments;Username=ganipay;Password=ganipay123
+    ports:
+      - "5214:8080"
+    networks:
+      - ganipay-net
+    depends_on:
+      - postgres
 
 #workers
 
