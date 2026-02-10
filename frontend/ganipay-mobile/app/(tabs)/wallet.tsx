@@ -4,7 +4,8 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Platform } from "react-n
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import * as Clipboard from "expo-clipboard";
-import { loadSession, StoredSession } from "@/constants/storage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { loadSession, StoredSession, SessionKeys } from "@/constants/storage";
 
 const BG = "#0B1220";
 const CARD = "rgba(255,255,255,0.06)";
@@ -69,10 +70,10 @@ function txTitle(h: BalanceHistoryItem) {
 }
 
 function getAccountingBaseUrl() {
-  // Accounting swagger: 5103
-  if (Platform.OS === "web") return "http://localhost:5103";
-  if (Platform.OS === "android") return "http://10.0.2.2:5103";
-  return "http://192.168.1.5:5103";
+  // ✅ Artık accounting'e direkt porttan değil APISIX gateway üzerinden gidiyoruz (9080)
+  if (Platform.OS === "web") return "http://localhost:9080";
+  if (Platform.OS === "android") return "http://10.0.2.2:9080";
+  return "http://192.168.1.5:9080";
 }
 
 export default function WalletScreen() {
@@ -120,8 +121,19 @@ export default function WalletScreen() {
     setLoading(true);
     try {
       const baseUrl = getAccountingBaseUrl();
-      const url = `${baseUrl}/api/accounting/accounts/${encodeURIComponent(wallet.accountId)}/balance-history`;
-      const res = await fetch(url, { method: "GET" });
+      // ✅ APISIX route prefix eklendi: /accounting-api
+      const url = `${baseUrl}/accounting-api/api/accounting/accounts/${encodeURIComponent(wallet.accountId)}/balance-history`;
+
+      // ✅ Bearer token (Authorize varsa şart)
+      const token = await AsyncStorage.getItem(SessionKeys.accessToken);
+
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
 
       if (!res.ok) {
         // burada 404 vs olunca direkt boş gösterelim (UI bozulmasın)

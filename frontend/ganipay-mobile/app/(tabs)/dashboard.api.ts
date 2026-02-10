@@ -1,18 +1,17 @@
 // app/(tabs)/dashboard.api.ts
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-// Eğer sende path alias varsa "@/constants/storage" kullanabilirsin.
-// Yoksa index.tsx içinden "../../constants/storage" ile import edeceğiz.
 import { SessionKeys } from "../../constants/storage";
 
-const WEB_ACCOUNTING_BASE_URL = "http://localhost:5103";
-const REAL_DEVICE_ACCOUNTING_BASE_URL = "http://192.168.1.5:5104"; // PC IP + 5104
-// const REAL_DEVICE_ACCOUNTING_BASE_URL = "http://192.168.1.5:5103";
+// ✅ Artık Accounting'e direkt portla değil, APISIX üzerinden gidiyoruz.
+const WEB_GATEWAY_BASE_URL = "http://localhost:9080";
+const ANDROID_EMU_GATEWAY_BASE_URL = "http://10.0.2.2:9080";
+const REAL_DEVICE_GATEWAY_BASE_URL = "http://192.168.1.5:9080"; // PC IP + 9080
 
-function getAccountingBaseUrl() {
-  if (Platform.OS === "web") return WEB_ACCOUNTING_BASE_URL;
-  return REAL_DEVICE_ACCOUNTING_BASE_URL;
+function getGatewayBaseUrl() {
+  if (Platform.OS === "web") return WEB_GATEWAY_BASE_URL;
+  if (Platform.OS === "android") return ANDROID_EMU_GATEWAY_BASE_URL;
+  return REAL_DEVICE_GATEWAY_BASE_URL;
 }
 
 async function authHeaders() {
@@ -48,14 +47,15 @@ export type BalanceHistoryItem = {
   currency: string;
   operationType?: string;
   referenceId?: string;
-  createdAt: string; // ISO
+  createdAt: string;
 };
 
 export async function getCustomerBalance(customerId: string, currency = "TRY") {
-  const baseUrl = getAccountingBaseUrl();
-  const url = `${baseUrl}/api/accounting/customers/${encodeURIComponent(customerId)}/balance?currency=${encodeURIComponent(
-    currency
-  )}`;
+  const baseUrl = getGatewayBaseUrl();
+  // ✅ APISIX route prefix: /accounting-api
+  const url =
+    `${baseUrl}/accounting-api/api/accounting/customers/${encodeURIComponent(customerId)}` +
+    `/balance?currency=${encodeURIComponent(currency)}`;
 
   const res = await fetch(url, { method: "GET", headers: await authHeaders() });
   if (!res.ok) throw new Error(await res.text().catch(() => `Balance failed (${res.status})`));
@@ -66,8 +66,8 @@ export async function getCustomerBalance(customerId: string, currency = "TRY") {
 }
 
 export async function getAccountBalanceHistory(accountId: string) {
-  const baseUrl = getAccountingBaseUrl();
-  const url = `${baseUrl}/api/accounting/accounts/${encodeURIComponent(accountId)}/balance-history`;
+  const baseUrl = getGatewayBaseUrl();
+  const url = `${baseUrl}/accounting-api/api/accounting/accounts/${encodeURIComponent(accountId)}/balance-history`;
 
   const res = await fetch(url, { method: "GET", headers: await authHeaders() });
   if (!res.ok) throw new Error(await res.text().catch(() => `History failed (${res.status})`));
