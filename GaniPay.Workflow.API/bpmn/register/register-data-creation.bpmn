@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" id="Definitions_register_data_creation" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.40.1">
+  <bpmn:process id="Register_DataCreation_Process" name="Register.DataCreation" isExecutable="true">
+    <bpmn:startEvent id="Start_DataCreation" name="Start Data Creation" />
+    <bpmn:sequenceFlow id="F_01" sourceRef="Start_DataCreation" targetRef="T_WalletLedgerIdGet" />
+    <bpmn:serviceTask id="T_WalletLedgerIdGet" name="Wallet Account Ledger Id Get">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="accounting.wallet.ledgerid.get" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:outgoing>Flow_150a30n</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="End_DataCreation" name="End Data Creation">
+      <bpmn:incoming>Flow_1guy4we</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="T_CustomerCreate" name="Customer Create">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="customer.create" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_150a30n</bpmn:incoming>
+      <bpmn:outgoing>Flow_0zld6qu</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="T_CustomerIndividualCreate" name="Customer Individual Create">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="customer.individual.create" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_0zld6qu</bpmn:incoming>
+      <bpmn:outgoing>Flow_0jk1we1</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_0zld6qu" sourceRef="T_CustomerCreate" targetRef="T_CustomerIndividualCreate" />
+    <bpmn:sequenceFlow id="Flow_150a30n" sourceRef="T_WalletLedgerIdGet" targetRef="T_CustomerCreate" />
+    <bpmn:serviceTask id="T_CustomerPhoneCreate" name="Customer Phone Create">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="customer.phone.create" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=customerId" target="customerId" />
+          <zeebe:input source="=countryCode" target="countryCode" />
+          <zeebe:input source="=phoneNumber" target="phoneNumber" />
+          <zeebe:input source="=phoneType" target="phoneType" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_0jk1we1</bpmn:incoming>
+      <bpmn:outgoing>Flow_1r1y3zg</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_0jk1we1" sourceRef="T_CustomerIndividualCreate" targetRef="T_CustomerPhoneCreate" />
+    <bpmn:serviceTask id="T_AccountCreate" name="Account Create">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="accounting.account.create" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_0ez6t17</bpmn:incoming>
+      <bpmn:outgoing>Flow_0ofeaf6</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_1r1y3zg" sourceRef="T_CustomerPhoneCreate" targetRef="T_LinkDeviceCustomer" />
+    <bpmn:serviceTask id="T_LinkDeviceCustomer" name="Link Device and Customer">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.device.customer.link" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1r1y3zg</bpmn:incoming>
+      <bpmn:outgoing>Flow_0ez6t17</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="T_CustomerEmailCreate" name="Customer E-mail Create">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="customer.email.create" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_0ofeaf6</bpmn:incoming>
+      <bpmn:outgoing>Flow_1ft8n3l</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:intermediateThrowEvent id="Event_049kbti">
+      <bpmn:incoming>Flow_0n94wm9</bpmn:incoming>
+      <bpmn:outgoing>Flow_1guy4we</bpmn:outgoing>
+    </bpmn:intermediateThrowEvent>
+    <bpmn:sequenceFlow id="Flow_1guy4we" sourceRef="Event_049kbti" targetRef="End_DataCreation" />
+    <bpmn:sequenceFlow id="Flow_0ofeaf6" sourceRef="T_AccountCreate" targetRef="T_CustomerEmailCreate" />
+    <bpmn:sequenceFlow id="Flow_1ft8n3l" sourceRef="T_CustomerEmailCreate" targetRef="T_CustomerAddressCreate" />
+    <bpmn:serviceTask id="T_CustomerAddressCreate" name="Customer Address Create">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="customer.address.create" retries="3" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=address.addressType" target="addressType" />
+          <zeebe:input source="=address.city" target="city" />
+          <zeebe:input source="=address.district" target="district" />
+          <zeebe:input source="=address.postalCode" target="postalCode" />
+          <zeebe:input source="=address.addressLine1" target="addressLine1" />
+          <zeebe:input source="=customerId" target="customerId" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_1ft8n3l</bpmn:incoming>
+      <bpmn:outgoing>Flow_132n2fu</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_0fqkabn" sourceRef="T_CustomerOccupationCreate" targetRef="T_IdentityCredentialCreate" />
+    <bpmn:sequenceFlow id="Flow_132n2fu" sourceRef="T_CustomerAddressCreate" targetRef="T_CustomerOccupationCreate" />
+    <bpmn:serviceTask id="T_CustomerOccupationCreate" name="Customer Occupation Create">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="mock.customer.occupation.create" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_132n2fu</bpmn:incoming>
+      <bpmn:outgoing>Flow_0fqkabn</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_0ez6t17" sourceRef="T_LinkDeviceCustomer" targetRef="T_AccountCreate" />
+    <bpmn:serviceTask id="T_IdentityCredentialCreate" name="Identity Credential Create">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="identity.credential.create" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_0fqkabn</bpmn:incoming>
+      <bpmn:outgoing>Flow_0n94wm9</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_0n94wm9" sourceRef="T_IdentityCredentialCreate" targetRef="Event_049kbti" />
+    <bpmn:group id="Group_1bsfet4" categoryValueRef="CategoryValue_05nm6dc" />
+  </bpmn:process>
+  <bpmn:category id="Category_0ytuybq">
+    <bpmn:categoryValue id="CategoryValue_05nm6dc" value="Transactions" />
+  </bpmn:category>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Register_DataCreation">
+    <bpmndi:BPMNPlane id="BPMNPlane_Register_DataCreation" bpmnElement="Register_DataCreation_Process">
+      <bpmndi:BPMNShape id="DI_Start_DataCreation" bpmnElement="Start_DataCreation">
+        <dc:Bounds x="162" y="188" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="155" y="224" width="50" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DI_T_WalletLedgerIdGet" bpmnElement="T_WalletLedgerIdGet">
+        <dc:Bounds x="240" y="166" width="140" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DI_End_DataCreation" bpmnElement="End_DataCreation">
+        <dc:Bounds x="272" y="412" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="267" y="456" width="46" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DI_T_CustomerCreate" bpmnElement="T_CustomerCreate">
+        <dc:Bounds x="470" y="176" width="120" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DI_T_CustomerIndividualCreate" bpmnElement="T_CustomerIndividualCreate">
+        <dc:Bounds x="720" y="176" width="140" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DI_T_CustomerPhoneCreate" bpmnElement="T_CustomerPhoneCreate">
+        <dc:Bounds x="990" y="176" width="140" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DI_T_AccountCreate" bpmnElement="T_AccountCreate">
+        <dc:Bounds x="1240" y="400" width="120" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DI_T_LinkDeviceCustomer" bpmnElement="T_LinkDeviceCustomer">
+        <dc:Bounds x="1230" y="176" width="140" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DI_T_CustomerEmailCreate" bpmnElement="T_CustomerEmailCreate">
+        <dc:Bounds x="1045" y="400" width="130" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_049kbti_di" bpmnElement="Event_049kbti">
+        <dc:Bounds x="352" y="412" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DI_T_CustomerAddressCreate" bpmnElement="T_CustomerAddressCreate">
+        <dc:Bounds x="840" y="400" width="140" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DI_T_CustomerOccupationCreate" bpmnElement="T_CustomerOccupationCreate">
+        <dc:Bounds x="630" y="400" width="140" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_0ds3jk1" bpmnElement="T_IdentityCredentialCreate">
+        <dc:Bounds x="450" y="400" width="140" height="60" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Group_1bsfet4_di" bpmnElement="Group_1bsfet4">
+        <dc:Bounds x="420" y="120" width="980" height="440" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="879" y="127" width="63" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="DI_F_01" bpmnElement="F_01">
+        <di:waypoint x="198" y="207" />
+        <di:waypoint x="240" y="207" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0zld6qu_di" bpmnElement="Flow_0zld6qu">
+        <di:waypoint x="590" y="206" />
+        <di:waypoint x="720" y="206" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_150a30n_di" bpmnElement="Flow_150a30n">
+        <di:waypoint x="380" y="206" />
+        <di:waypoint x="470" y="206" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0jk1we1_di" bpmnElement="Flow_0jk1we1">
+        <di:waypoint x="860" y="206" />
+        <di:waypoint x="990" y="206" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1r1y3zg_di" bpmnElement="Flow_1r1y3zg">
+        <di:waypoint x="1130" y="206" />
+        <di:waypoint x="1230" y="206" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1guy4we_di" bpmnElement="Flow_1guy4we">
+        <di:waypoint x="352" y="430" />
+        <di:waypoint x="308" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0ofeaf6_di" bpmnElement="Flow_0ofeaf6">
+        <di:waypoint x="1240" y="430" />
+        <di:waypoint x="1175" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1ft8n3l_di" bpmnElement="Flow_1ft8n3l">
+        <di:waypoint x="1045" y="430" />
+        <di:waypoint x="980" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0fqkabn_di" bpmnElement="Flow_0fqkabn">
+        <di:waypoint x="630" y="430" />
+        <di:waypoint x="590" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_132n2fu_di" bpmnElement="Flow_132n2fu">
+        <di:waypoint x="840" y="430" />
+        <di:waypoint x="770" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0ez6t17_di" bpmnElement="Flow_0ez6t17">
+        <di:waypoint x="1300" y="236" />
+        <di:waypoint x="1300" y="400" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0n94wm9_di" bpmnElement="Flow_0n94wm9">
+        <di:waypoint x="450" y="430" />
+        <di:waypoint x="388" y="430" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

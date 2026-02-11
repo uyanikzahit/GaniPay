@@ -13,4 +13,12 @@
 		<PackageReference Include="Microsoft.OpenApi" Version="1.6.22" />
 	</ItemGroup>
 
+
+	<ItemGroup>
+		<Content Include="bpmn\**\*.bpmn">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
+		</Content>
+	</ItemGroup>
+
 </Project>

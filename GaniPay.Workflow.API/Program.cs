@@ -4,12 +4,16 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Zeebe.Client;
 
+// ✅ EK: HostedService + reflection için
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
 
 builder.Services.AddCors(options =>
 {
@@ -17,8 +21,8 @@ builder.Services.AddCors(options =>
     {
         policy
             .WithOrigins(
-                "http://localhost:8082", 
-                "https://localhost:8082" 
+                "http://localhost:8082",
+                "https://localhost:8082"
             )
             .AllowAnyHeader()
             .AllowAnyMethod();
@@ -47,6 +51,9 @@ builder.Services.AddSingleton<IZeebeClient>(_ =>
        .UsePlainText()
        .Build();
 });
+
+// ✅ EK: BPMN auto deploy (Docker restart sonrası otomatik deploy)
+builder.Services.AddHostedService<BpmnAutoDeployerHostedService>();
 
 // Variables serializer (Zeebe’ye JSON string basacağız)
 var zeebeJsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
@@ -647,3 +654,128 @@ public sealed record TransferResultCallback(
     string Message,
     object? Data
 );
+
+
+// ✅ EK: BPMN Auto Deployer (zb-client uyumsuzluklarını reflection ile bypass eder)
+public sealed class BpmnAutoDeployerHostedService : BackgroundService
+{
+    private readonly IServiceProvider _sp;
+    private readonly ILogger<BpmnAutoDeployerHostedService> _logger;
+
+    public BpmnAutoDeployerHostedService(IServiceProvider sp, ILogger<BpmnAutoDeployerHostedService> logger)
+    {
+        _sp = sp;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        const int maxAttempts = 60; // ~60 sn
+
+        for (int attempt = 1; attempt <= maxAttempts && !stoppingToken.IsCancellationRequested; attempt++)
+        {
+            try
+            {
+                using var scope = _sp.CreateScope();
+                var zeebe = scope.ServiceProvider.GetRequiredService<IZeebeClient>();
+
+                var bpmnDir = Path.Combine(AppContext.BaseDirectory, "bpmn");
+                if (!Directory.Exists(bpmnDir))
+                {
+                    _logger.LogWarning("BPMN folder not found: {Dir}", bpmnDir);
+                    return;
+                }
+
+                var files = Directory.GetFiles(bpmnDir, "*.bpmn", SearchOption.AllDirectories);
+                if (files.Length == 0)
+                {
+                    _logger.LogWarning("No BPMN files found under: {Dir}", bpmnDir);
+                    return;
+                }
+
+                // Deploy command'i runtime olarak çalıştıracağız
+                object cmd = zeebe.NewDeployCommand();
+
+                // AddResourceFile(string) varsa çağır
+                foreach (var f in files)
+                {
+                    var add = cmd.GetType().GetMethod("AddResourceFile", new[] { typeof(string) });
+                    if (add is null)
+                        throw new InvalidOperationException($"AddResourceFile(string) not found on {cmd.GetType().FullName}");
+
+                    var next = add.Invoke(cmd, new object[] { f });
+                    if (next is not null) cmd = next;
+                }
+
+                // Finalize: Send / SendRequest / SendAsync / SendRequestAsync
+                var send = FindSendMethod(cmd.GetType());
+                if (send is null)
+                    throw new InvalidOperationException($"No send method found on {cmd.GetType().FullName}");
+
+                object? taskObj;
+                var prms = send.GetParameters();
+
+                if (prms.Length == 1 && prms[0].ParameterType == typeof(CancellationToken))
+                    taskObj = send.Invoke(cmd, new object[] { stoppingToken });
+                else if (prms.Length == 0)
+                    taskObj = send.Invoke(cmd, Array.Empty<object>());
+                else
+                    throw new InvalidOperationException($"Unexpected send signature: {send.Name}({string.Join(",", prms.Select(p => p.ParameterType.Name))})");
+
+                if (taskObj is not Task t)
+                    throw new InvalidOperationException("Send method did not return a Task.");
+
+                await t.ConfigureAwait(false);
+
+                // Task<T> ise Result'ı güvenli oku
+                var resProp = t.GetType().GetProperty("Result");
+                var res = resProp?.GetValue(t);
+
+                var key = res?.GetType().GetProperty("Key")?.GetValue(res);
+                var processes = res?.GetType().GetProperty("Processes")?.GetValue(res) as System.Collections.ICollection;
+
+                _logger.LogInformation("✅ BPMN deployed. Key={Key} Processes={Count}", key ?? "?", processes?.Count ?? 0);
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "BPMN deploy attempt {Attempt}/{Max} failed. Retrying...", attempt, maxAttempts);
+                await Task.Delay(1000, stoppingToken);
+            }
+        }
+
+        _logger.LogError("❌ BPMN deploy failed after retries.");
+    }
+
+    private static MethodInfo? FindSendMethod(Type t)
+    {
+        var names = new[] { "Send", "SendRequest", "SendAsync", "SendRequestAsync" };
+
+        // önce CancellationToken alan overload'u seç
+        foreach (var name in names)
+        {
+            var ct = t.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                .FirstOrDefault(x =>
+                    x.Name == name &&
+                    typeof(Task).IsAssignableFrom(x.ReturnType) &&
+                    x.GetParameters().Length == 1 &&
+                    x.GetParameters()[0].ParameterType == typeof(CancellationToken));
+
+            if (ct is not null) return ct;
+        }
+
+        // sonra parametresiz olanı seç
+        foreach (var name in names)
+        {
+            var m = t.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                .FirstOrDefault(x =>
+                    x.Name == name &&
+                    typeof(Task).IsAssignableFrom(x.ReturnType) &&
+                    x.GetParameters().Length == 0);
+
+            if (m is not null) return m;
+        }
+
+        return null;
+    }
+}
