@@ -14,11 +14,4 @@
 	</ItemGroup>
 
 
-	<ItemGroup>
-		<Content Include="bpmn\**\*.bpmn">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<CopyToPublishDirectory>Always</CopyToPublishDirectory>
-		</Content>
-	</ItemGroup>
-
 </Project>

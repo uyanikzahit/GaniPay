@@ -3,9 +3,9 @@ services:
   orchestration:
     image: camunda/camunda:${CAMUNDA_VERSION}
     ports:
-      - "26500:26500"   # Zeebe gRPC
-      - "9600:9600"     # Actuator
-      - "8081:8080"     # Operate + Tasklist (tek port)
+      - "26500:26500"   
+      - "9600:9600"    
+      - "8081:8080"     
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/9600'"]
